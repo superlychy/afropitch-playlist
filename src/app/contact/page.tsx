@@ -7,7 +7,7 @@ import { siteConfig } from "@/../config/site";
 
 export default function ContactPage() {
     return (
-        <div className="container mx-auto max-w-lg px-4 py-16 md:py-24">
+        <div className="w-full mx-auto max-w-lg px-4 py-16 md:py-24">
             <div className="text-center mb-8">
                 <h1 className="text-3xl font-bold text-white mb-2">Contact Us</h1>
                 <p className="text-gray-400">Have questions about your submission?</p>

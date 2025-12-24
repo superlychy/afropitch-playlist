@@ -8,7 +8,7 @@ export default function PricingPage() {
     const { currency, tiers } = pricingConfig;
 
     return (
-        <div className="container mx-auto max-w-6xl py-16 md:py-24 text-center">
+        <div className="w-full mx-auto max-w-6xl px-4 py-16 md:py-24 text-center">
             <div className="space-y-4 mb-16">
                 <h1 className="text-4xl font-bold tracking-tight text-white sm:text-5xl">
                     Choose Your Speed
@@ -18,7 +18,7 @@ export default function PricingPage() {
                 </p>
             </div>
 
-            <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+            <div className="flex flex-col md:flex-row justify-center gap-8 max-w-5xl mx-auto px-4">
                 {/* Standard Tier */}
                 <Card className="border-white/10 bg-black/40 backdrop-blur-md relative overflow-hidden flex flex-col">
                     <CardHeader>

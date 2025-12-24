@@ -3,7 +3,7 @@ import { ShieldCheck, UserCheck, BarChart } from "lucide-react";
 
 export default function TrustPage() {
     return (
-        <div className="container mx-auto max-w-4xl px-4 py-16 md:py-24 space-y-16">
+        <div className="w-full mx-auto max-w-4xl px-4 py-16 md:py-24 space-y-16">
             <div className="text-center space-y-4">
                 <h1 className="text-4xl font-bold tracking-tight text-white sm:text-5xl">
                     Trust & Safety
