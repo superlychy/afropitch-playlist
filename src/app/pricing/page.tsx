@@ -8,8 +8,8 @@ export default function PricingPage() {
     const { currency, tiers } = pricingConfig;
 
     return (
-        <div className="w-full mx-auto max-w-6xl px-4 py-16 md:py-24 text-center">
-            <div className="space-y-4 mb-16">
+        <div className="flex flex-col items-center justify-center min-h-[80vh] py-16 px-4">
+            <div className="text-center space-y-4 mb-16 max-w-2xl">
                 <h1 className="text-4xl font-bold tracking-tight text-white sm:text-5xl">
                     Choose Your Speed
                 </h1>
@@ -18,9 +18,9 @@ export default function PricingPage() {
                 </p>
             </div>
 
-            <div className="flex flex-col md:flex-row justify-center gap-8 max-w-5xl mx-auto px-4">
+            <div className="flex flex-col md:flex-row gap-8 justify-center items-stretch w-full max-w-5xl">
                 {/* Standard Tier */}
-                <Card className="border-white/10 bg-black/40 backdrop-blur-md relative overflow-hidden flex flex-col">
+                <Card className="flex-1 border-white/10 bg-black/40 backdrop-blur-md relative overflow-hidden flex flex-col max-w-md">
                     <CardHeader>
                         <CardTitle className="text-2xl mb-2">{tiers.standard.title}</CardTitle>
                         <CardDescription>{tiers.standard.description}</CardDescription>
@@ -50,7 +50,7 @@ export default function PricingPage() {
                 </Card>
 
                 {/* Express Tier */}
-                <Card className="border-green-500/30 bg-black/40 backdrop-blur-md shadow-[0_0_40px_rgba(22,163,74,0.1)] relative overflow-hidden flex flex-col">
+                <Card className="flex-1 border-green-500/30 bg-black/40 backdrop-blur-md shadow-[0_0_40px_rgba(22,163,74,0.1)] relative overflow-hidden flex flex-col max-w-md">
                     <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-green-500 to-orange-500" />
                     <div className="absolute top-4 right-4 bg-green-500 text-white text-xs font-bold px-2 py-1 rounded-full animate-pulse">
                         RECOMMENDED
@@ -85,7 +85,7 @@ export default function PricingPage() {
                 </Card>
             </div>
 
-            <p className="mt-12 text-sm text-gray-500">
+            <p className="mt-12 text-sm text-gray-400 text-center">
                 Secure payment via Paystack/Flutterwave (Coming soon). <br />
                 Accepted: Debit Card, Bank Transfer, USSD.
             </p>
