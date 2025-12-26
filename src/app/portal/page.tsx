@@ -135,10 +135,15 @@ export default function PortalPage() {
                                         <Input type="email" placeholder="artist@example.com" value={email} onChange={e => setEmail(e.target.value)} required />
                                     </div>
                                     <Button className="w-full bg-green-600 hover:bg-green-700 font-bold">
-                                        Login / Create Account
+                                        Login
                                     </Button>
                                 </form>
                             </CardContent>
+                            <CardFooter className="justify-center border-t border-white/5 pt-6">
+                                <p className="text-sm text-gray-400">
+                                    New here? <a href="/signup/artist" className="text-green-500 hover:underline">Create an Artist Account</a>
+                                </p>
+                            </CardFooter>
                         </Card>
                     </div>
                 )}

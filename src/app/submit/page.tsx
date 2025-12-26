@@ -12,7 +12,10 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { genres } from "@/../config/genres";
 import { pricingConfig } from "@/../config/pricing";
 import { curators, Playlist } from "@/../config/curators";
-import { Loader2, Music, CheckCircle, Wallet, CreditCard, User } from "lucide-react";
+import { Loader2, Music, CheckCircle, Wallet, CreditCard, User, Search } from "lucide-react";
+import dynamic from "next/dynamic";
+
+const PayWithPaystack = dynamic(() => import("@/components/PaystackButton"), { ssr: false });
 
 function SubmitForm() {
     const router = useRouter();
@@ -26,6 +29,7 @@ function SubmitForm() {
     // State for form fields
     const [tier, setTier] = useState("standard");
     const [selectedPlaylistIds, setSelectedPlaylistIds] = useState<string[]>([]);
+    const [playlistSearch, setPlaylistSearch] = useState("");
 
     // Load playlist from URL if present
     useEffect(() => {
@@ -158,22 +162,36 @@ function SubmitForm() {
                             <CardContent className="space-y-6">
                                 <div className="space-y-2">
                                     <Label>Select Playlists to Pitch</Label>
-                                    <div className="grid gap-3 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
-                                        {allPlaylists.map((p) => (
-                                            <div key={p.id}
-                                                onClick={() => togglePlaylist(p.id)}
-                                                className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-all ${selectedPlaylistIds.includes(p.id) ? 'bg-green-600/20 border-green-500' : 'bg-white/5 border-white/10 hover:border-white/30'}`}
-                                            >
-                                                <div className="flex items-center gap-3">
-                                                    <div className={`w-8 h-8 rounded ${p.coverImage} flex items-center justify-center`}><Music className="w-4 h-4 text-white" /></div>
-                                                    <div>
-                                                        <p className="font-bold text-sm text-white">{p.name}</p>
-                                                        <p className="text-xs text-gray-400">{p.genre} • {p.submissionFee === 0 ? "FREE" : "Paid"}</p>
+                                    <div className="relative mb-2">
+                                        <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-500" />
+                                        <Input
+                                            placeholder="Search playlists by name or genre..."
+                                            className="pl-9 bg-white/5 border-white/10"
+                                            value={playlistSearch}
+                                            onChange={(e) => setPlaylistSearch(e.target.value)}
+                                        />
+                                    </div>
+                                    <div className="grid gap-3 max-h-96 overflow-y-auto pr-2 custom-scrollbar">
+                                        {allPlaylists
+                                            .filter(p =>
+                                                p.name.toLowerCase().includes(playlistSearch.toLowerCase()) ||
+                                                p.genre.toLowerCase().includes(playlistSearch.toLowerCase())
+                                            )
+                                            .map((p) => (
+                                                <div key={p.id}
+                                                    onClick={() => togglePlaylist(p.id)}
+                                                    className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-all ${selectedPlaylistIds.includes(p.id) ? 'bg-green-600/20 border-green-500' : 'bg-white/5 border-white/10 hover:border-white/30'}`}
+                                                >
+                                                    <div className="flex items-center gap-3">
+                                                        <div className={`w-8 h-8 rounded ${p.coverImage} flex items-center justify-center`}><Music className="w-4 h-4 text-white" /></div>
+                                                        <div>
+                                                            <p className="font-bold text-sm text-white">{p.name}</p>
+                                                            <p className="text-xs text-gray-400">{p.genre} • {p.submissionFee === 0 ? "FREE" : "Paid"}</p>
+                                                        </div>
                                                     </div>
+                                                    {selectedPlaylistIds.includes(p.id) && <CheckCircle className="w-5 h-5 text-green-500" />}
                                                 </div>
-                                                {selectedPlaylistIds.includes(p.id) && <CheckCircle className="w-5 h-5 text-green-500" />}
-                                            </div>
-                                        ))}
+                                            ))}
                                     </div>
                                     {selectedPlaylistIds.length >= 2 && <p className="text-xs text-green-400 font-bold">Bulk discount applied!</p>}
                                 </div>
@@ -270,7 +288,23 @@ function SubmitForm() {
                                         </>
                                     ) : (
                                         <>
-                                            PAY {pricingConfig.currency}{total.toLocaleString()}
+                                            {paymentMethod === "direct" ? (
+                                                <div className="w-full">
+                                                    {/* We hide the default button and show Paystack when 'direct' is selected */}
+                                                    <PayWithPaystack
+                                                        email="user@test.com" // In real app, use form email state
+                                                        amount={total * 100} // Convert to Kobo
+                                                        onSuccess={(ref) => {
+                                                            setIsSubmitting(false);
+                                                            setIsSuccess(true);
+                                                            console.log("Payment success:", ref);
+                                                        }}
+                                                        onClose={() => setIsSubmitting(false)}
+                                                    />
+                                                </div>
+                                            ) : (
+                                                <span>PAY {pricingConfig.currency}{total.toLocaleString()}</span>
+                                            )}
                                         </>
                                     )}
                                 </Button>

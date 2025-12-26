@@ -2,9 +2,13 @@
 
 import React, { createContext, useContext, useState, useEffect } from "react";
 
-type UserRole = "artist" | "curator" | "admin" | null;
+import { supabase } from "@/lib/supabase";
+import { useRouter } from "next/navigation";
 
-interface User {
+export type UserRole = "artist" | "curator" | "admin" | null;
+
+export interface User {
+    id?: string;
     name: string;
     email: string;
     role: UserRole;
@@ -15,7 +19,7 @@ interface User {
 interface AuthContextType {
     user: User | null;
     isLoading: boolean;
-    login: (email: string, role: UserRole) => void;
+    login: (email: string, role: UserRole, name?: string) => Promise<void>;
     logout: () => void;
     loadFunds: (amount: number) => void;
     deductFunds: (amount: number) => boolean;
@@ -28,43 +32,78 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
     const [isLoading, setIsLoading] = useState(true);
 
-    // Load from local storage for persistence across reloads
-    useEffect(() => {
-        const stored = localStorage.getItem("afropitch_user");
-        if (stored) {
-            setUser(JSON.parse(stored));
-        }
-        setIsLoading(false);
-    }, []);
+    const router = useRouter();
 
+    // Load session from Supabase on mount
     useEffect(() => {
-        if (user) {
-            localStorage.setItem("afropitch_user", JSON.stringify(user));
-        } else {
-            localStorage.removeItem("afropitch_user");
-        }
-    }, [user]);
+        const getSession = async () => {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session?.user) {
+                // Determine role based on email or metadata (mock for now)
+                const role = session.user.email?.includes("curator") ? "curator" : "artist";
 
-    const login = (email: string, role: UserRole) => {
-        // Mock login logic
-        const newUser: User = {
-            name: email.split("@")[0],
-            email,
-            role,
-            balance: role === "artist" ? 0 : 0,
-            earnings: 0,
+                setUser({
+                    id: session.user.id,
+                    name: session.user.user_metadata?.full_name || session.user.email?.split("@")[0] || "User",
+                    email: session.user.email || "",
+                    role: role as UserRole,
+                    balance: 0,
+                    earnings: 0
+                });
+            }
+            setIsLoading(false);
         };
 
-        // Simulate pre-loaded curated data for demo
-        if (role === "curator") {
-            newUser.name = "Lagos Vibes Team";
-            newUser.earnings = 15000;
-        }
+        getSession();
 
-        setUser(newUser);
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+            if (session?.user) {
+                const role = session.user.email?.includes("curator") ? "curator" : "artist";
+                setUser({
+                    id: session.user.id,
+                    name: session.user.user_metadata?.full_name || session.user.email?.split("@")[0] || "User",
+                    email: session.user.email || "",
+                    role: role as UserRole,
+                    balance: 0,
+                    earnings: 0
+                });
+            } else {
+                setUser(null);
+            }
+            setIsLoading(false);
+        });
+
+        return () => subscription.unsubscribe();
+    }, []);
+
+    const login = async (email: string, role: UserRole, name?: string) => {
+        setIsLoading(true);
+        // Supabase Magic Link Login
+        const { error } = await supabase.auth.signInWithOtp({
+            email,
+            options: {
+                // Redirect back to the portal page after login
+                emailRedirectTo: `${window.location.origin}/portal`,
+                data: {
+                    full_name: name,
+                    role: role
+                }
+            },
+        });
+
+        if (error) {
+            alert("Error logging in: " + error.message);
+        } else {
+            alert("Check your email for the login link! (For testing, check Supabase dashboard)");
+        }
+        setIsLoading(false);
     };
 
-    const logout = () => setUser(null);
+    const logout = async () => {
+        await supabase.auth.signOut();
+        setUser(null);
+        router.push("/portal");
+    };
 
     const loadFunds = (amount: number) => {
         if (!user) return;
