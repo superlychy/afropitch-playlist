@@ -11,9 +11,22 @@ import { Select } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { genres } from "@/../config/genres";
 import { pricingConfig } from "@/../config/pricing";
-import { curators, Playlist } from "@/../config/curators";
+// Calculations
+// Calculations moved inside components
 import { Loader2, Music, CheckCircle, Wallet, CreditCard, User, Search } from "lucide-react";
 import dynamic from "next/dynamic";
+import { supabase } from "@/lib/supabase";
+
+interface Playlist {
+    id: string;
+    name: string;
+    genre: string;
+    followers: number;
+    description: string;
+    coverImage: string;
+    submissionFee: number;
+    type: "regular" | "exclusive";
+}
 
 const PayWithPaystack = dynamic(() => import("@/components/PaystackButton"), { ssr: false });
 
@@ -30,6 +43,35 @@ function SubmitForm() {
     const [tier, setTier] = useState("standard");
     const [selectedPlaylistIds, setSelectedPlaylistIds] = useState<string[]>([]);
     const [playlistSearch, setPlaylistSearch] = useState("");
+    const [allPlaylists, setAllPlaylists] = useState<Playlist[]>([]);
+    const [isLoadingPlaylists, setIsLoadingPlaylists] = useState(true);
+
+    // Fetch playlists from Supabase
+    useEffect(() => {
+        const fetchPlaylists = async () => {
+            const { data, error } = await supabase
+                .from('playlists')
+                .select('*')
+                .eq('is_active', true);
+
+            if (data) {
+                // Map DB snake_case to frontend camelCase
+                const mapped = data.map((p: any) => ({
+                    id: p.id,
+                    name: p.name,
+                    genre: p.genre,
+                    followers: p.followers,
+                    description: p.description,
+                    coverImage: p.cover_image,
+                    submissionFee: p.submission_fee,
+                    type: p.type
+                }));
+                setAllPlaylists(mapped);
+            }
+            setIsLoadingPlaylists(false);
+        };
+        fetchPlaylists();
+    }, []);
 
     // Load playlist from URL if present
     useEffect(() => {
@@ -43,7 +85,7 @@ function SubmitForm() {
 
     // Calculations
     const selectedTierConfig = pricingConfig.tiers[tier as keyof typeof pricingConfig.tiers];
-    const allPlaylists = curators.flatMap(c => c.playlists);
+    // const allPlaylists = curators.flatMap(c => c.playlists); // Removed mock fetch
 
     const togglePlaylist = (id: string) => {
         setSelectedPlaylistIds(prev =>

@@ -3,7 +3,7 @@ create extension if not exists "uuid-ossp";
 
 -- 1. PROFILES TABLE (Public user data)
 create table public.profiles (
-  id uuid references auth.users on delete cascade primary key,
+  id uuid primary key,
   email text,
   full_name text,
   role text check (role in ('artist', 'curator', 'admin')) default 'artist',

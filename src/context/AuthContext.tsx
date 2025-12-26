@@ -36,40 +36,85 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Load session from Supabase on mount
     useEffect(() => {
+        const syncProfile = async (session: any) => {
+            if (session?.user) {
+                try {
+                    // 1. Try to fetch existing profile
+                    const { data: profile, error } = await supabase
+                        .from('profiles')
+                        .select('*')
+                        .eq('id', session.user.id)
+                        .single();
+
+                    if (profile) {
+                        setUser({
+                            id: profile.id,
+                            name: profile.full_name || session.user.email?.split("@")[0] || "User",
+                            email: profile.email || session.user.email || "",
+                            role: (profile.role as UserRole) || "artist",
+                            balance: profile.balance || 0,
+                            earnings: 0 // In real app, this might be separate table or field
+                        });
+                        return;
+                    }
+
+                    // 2. If no profile, create one (First time login)
+                    const role = session.user.user_metadata?.role || (session.user.email?.includes("curator") ? "curator" : "artist");
+                    const name = session.user.user_metadata?.full_name || session.user.email?.split("@")[0] || "User";
+
+                    const newProfile = {
+                        id: session.user.id,
+                        email: session.user.email,
+                        full_name: name,
+                        role: role,
+                        balance: 0,
+                        verified: false
+                    };
+
+                    const { error: insertError } = await supabase
+                        .from('profiles')
+                        .insert([newProfile]);
+
+                    if (!insertError) {
+                        setUser({
+                            id: newProfile.id,
+                            name: newProfile.full_name,
+                            email: newProfile.email || "",
+                            role: newProfile.role as UserRole,
+                            balance: newProfile.balance,
+                            earnings: 0
+                        });
+                    } else {
+                        console.error("Error creating profile:", insertError);
+                        // Fallback to session data
+                        setUser({
+                            id: session.user.id,
+                            name: name,
+                            email: session.user.email || "",
+                            role: role as UserRole,
+                            balance: 0,
+                            earnings: 0
+                        });
+                    }
+
+                } catch (e) {
+                    console.error("Profile sync error", e);
+                }
+            } else {
+                setUser(null);
+            }
+        };
+
         const getSession = async () => {
             const { data: { session } } = await supabase.auth.getSession();
-            if (session?.user) {
-                // Determine role based on email or metadata (mock for now)
-                const role = session.user.email?.includes("curator") ? "curator" : "artist";
-
-                setUser({
-                    id: session.user.id,
-                    name: session.user.user_metadata?.full_name || session.user.email?.split("@")[0] || "User",
-                    email: session.user.email || "",
-                    role: role as UserRole,
-                    balance: 0,
-                    earnings: 0
-                });
-            }
+            await syncProfile(session);
             setIsLoading(false);
         };
 
         getSession();
 
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-            if (session?.user) {
-                const role = session.user.email?.includes("curator") ? "curator" : "artist";
-                setUser({
-                    id: session.user.id,
-                    name: session.user.user_metadata?.full_name || session.user.email?.split("@")[0] || "User",
-                    email: session.user.email || "",
-                    role: role as UserRole,
-                    balance: 0,
-                    earnings: 0
-                });
-            } else {
-                setUser(null);
-            }
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+            await syncProfile(session);
             setIsLoading(false);
         });
 
