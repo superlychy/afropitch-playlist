@@ -17,9 +17,7 @@ export default function PortalPage() {
     // Login State
     const [email, setEmail] = useState("");
 
-    // Verification State
-    const [isChecking, setIsChecking] = useState(false);
-    const [verifyResult, setVerifyResult] = useState<"success" | "error" | null>(null);
+
 
     const handleLogin = (e: React.FormEvent) => {
         e.preventDefault();
@@ -31,17 +29,7 @@ export default function PortalPage() {
         }
     };
 
-    const handleVerify = (e: React.FormEvent) => {
-        e.preventDefault();
-        setIsChecking(true);
-        setVerifyResult(null);
 
-        // Mock API
-        setTimeout(() => {
-            setIsChecking(false);
-            setVerifyResult(Math.random() > 0.3 ? "success" : "error");
-        }, 2000);
-    };
 
     if (user) {
         return (
@@ -88,39 +76,7 @@ export default function PortalPage() {
                 {/* ARTIST TAB - LOGIN & VERIFY */}
                 {activeTab === "artist" && (
                     <div className="space-y-8">
-                        {/* Quick Verification (No Login Needed) */}
-                        <Card className="border-green-500/20 bg-black/40">
-                            <CardHeader>
-                                <CardTitle className="flex items-center gap-2">
-                                    <ShieldCheck className="w-5 h-5 text-green-500" /> Quick Verification
-                                </CardTitle>
-                                <CardDescription>Check song placement without logging in.</CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                <form onSubmit={handleVerify} className="space-y-4">
-                                    <div className="space-y-2">
-                                        <Input placeholder="Song Link..." required />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Input placeholder="Playlist Link..." required />
-                                    </div>
-                                    <Button className="w-full bg-white/10 hover:bg-white/20" disabled={isChecking}>
-                                        {isChecking ? "Checking..." : "Verify & Release Funds"}
-                                    </Button>
-                                    {verifyResult === "success" && (
-                                        <p className="text-green-500 text-sm font-bold flex items-center gap-2"><CheckCircle className="w-4 h-4" /> Verified!</p>
-                                    )}
-                                    {verifyResult === "error" && (
-                                        <p className="text-red-500 text-sm font-bold flex items-center gap-2"><AlertCircle className="w-4 h-4" /> Not Found</p>
-                                    )}
-                                </form>
-                            </CardContent>
-                        </Card>
 
-                        <div className="relative">
-                            <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-white/10"></span></div>
-                            <div className="relative flex justify-center text-xs uppercase"><span className="bg-background px-2 text-gray-400">OR LOGIN TO DASHBOARD</span></div>
-                        </div>
 
                         {/* Login Form */}
                         <Card className="border-white/10 bg-black/40">
