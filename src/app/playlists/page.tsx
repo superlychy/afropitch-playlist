@@ -18,6 +18,7 @@ export default function PlaylistsPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
     const [selectedGenre, setSelectedGenre] = useState("All");
+    const [usingMockData, setUsingMockData] = useState(false);
 
     const genres = ["All", "Afrobeats", "Amapiano", "Hip Hop", "RnB", "Pop", "Alternative"]; // Add more as needed
 
@@ -38,13 +39,16 @@ export default function PlaylistsPage() {
                     .eq('role', 'curator');
 
                 const timeoutPromise = new Promise((_, reject) =>
-                    setTimeout(() => reject(new Error("Request timed out")), 5000)
+                    setTimeout(() => reject(new Error("Request timed out")), 15000)
                 );
 
                 const [plResult, curResult] = await Promise.allSettled([
                     Promise.race([fetchPlaylistsPromise, timeoutPromise]),
                     Promise.race([fetchCuratorsPromise, timeoutPromise])
                 ]);
+
+                console.log("Playlists Fetch Result:", plResult);
+                console.log("Curators Fetch Result:", curResult);
 
                 // Handle Playlists Result
                 if (plResult.status === 'fulfilled' && (plResult.value as any).data) {
@@ -56,6 +60,7 @@ export default function PlaylistsPage() {
                     setPlaylists(mapped);
                 } else {
                     console.error("Playlists fetch failed or timed out", plResult);
+                    setUsingMockData(true);
                     // Fallback Mock Data for testing if backend fails
                     setPlaylists([
                         { id: '1', name: 'Afro Hits', description: 'Top Afrobeat hits. 50 songs', followers: 1200, cover_image: null, genre: 'Afrobeats', submission_fee: 3000, songCount: '50' },
@@ -98,6 +103,12 @@ export default function PlaylistsPage() {
 
     return (
         <div className="w-full mx-auto max-w-7xl px-4 py-16 md:py-24 min-h-screen">
+            {usingMockData && (
+                <div className="mb-8 p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-lg flex items-center justify-center gap-2 text-yellow-500">
+                    <span className="font-bold">⚠️ Demo Mode:</span>
+                    <span>Connection to database failed. Showing example data.</span>
+                </div>
+            )}
             <div className="text-center mb-12 space-y-4">
                 <h1 className="text-4xl font-bold tracking-tight text-white sm:text-5xl">
                     Discover <span className="text-green-500">Music</span>
