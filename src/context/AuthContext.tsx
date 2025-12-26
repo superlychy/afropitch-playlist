@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from "react";
 
-type UserRole = "artist" | "curator" | null;
+type UserRole = "artist" | "curator" | "admin" | null;
 
 interface User {
     name: string;
@@ -14,6 +14,7 @@ interface User {
 
 interface AuthContextType {
     user: User | null;
+    isLoading: boolean;
     login: (email: string, role: UserRole) => void;
     logout: () => void;
     loadFunds: (amount: number) => void;
@@ -25,6 +26,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
 
     // Load from local storage for persistence across reloads
     useEffect(() => {
@@ -32,6 +34,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (stored) {
             setUser(JSON.parse(stored));
         }
+        setIsLoading(false);
     }, []);
 
     useEffect(() => {
@@ -80,7 +83,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     return (
-        <AuthContext.Provider value={{ user, login, logout, loadFunds, deductFunds, addEarnings }}>
+        <AuthContext.Provider value={{ user, isLoading, login, logout, loadFunds, deductFunds, addEarnings }}>
             {children}
         </AuthContext.Provider>
     );

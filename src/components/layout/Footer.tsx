@@ -10,7 +10,7 @@ export function Footer() {
                         <h3 className="text-xl font-bold text-white">AfroPitch Playlist</h3>
                         <p className="text-gray-400 text-sm">
                             Helping Afro-based artists get heard. Trusted playlist reviews and
-                            pitches powered by AntiGravity.
+                            pitches.
                         </p>
                     </div>
                     <div>
@@ -77,7 +77,7 @@ export function Footer() {
                 <div className="mt-8 pt-8 border-t border-white/10 text-center text-gray-500 text-sm">
                     <p>
                         &copy; {new Date().getFullYear()} {siteConfig.name}. All rights
-                        reserved. Powered by AntiGravity.
+                        reserved.
                     </p>
                 </div>
             </div>

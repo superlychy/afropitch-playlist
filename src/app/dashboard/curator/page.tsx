@@ -5,19 +5,27 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { DollarSign, CheckCircle, XCircle, Clock } from "lucide-react";
+import { DollarSign, CheckCircle, XCircle, Clock, Settings, User } from "lucide-react";
 import { pricingConfig } from "@/../config/pricing";
+import { Plus, ListMusic, MoreVertical } from "lucide-react";
+
+// Mock Playlists for the dashboard
+const MY_PLAYLISTS = [
+    { id: 1, name: "Afro Hits 2024", followers: 15400, submissions: 12 },
+    { id: 2, name: "Underground Vibes", followers: 8200, submissions: 5 },
+];
 
 export default function CuratorDashboard() {
-    const { user } = useAuth();
+    const { user, isLoading } = useAuth();
     const router = useRouter();
 
     useEffect(() => {
-        if (!user || user.role !== "curator") {
+        if (!isLoading && (!user || user.role !== "curator")) {
             router.push("/portal");
         }
-    }, [user, router]);
+    }, [user, isLoading, router]);
 
+    if (isLoading) return <div className="p-8 text-center text-gray-500">Loading dashboard...</div>;
     if (!user) return null;
 
     // Mock Data (Simulate mixed tier and discounted submissions)
@@ -37,9 +45,14 @@ export default function CuratorDashboard() {
                     <h1 className="text-3xl font-bold text-white">Dashboard</h1>
                     <p className="text-gray-400">Welcome back, <span className="text-green-500">{user.name}</span></p>
                 </div>
-                <div className="text-right">
-                    <span className="block text-sm text-gray-400">Net Earnings</span>
-                    <span className="text-3xl font-bold text-white">{pricingConfig.currency}{user.earnings.toLocaleString()}</span>
+                <div className="text-right flex items-center gap-4">
+                    <div>
+                        <span className="block text-sm text-gray-400">Net Earnings</span>
+                        <span className="text-3xl font-bold text-white">{pricingConfig.currency}{user.earnings.toLocaleString()}</span>
+                    </div>
+                    <Button variant="outline" size="icon" className="border-white/10 hover:bg-white/10" title="Manage Profile">
+                        <Settings className="w-5 h-5 text-gray-400" />
+                    </Button>
                 </div>
             </div>
 
@@ -69,6 +82,35 @@ export default function CuratorDashboard() {
                         <div className="text-2xl font-bold text-white">4.2 Hrs</div>
                     </CardContent>
                 </Card>
+            </div>
+
+            {/* My Playlists Section */}
+            <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-bold text-white">My Playlists</h2>
+                <Button onClick={() => alert("Add Playlist Modal showing...")} className="bg-white text-black hover:bg-gray-200">
+                    <Plus className="w-4 h-4 mr-2" /> Add Playlist
+                </Button>
+            </div>
+            <div className="grid md:grid-cols-2 gap-4 mb-12">
+                {MY_PLAYLISTS.map((pl) => (
+                    <Card key={pl.id} className="bg-white/5 border-none">
+                        <CardContent className="p-4 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="w-12 h-12 bg-gray-800 rounded flex items-center justify-center">
+                                    <ListMusic className="w-6 h-6 text-gray-400" />
+                                </div>
+                                <div>
+                                    <p className="font-bold text-white">{pl.name}</p>
+                                    <p className="text-sm text-gray-400">{pl.followers.toLocaleString()} Followers</p>
+                                </div>
+                            </div>
+                            <div className="text-right">
+                                <span className="block font-bold text-green-500">{pl.submissions}</span>
+                                <span className="text-xs text-gray-500">Active Submissions</span>
+                            </div>
+                        </CardContent>
+                    </Card>
+                ))}
             </div>
 
             <h2 className="text-xl font-bold text-white mb-4">Pending Reviews</h2>

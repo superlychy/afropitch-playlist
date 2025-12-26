@@ -13,6 +13,11 @@ export interface Curator {
     name: string;
     bio: string;
     verified: boolean;
+    socials?: {
+        instagram?: string;
+        twitter?: string;
+        website?: string;
+    };
     playlists: Playlist[];
 }
 
@@ -22,6 +27,11 @@ export const curators: Curator[] = [
         name: "Lagos Vibes Team",
         bio: "We curate the hottest sounds coming out of Lagos. From mainland to island.",
         verified: true,
+        socials: {
+            instagram: "lagosvibes",
+            twitter: "lagosvibes_ng",
+            website: "https://lagosvibes.com"
+        },
         playlists: [
             {
                 id: "pl_1",
@@ -48,6 +58,10 @@ export const curators: Curator[] = [
         name: "Amapiano Central",
         bio: "Strictly Piano. If it doesn't verify the log drum, we don't want it.",
         verified: true,
+        socials: {
+            instagram: "amapianocentral",
+            website: "https://amapiano.co.za"
+        },
         playlists: [
             {
                 id: "pl_3",

@@ -54,7 +54,7 @@ export default function Home() {
       <section className="w-full border-y border-white/5 bg-white/[0.02] py-8">
         <div className="max-w-7xl mx-auto px-4 text-center">
           <p className="text-sm font-medium text-gray-500 uppercase tracking-widest mb-6">
-            Powered by AntiGravity • Trusted by Artists
+            Trusted by Artists
           </p>
           <div className="flex flex-wrap justify-center gap-8 md:gap-16 opacity-50 grayscale hover:grayscale-0 transition-all duration-500">
             {/* Placeholders for logos if needed, for now just text or icons */}
@@ -86,7 +86,7 @@ export default function Home() {
               "Strictly for Afro genres (Afrobeats, Amapiano, etc.)",
               "Direct feedback from real curators",
               "Honest pricing - no hidden fees",
-              "Secure platform powered by AntiGravity"
+              "Secure platform"
             ].map((item, i) => (
               <li key={i} className="flex items-start gap-3">
                 <div className="mt-1 min-w-5 min-h-5 rounded-full bg-green-500/20 text-green-500 flex items-center justify-center">

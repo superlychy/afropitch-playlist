@@ -8,7 +8,7 @@ export default function PricingPage() {
     const { currency, tiers } = pricingConfig;
 
     return (
-        <div className="flex flex-col items-center justify-center min-h-[80vh] py-16 px-4">
+        <div className="w-full mx-auto max-w-7xl px-4 py-16 md:py-24 flex flex-col items-center justify-center min-h-[80vh]">
             <div className="text-center space-y-4 mb-16 max-w-2xl">
                 <h1 className="text-4xl font-bold tracking-tight text-white sm:text-5xl">
                     Choose Your Speed

@@ -8,15 +8,7 @@ import { BadgeCheck, Music2, Users, ArrowRight } from "lucide-react";
 import Link from "next/link";
 
 export default function CuratorsPage() {
-    const [selectedCurator, setSelectedCurator] = useState<string | null>(null);
 
-    const toggleCurator = (id: string) => {
-        if (selectedCurator === id) {
-            setSelectedCurator(null);
-        } else {
-            setSelectedCurator(id);
-        }
-    };
 
     return (
         <div className="w-full mx-auto max-w-7xl px-4 py-16 md:py-24">
@@ -33,8 +25,7 @@ export default function CuratorsPage() {
                 {curators.map((curator) => (
                     <div key={curator.id} className="space-y-4">
                         <Card
-                            className={`cursor-pointer transition-all border-white/10 bg-black/40 hover:border-green-500/50 ${selectedCurator === curator.id ? 'ring-2 ring-green-500' : ''}`}
-                            onClick={() => toggleCurator(curator.id)}
+                            className="cursor-pointer transition-all border-white/10 bg-black/40 hover:border-green-500/50 hover:shadow-lg hover:shadow-green-900/10"
                         >
                             <CardHeader className="pb-2">
                                 <div className="flex items-center justify-between">
@@ -58,39 +49,13 @@ export default function CuratorsPage() {
                                 </div>
                             </CardContent>
                             <CardFooter className="pt-0">
-                                <Button variant="ghost" className="w-full text-green-400 hover:text-green-300 hover:bg-green-400/10">
-                                    {selectedCurator === curator.id ? "Hide Playlists" : "View Playlists"}
-                                </Button>
+                                <Link href={`/curators/${curator.id}`} className="w-full">
+                                    <Button variant="ghost" className="w-full text-green-400 hover:text-green-300 hover:bg-green-400/10 group">
+                                        View Profile <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
+                                    </Button>
+                                </Link>
                             </CardFooter>
                         </Card>
-
-                        {/* Expanded Playlist View */}
-                        {selectedCurator === curator.id && (
-                            <div className="ml-4 space-y-3 border-l-2 border-green-500/20 pl-4 animate-in slide-in-from-top-2 duration-200">
-                                {curator.playlists.map((playlist) => (
-                                    <Card key={playlist.id} className="bg-white/5 border-none">
-                                        <CardContent className="p-4 flex items-center justify-between gap-4">
-                                            <div className="flex items-center gap-3 overflow-hidden">
-                                                <div className={`w-10 h-10 rounded shrink-0 ${playlist.coverImage} flex items-center justify-center`}>
-                                                    <Music2 className="w-5 h-5 text-white/50" />
-                                                </div>
-                                                <div>
-                                                    <p className="font-semibold text-white text-sm truncate">{playlist.name}</p>
-                                                    <p className="text-xs text-gray-400 flex items-center gap-2">
-                                                        <span>{playlist.genre}</span> • <span className="flex items-center gap-0.5"><Users className="w-3 h-3" /> {playlist.followers.toLocaleString()}</span>
-                                                    </p>
-                                                </div>
-                                            </div>
-                                            <Link href={`/submit?playlist=${playlist.id}`}>
-                                                <Button size="sm" className="bg-white/10 hover:bg-green-600 text-white shrink-0">
-                                                    Pitch <ArrowRight className="w-3 h-3 ml-1" />
-                                                </Button>
-                                            </Link>
-                                        </CardContent>
-                                    </Card>
-                                ))}
-                            </div>
-                        )}
                     </div>
                 ))}
             </div>

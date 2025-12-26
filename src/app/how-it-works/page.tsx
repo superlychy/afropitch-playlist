@@ -67,6 +67,28 @@ export default function HowItWorksPage() {
                 ))}
             </div>
 
+            {/* Money-back Guarantee / Escrow Info */}
+            <div className="mt-16 bg-blue-500/10 border border-blue-500/20 rounded-2xl p-8 md:p-12 relative overflow-hidden">
+                <div className="relative z-10 flex flex-col md:flex-row items-center gap-8 md:gap-12">
+                    <div className="bg-blue-500/20 p-4 rounded-full shrink-0">
+                        <CreditCard className="w-8 h-8 text-blue-400" />
+                    </div>
+                    <div className="space-y-4 text-center md:text-left">
+                        <h2 className="text-2xl md:text-3xl font-bold text-white">100% Money-Back Guarantee</h2>
+                        <p className="text-gray-300 text-lg leading-relaxed">
+                            Your funds are held in <span className="text-white font-bold">Escrow</span> until the curator reviews your song.
+                            <br className="hidden md:block" />
+                            If your song is active on a playlist but not showing, or if you are declined, the submission fee is automatically returned to your wallet.
+                        </p>
+                        <div className="flex flex-wrap gap-4 justify-center md:justify-start text-sm font-medium text-blue-300">
+                            <span className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-blue-500" /> No Risk</span>
+                            <span className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-blue-500" /> Instant Refund</span>
+                            <span className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-blue-500" /> Secure</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div className="mt-16 text-center bg-white/5 rounded-2xl p-8 border border-white/10">
                 <h3 className="text-2xl font-bold text-white mb-4">Ready to be heard?</h3>
                 <p className="text-gray-400 mb-8 max-w-md mx-auto">

@@ -82,6 +82,33 @@ export default function JoinCuratorsPage() {
                             <p className="text-xs text-gray-500">We verify ownership before approval.</p>
                         </div>
 
+                        {/* Socials Section */}
+                        <div className="space-y-4 pt-4 border-t border-white/10">
+                            <h3 className="text-lg font-semibold text-white">Social Profiles (Optional)</h3>
+                            <p className="text-sm text-gray-400 -mt-3">Help artists find and verify you.</p>
+
+                            <div className="grid md:grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="instagram">Instagram Username</Label>
+                                    <div className="relative">
+                                        <span className="absolute left-3 top-3 text-gray-500 text-sm">@</span>
+                                        <Input id="instagram" className="pl-8" placeholder="username" />
+                                    </div>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="twitter">Twitter/X Username</Label>
+                                    <div className="relative">
+                                        <span className="absolute left-3 top-3 text-gray-500 text-sm">@</span>
+                                        <Input id="twitter" className="pl-8" placeholder="username" />
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="website">Website / Portfolio</Label>
+                                <Input id="website" placeholder="https://..." />
+                            </div>
+                        </div>
+
                         <Button
                             type="submit"
                             className="w-full bg-white text-black hover:bg-gray-200 text-lg py-6 font-bold"

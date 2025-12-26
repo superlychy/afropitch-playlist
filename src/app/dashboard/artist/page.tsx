@@ -8,18 +8,44 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Wallet, Plus, CreditCard, History } from "lucide-react";
 import { pricingConfig } from "@/../config/pricing";
+import { Copy, ExternalLink, BarChart3, TrendingUp, AlertCircle } from "lucide-react";
+
+// Mock Data for Dashboard
+const MOCK_PLACEMENTS = [
+    {
+        id: "sub_1",
+        song: "Amapiano Vibes",
+        curator: "Lagos Heat",
+        status: "Approved",
+        date: "2 days ago",
+        trackingSlug: "amapiano-vibes-sub1",
+        clicks: 142,
+        earnings: null
+    },
+    {
+        id: "sub_2",
+        song: "My Hit Song",
+        curator: "Nairobi Drill",
+        status: "Pending",
+        date: "1 hour ago",
+        trackingSlug: null,
+        clicks: 0,
+        earnings: -5000
+    }
+];
 
 export default function ArtistDashboard() {
-    const { user, loadFunds } = useAuth();
+    const { user, loadFunds, isLoading } = useAuth();
     const router = useRouter();
     const [amount, setAmount] = useState("");
 
     useEffect(() => {
-        if (!user || user.role !== "artist") {
+        if (!isLoading && (!user || user.role !== "artist")) {
             router.push("/portal");
         }
-    }, [user, router]);
+    }, [user, isLoading, router]);
 
+    if (isLoading) return <div className="p-8 text-center text-gray-500">Loading dashboard...</div>;
     if (!user) return null;
 
     const handleLoadFunds = (e: React.FormEvent) => {
@@ -100,31 +126,86 @@ export default function ArtistDashboard() {
                         <History className="w-5 h-5 text-gray-500" /> Recent Activity
                     </h3>
 
-                    <div className="space-y-3">
-                        {/* Mock History Item */}
-                        <div className="bg-white/5 rounded-lg p-4 flex items-center justify-between">
-                            <div>
-                                <p className="font-bold text-white">Submitted "My Hit Song"</p>
-                                <p className="text-xs text-gray-400">To: Lagos Vibes Team • Express Tier</p>
+                    <div className="space-y-4">
+                        {MOCK_PLACEMENTS.map((item) => (
+                            <div key={item.id} className="bg-white/5 rounded-lg p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                <div>
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <p className="font-bold text-white">{item.song}</p>
+                                        <span className={`text-[10px] px-2 py-0.5 rounded-full border ${item.status === 'Approved'
+                                            ? 'bg-green-500/10 border-green-500 text-green-500'
+                                            : 'bg-yellow-500/10 border-yellow-500 text-yellow-500'
+                                            }`}>
+                                            {item.status}
+                                        </span>
+                                    </div>
+
+                                    {/* GAMIFICATION PROMPT */}
+                                    {item.status === 'Approved' && (
+                                        <div className="mt-4 p-3 rounded bg-blue-500/10 border border-blue-500/20 text-xs text-blue-200">
+                                            <p className="font-bold flex items-center gap-2 mb-1">
+                                                <TrendingUp className="w-3 h-3 text-blue-400" />
+                                                Boost Your Ranking!
+                                            </p>
+                                            <p className="opacity-80">
+                                                Share this link with your fans. The more people <strong>click, save, and follow</strong>, the higher your song moves up the playlist automatically.
+                                                <br />
+                                                <em>Currently ranking: Top 20%</em>
+                                            </p>
+                                        </div>
+                                    )}
+                                    <p className="text-xs text-gray-400">To: {item.curator} • {item.date}</p>
+
+                                    {/* Tracking Link Section for Approved Songs */}
+                                    {item.status === 'Approved' && (
+                                        <div className="mt-3 p-2 bg-black/40 rounded border border-white/5 flex items-center gap-3">
+                                            <div className="flex items-center gap-2 text-xs text-blue-400">
+                                                <BarChart3 className="w-3 h-3" />
+                                                <span className="font-mono">{item.clicks} clicks</span>
+                                            </div>
+                                            <div className="h-4 w-px bg-white/10"></div>
+                                            <code className="text-[10px] text-gray-400 font-mono">afropitch.com/listen/{item.trackingSlug}</code>
+                                            <Button variant="ghost" size="icon" className="h-5 w-5 text-gray-500 hover:text-white"
+                                                onClick={() => navigator.clipboard.writeText(`https://afropitch.com/listen/${item.trackingSlug}`)}
+                                                title="Copy Tracking Link"
+                                            >
+                                                <Copy className="w-3 h-3" />
+                                            </Button>
+                                        </div>
+                                    )}
+
+                                    {/* Report Issue Button */}
+                                    {item.status === 'Approved' && (
+                                        <div className="mt-2 text-right sm:text-left">
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="text-red-400 hover:text-red-300 hover:bg-red-400/10 h-6 px-2 text-[10px]"
+                                                onClick={() => alert("Report received. Our support team will verify if your song is on the playlist within 2 hours.")}
+                                            >
+                                                <AlertCircle className="w-3 h-3 mr-1.5" />
+                                                Report Missing Song
+                                            </Button>
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="text-right min-w-[100px]">
+                                    {item.earnings ? (
+                                        <span className={`block font-bold ${item.earnings > 0 ? 'text-green-500' : 'text-white'}`}>
+                                            {item.earnings > 0 ? '+' : ''}{pricingConfig.currency}{Math.abs(item.earnings).toLocaleString()}
+                                        </span>
+                                    ) : (
+                                        <span className="text-sm text-gray-500">PAID</span>
+                                    )}
+                                    <span className="text-xs text-gray-500 block">
+                                        {item.status === 'Approved' ? 'Active & Tracking' : 'Review in progess'}
+                                    </span>
+                                </div>
                             </div>
-                            <div className="text-right">
-                                <span className="block font-bold text-white">-{pricingConfig.currency}5,000</span>
-                                <span className="text-xs text-yellow-500">Pending Review</span>
-                            </div>
-                        </div>
-                        <div className="bg-white/5 rounded-lg p-4 flex items-center justify-between">
-                            <div>
-                                <p className="font-bold text-white">Wallet Top-up</p>
-                                <p className="text-xs text-gray-400">Via Paystack</p>
-                            </div>
-                            <div className="text-right">
-                                <span className="block font-bold text-green-500">+{pricingConfig.currency}10,000</span>
-                                <span className="text-xs text-gray-500">Success</span>
-                            </div>
-                        </div>
+                        ))}
                     </div>
                 </div>
             </div>
-        </div>
+        </div >
     );
 }
