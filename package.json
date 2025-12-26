@@ -15,11 +15,14 @@
     "@capacitor/ios": "^8.0.0",
     "@supabase/supabase-js": "^2.89.0",
     "clsx": "^2.1.1",
+    "cross-fetch": "^4.1.0",
+    "date-fns": "^4.1.0",
     "lucide-react": "^0.562.0",
     "next": "16.1.1",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-paystack": "^6.0.0",
+    "spotify-url-info": "^3.2.18",
     "tailwind-merge": "^3.4.0"
   },
   "devDependencies": {

@@ -19,7 +19,8 @@ export interface User {
 interface AuthContextType {
     user: User | null;
     isLoading: boolean;
-    login: (email: string, role: UserRole, name?: string) => Promise<void>;
+    login: (email: string, password: string) => Promise<void>;
+    signup: (email: string, password: string, role: UserRole, name: string) => Promise<void>;
     logout: () => void;
     loadFunds: (amount: number) => void;
     deductFunds: (amount: number) => boolean;
@@ -121,25 +122,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return () => subscription.unsubscribe();
     }, []);
 
-    const login = async (email: string, role: UserRole, name?: string) => {
+    const login = async (email: string, password: string) => {
         setIsLoading(true);
-        // Supabase Magic Link Login
-        const { error } = await supabase.auth.signInWithOtp({
+        const { error } = await supabase.auth.signInWithPassword({
             email,
-            options: {
-                // Redirect back to the portal page after login
-                emailRedirectTo: `${window.location.origin}/portal`,
-                data: {
-                    full_name: name,
-                    role: role
-                }
-            },
+            password
         });
 
         if (error) {
             alert("Error logging in: " + error.message);
+        }
+        setIsLoading(false);
+    };
+
+    const signup = async (email: string, password: string, role: UserRole, name: string) => {
+        setIsLoading(true);
+        const { error } = await supabase.auth.signUp({
+            email,
+            password,
+            options: {
+                data: {
+                    full_name: name,
+                    role: role
+                }
+            }
+        });
+
+        if (error) {
+            alert("Error signing up: " + error.message);
         } else {
-            alert("Check your email for the login link! (For testing, check Supabase dashboard)");
+            alert("Account created! You can now log in.");
         }
         setIsLoading(false);
     };
@@ -167,7 +179,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     return (
-        <AuthContext.Provider value={{ user, isLoading, login, logout, loadFunds, deductFunds, addEarnings }}>
+        <AuthContext.Provider value={{ user, isLoading, login, signup, logout, loadFunds, deductFunds, addEarnings }}>
             {children}
         </AuthContext.Provider>
     );

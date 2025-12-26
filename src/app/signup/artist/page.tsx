@@ -12,15 +12,21 @@ import Link from "next/link";
 
 export default function ArtistSignupPage() {
     const router = useRouter();
-    const { login, isLoading } = useAuth();
+    const { signup, isLoading } = useAuth();
     const [name, setName] = useState("");
     const [email, setEmail] = useState("");
+    const [password, setPassword] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     const handleSignup = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsSubmitting(true);
-        await login(email, "artist", name);
+        await signup(email, password, "artist", name);
+        // AuthContext handles alert. If success, user needs to login or is auto-logged in? 
+        // Supabase auto-login after signup is default unless email confirmation is on. 
+        // But my AuthContext signup says "Account created! You can now log in." 
+        // Logic suggests redirect to login (portal).
+        router.push("/portal");
         setIsSubmitting(false);
     };
 
@@ -39,7 +45,7 @@ export default function ArtistSignupPage() {
             <Card className="border-white/10 bg-black/40 backdrop-blur-sm">
                 <CardHeader>
                     <CardTitle>Create Account</CardTitle>
-                    <CardDescription>We'll send you a magic link to sign in securely.</CardDescription>
+                    <CardDescription>Sign up with email and password.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <form onSubmit={handleSignup} className="space-y-4">
@@ -72,11 +78,23 @@ export default function ArtistSignupPage() {
                                 />
                             </div>
                         </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="password">Password</Label>
+                            <Input
+                                id="password"
+                                type="password"
+                                placeholder="••••••••"
+                                className="bg-white/5 border-white/10"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                required
+                            />
+                        </div>
 
                         <Button type="submit" className="w-full bg-green-600 hover:bg-green-700 font-bold h-11" disabled={isSubmitting || isLoading}>
                             {isSubmitting || isLoading ? (
                                 <>
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Sending Link...
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Creating...
                                 </>
                             ) : (
                                 <>

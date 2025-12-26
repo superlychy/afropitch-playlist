@@ -32,6 +32,7 @@ create table public.playlists (
   genre text not null,
   followers int default 0,
   description text,
+  playlist_link text, -- External link to playlist (Spotify/Apple)
   cover_image text, -- CSS class or URL
   submission_fee numeric default 0,
   type text check (type in ('regular', 'exclusive')) default 'regular',
