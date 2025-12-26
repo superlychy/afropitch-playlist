@@ -2,22 +2,30 @@
 
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { DollarSign, CheckCircle, XCircle, Clock, Settings, User } from "lucide-react";
+import { DollarSign, CheckCircle, XCircle, Clock, Settings, User, Plus, ListMusic, MoreVertical, Star, Zap } from "lucide-react";
 import { pricingConfig } from "@/../config/pricing";
-import { Plus, ListMusic, MoreVertical } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
 
 // Mock Playlists for the dashboard
 const MY_PLAYLISTS = [
-    { id: 1, name: "Afro Hits 2024", followers: 15400, submissions: 12 },
-    { id: 2, name: "Underground Vibes", followers: 8200, submissions: 5 },
+    { id: 1, name: "Afro Hits 2024", followers: 15400, submissions: 12, type: "regular" },
+    { id: 2, name: "Underground Vibes", followers: 8200, submissions: 5, type: "regular" },
+    { id: 3, name: "Piano Exclusive", followers: 45000, submissions: 20, type: "exclusive" },
 ];
 
 export default function CuratorDashboard() {
     const { user, isLoading } = useAuth();
     const router = useRouter();
+
+    // Modal State
+    const [showAddPlaylist, setShowAddPlaylist] = useState(false);
+    const [newPlaylistType, setNewPlaylistType] = useState<"regular" | "exclusive">("regular");
+    const [customPrice, setCustomPrice] = useState(7000);
 
     useEffect(() => {
         if (!isLoading && (!user || user.role !== "curator")) {
@@ -39,7 +47,7 @@ export default function CuratorDashboard() {
     ];
 
     return (
-        <div className="container mx-auto px-4 max-w-6xl py-12">
+        <div className="container mx-auto px-4 max-w-6xl py-12 relative">
             <div className="flex justify-between items-center mb-8">
                 <div>
                     <h1 className="text-3xl font-bold text-white">Dashboard</h1>
@@ -87,7 +95,7 @@ export default function CuratorDashboard() {
             {/* My Playlists Section */}
             <div className="flex justify-between items-center mb-4">
                 <h2 className="text-xl font-bold text-white">My Playlists</h2>
-                <Button onClick={() => alert("Add Playlist Modal showing...")} className="bg-white text-black hover:bg-gray-200">
+                <Button onClick={() => setShowAddPlaylist(true)} className="bg-white text-black hover:bg-gray-200">
                     <Plus className="w-4 h-4 mr-2" /> Add Playlist
                 </Button>
             </div>
@@ -96,11 +104,14 @@ export default function CuratorDashboard() {
                     <Card key={pl.id} className="bg-white/5 border-none">
                         <CardContent className="p-4 flex items-center justify-between">
                             <div className="flex items-center gap-3">
-                                <div className="w-12 h-12 bg-gray-800 rounded flex items-center justify-center">
-                                    <ListMusic className="w-6 h-6 text-gray-400" />
+                                <div className={`w-12 h-12 rounded flex items-center justify-center ${pl.type === 'exclusive' ? 'bg-yellow-600/20 text-yellow-500' : 'bg-gray-800 text-gray-400'}`}>
+                                    {pl.type === 'exclusive' ? <Star className="w-6 h-6" /> : <ListMusic className="w-6 h-6" />}
                                 </div>
                                 <div>
-                                    <p className="font-bold text-white">{pl.name}</p>
+                                    <p className="font-bold text-white flex items-center gap-2">
+                                        {pl.name}
+                                        {pl.type === 'exclusive' && <span className="text-[10px] bg-yellow-500 text-black px-1.5 py-0.5 rounded font-bold uppercase">Exclusive</span>}
+                                    </p>
                                     <p className="text-sm text-gray-400">{pl.followers.toLocaleString()} Followers</p>
                                 </div>
                             </div>
@@ -112,6 +123,67 @@ export default function CuratorDashboard() {
                     </Card>
                 ))}
             </div>
+
+            {/* Add Playlist Modal (Custom) */}
+            {showAddPlaylist && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="w-full max-w-md bg-zinc-900 border border-white/10 rounded-lg shadow-xl p-6 space-y-6">
+                        <div className="space-y-2">
+                            <h3 className="text-lg font-bold text-white">Add New Playlist</h3>
+                            <p className="text-sm text-gray-400">Add a playlist to start receiving submissions.</p>
+                        </div>
+
+                        <div className="space-y-4">
+                            <div className="space-y-2">
+                                <Label>Playlist Name</Label>
+                                <Input placeholder="e.g. Afro Vibes 2024" className="bg-white/5 border-white/10" />
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Playlist Type</Label>
+                                <Select
+                                    value={newPlaylistType}
+                                    onChange={(e) => setNewPlaylistType(e.target.value as "regular" | "exclusive")}
+                                    className="bg-white/5 border-white/10 text-white"
+                                >
+                                    <option value="regular" className="bg-zinc-900">Regular (Standard Pricing)</option>
+                                    <option value="exclusive" className="bg-zinc-900">Exclusive (Custom Pricing)</option>
+                                </Select>
+                                <p className="text-xs text-gray-400">
+                                    {newPlaylistType === "regular" ? "Standard tiers applied (3,000 / 5,000)." : "You set the price. 24-hour review time required."}
+                                </p>
+                            </div>
+
+                            {newPlaylistType === "exclusive" && (
+                                <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
+                                    <Label>Custom Submission Fee (₦)</Label>
+                                    <Input
+                                        type="number"
+                                        value={customPrice}
+                                        onChange={(e) => setCustomPrice(Number(e.target.value))}
+                                        className="bg-white/5 border-yellow-500/50 text-yellow-500 font-bold"
+                                    />
+                                    <p className="text-xs text-yellow-500/80">Exclusive playlists must command a premium.</p>
+                                </div>
+                            )}
+
+                            {newPlaylistType === "regular" && (
+                                <div className="p-3 bg-white/5 rounded text-sm text-gray-400 space-y-1">
+                                    <div className="flex justify-between"><span>Standard Review:</span> <span>₦3,000</span></div>
+                                    <div className="flex justify-between"><span>Express Review:</span> <span>₦5,000</span></div>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="flex justify-end gap-3 pt-4 border-t border-white/5">
+                            <Button variant="outline" onClick={() => setShowAddPlaylist(false)}>Cancel</Button>
+                            <Button className="bg-green-600 hover:bg-green-700" onClick={() => {
+                                alert("Playlist Added (Mock)! Type: " + newPlaylistType);
+                                setShowAddPlaylist(false);
+                            }}>Add Playlist</Button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             <h2 className="text-xl font-bold text-white mb-4">Pending Reviews</h2>
             <div className="space-y-4">

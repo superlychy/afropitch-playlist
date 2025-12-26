@@ -63,15 +63,14 @@ function SubmitForm() {
         selectedPlaylistIds.forEach(id => {
             const playlist = allPlaylists.find(p => p.id === id);
             if (playlist) {
-                // If playlist allows Free (0) use 0, otherwise use Tier Price (or specific fee if set > 0)
-                // Logic: If playlist.submissionFee is explicitly 0, it's free. 
-                // If it has a custom fee > 0, use that.
-                // Otherwise fallback to Tier Price.
-                // For simplicity in this demo: Free is Free. Paid uses Tier Price.
-
-                if (playlist.submissionFee === 0) {
+                if (playlist.type === 'exclusive') {
+                    // Exclusive playlists use their custom price, override tier price
+                    baseTotal += playlist.submissionFee;
+                } else if (playlist.submissionFee === 0) {
+                    // Free is free
                     baseTotal += 0;
                 } else {
+                    // Regular paid uses the selected Tier Price
                     baseTotal += selectedTierConfig.price;
                 }
             }
@@ -183,10 +182,25 @@ function SubmitForm() {
                                                     className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-all ${selectedPlaylistIds.includes(p.id) ? 'bg-green-600/20 border-green-500' : 'bg-white/5 border-white/10 hover:border-white/30'}`}
                                                 >
                                                     <div className="flex items-center gap-3">
-                                                        <div className={`w-8 h-8 rounded ${p.coverImage} flex items-center justify-center`}><Music className="w-4 h-4 text-white" /></div>
+                                                        <div className={`w-8 h-8 rounded flex items-center justify-center ${p.type === 'exclusive' ? 'bg-yellow-600/20 text-yellow-500' : p.coverImage}`}>
+                                                            <Music className="w-4 h-4 text-white" />
+                                                        </div>
                                                         <div>
-                                                            <p className="font-bold text-sm text-white">{p.name}</p>
-                                                            <p className="text-xs text-gray-400">{p.genre} • {p.submissionFee === 0 ? "FREE" : "Paid"}</p>
+                                                            <p className="font-bold text-sm text-white flex items-center gap-2">
+                                                                {p.name}
+                                                                {p.type === 'exclusive' && <span className="text-[10px] bg-yellow-500 text-black px-1.5 py-0.5 rounded font-bold uppercase">Exclusive</span>}
+                                                            </p>
+                                                            <div className="flex items-center gap-2 text-xs text-gray-400">
+                                                                <span>{p.genre}</span>
+                                                                <span>•</span>
+                                                                {p.type === 'exclusive' ? (
+                                                                    <span className="text-yellow-500 font-bold">{pricingConfig.currency}{p.submissionFee.toLocaleString()} (24h Review)</span>
+                                                                ) : p.submissionFee === 0 ? (
+                                                                    <span className="text-green-400">FREE</span>
+                                                                ) : (
+                                                                    <span>Standard Pricing</span>
+                                                                )}
+                                                            </div>
                                                         </div>
                                                     </div>
                                                     {selectedPlaylistIds.includes(p.id) && <CheckCircle className="w-5 h-5 text-green-500" />}

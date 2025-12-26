@@ -6,6 +6,7 @@ export interface Playlist {
     description: string;
     coverImage: string;
     submissionFee: number; // 0 for Free
+    type: "regular" | "exclusive";
 }
 
 export interface Curator {
@@ -40,7 +41,8 @@ export const curators: Curator[] = [
                 followers: 15400,
                 description: "The ultimate party starter pack.",
                 coverImage: "bg-green-600",
-                submissionFee: 3000
+                submissionFee: 3000,
+                type: "regular"
             },
             {
                 id: "pl_2",
@@ -49,7 +51,8 @@ export const curators: Curator[] = [
                 followers: 8200,
                 description: "For the cool kids. Smooth vibes only.",
                 coverImage: "bg-purple-600",
-                submissionFee: 0 // Free
+                submissionFee: 0, // Free
+                type: "regular"
             }
         ]
     },
@@ -70,7 +73,8 @@ export const curators: Curator[] = [
                 followers: 45000,
                 description: "Global Amapiano hits.",
                 coverImage: "bg-orange-500",
-                submissionFee: 5000
+                submissionFee: 7000, // Custom Exclusive Price
+                type: "exclusive"
             },
             {
                 id: "pl_4",
@@ -79,7 +83,8 @@ export const curators: Curator[] = [
                 followers: 12000,
                 description: "Deep, soulful, and exclusive.",
                 coverImage: "bg-yellow-600",
-                submissionFee: 3000
+                submissionFee: 3000,
+                type: "regular"
             }
         ]
     },
@@ -96,7 +101,8 @@ export const curators: Curator[] = [
                 followers: 25000,
                 description: "Love songs and heartbreak anthems.",
                 coverImage: "bg-pink-600",
-                submissionFee: 0 // Free
+                submissionFee: 0, // Free
+                type: "regular"
             }
         ]
     }
