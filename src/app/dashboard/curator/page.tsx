@@ -18,7 +18,7 @@ interface Playlist {
     name: string;
     followers: number;
     submissions: number;
-    type: "regular" | "exclusive";
+    type: "free" | "standard" | "exclusive";
     cover_image: string;
     description?: string;
 }
@@ -82,7 +82,7 @@ export default function CuratorDashboard() {
     const [newCoverImage, setNewCoverImage] = useState("");
     const [newFollowers, setNewFollowers] = useState(0);
     const [songsCount, setSongsCount] = useState(0);
-    const [newPlaylistType, setNewPlaylistType] = useState<"regular" | "exclusive">("regular");
+    const [newPlaylistType, setNewPlaylistType] = useState<"free" | "standard" | "exclusive">("free");
     const [customPrice, setCustomPrice] = useState(0);
     const [isCreating, setIsCreating] = useState(false);
 
@@ -763,10 +763,11 @@ export default function CuratorDashboard() {
                                     <Label>Playlist Type</Label>
                                     <Select
                                         value={newPlaylistType}
-                                        onChange={(e) => setNewPlaylistType(e.target.value as "regular" | "exclusive")}
+                                        onChange={(e) => setNewPlaylistType(e.target.value as "free" | "standard" | "exclusive")}
                                         className="bg-white/5 border-white/10 text-white"
                                     >
-                                        <option value="regular" className="bg-zinc-900">Regular</option>
+                                        <option value="free" className="bg-zinc-900">Free</option>
+                                        <option value="standard" className="bg-zinc-900">Standard</option>
                                         <option value="exclusive" className="bg-zinc-900">Exclusive</option>
                                     </Select>
                                 </div>
