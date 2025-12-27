@@ -9,7 +9,7 @@ import { DollarSign, CheckCircle, XCircle, Clock, Settings, User, Plus, ListMusi
 import { pricingConfig } from "@/../config/pricing";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select } from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/lib/supabase";
 
@@ -763,12 +763,16 @@ export default function CuratorDashboard() {
                                     <Label>Playlist Type</Label>
                                     <Select
                                         value={newPlaylistType}
-                                        onChange={(e) => setNewPlaylistType(e.target.value as "free" | "standard" | "exclusive")}
-                                        className="bg-white/5 border-white/10 text-white"
+                                        onValueChange={(val) => setNewPlaylistType(val as "free" | "standard" | "exclusive")}
                                     >
-                                        <option value="free" className="bg-zinc-900">Free</option>
-                                        <option value="standard" className="bg-zinc-900">Standard</option>
-                                        <option value="exclusive" className="bg-zinc-900">Exclusive</option>
+                                        <SelectTrigger className="bg-white/5 border-white/10 text-white">
+                                            <SelectValue placeholder="Select type" />
+                                        </SelectTrigger>
+                                        <SelectContent className="bg-zinc-900 border-white/10 text-white">
+                                            <SelectItem value="free" className="focus:bg-white/10">Free</SelectItem>
+                                            <SelectItem value="standard" className="focus:bg-white/10">Standard</SelectItem>
+                                            <SelectItem value="exclusive" className="focus:bg-white/10">Exclusive</SelectItem>
+                                        </SelectContent>
                                     </Select>
                                 </div>
                             </div>
