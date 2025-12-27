@@ -19,32 +19,45 @@ export default function PortalPage() {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [name, setName] = useState("");
+    const [error, setError] = useState("");
+    const [isLoading, setIsLoading] = useState(false);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        setError("");
+        setIsLoading(true);
 
-        if (isSignup) {
-            await signup(email, password, activeTab, name);
-        } else {
-            await login(email, password);
+        try {
+            if (isSignup) {
+                await signup(email, password, activeTab, name);
+            } else {
+                await login(email, password);
+            }
+            // Start client-side redirect immediately on success if login doesn't throw
+            if (isSignup) {
+                // Signup success doesn't auto login usually in supabase unless email confirm off, 
+                // but assuming it does or we just show success. 
+                // Context handles success alert for signup currently in console.
+            }
+        } catch (err: any) {
+            console.error(err);
+            setError(err.message || "An error occurred");
+        } finally {
+            setIsLoading(false);
         }
     };
 
     // Redirect after login
+    // Redirect after login
+    // Note: We use useEffect or router replacement usually, but doing it in render is okay for simple apps if guarded.
+    // However, to avoid "Cannot update during render" warnings, let's use a small effect or just keep it simple.
+    // The previous code had it in render. I'll stick to that but maybe safer.
     if (user) {
         if (user.role === 'curator') router.push("/dashboard/curator");
         else router.push("/dashboard/artist");
     }
 
-    /* 
-    Optional: Just for smoother UX, we won't auto-redirect inside the render if we want to show a success message first, 
-    but the AuthContext updates `user` state which triggers the redirect above. 
-    However, purely relying on the render redirect might cause flicker. 
-    Ideally, we'd handle navigation inside handleSubmit after success. 
-    But AuthContext login is void, so we rely on user state change.
-    */
-
-    // If user is already logged in, show welcome (or redirect logic above takes over)
+    // If user is already logged in, show welcome (as fallback if redirect is slow)
     if (user) {
         return (
             <div className="container mx-auto px-4 max-w-4xl py-16 text-center space-y-6">
@@ -74,13 +87,13 @@ export default function PortalPage() {
             <div className="flex justify-center mb-8">
                 <div className="bg-white/5 p-1 rounded-lg flex space-x-2">
                     <button
-                        onClick={() => setActiveTab("artist")}
+                        onClick={() => { setActiveTab("artist"); setError(""); }}
                         className={`px-6 py-2 rounded-md text-sm font-medium transition-all ${activeTab === "artist" ? "bg-green-600 text-white" : "text-gray-400 hover:text-white"}`}
                     >
                         Artist Access
                     </button>
                     <button
-                        onClick={() => setActiveTab("curator")}
+                        onClick={() => { setActiveTab("curator"); setError(""); }}
                         className={`px-6 py-2 rounded-md text-sm font-medium transition-all ${activeTab === "curator" ? "bg-white text-black" : "text-gray-400 hover:text-white"}`}
                     >
                         Curator Portal
@@ -102,6 +115,12 @@ export default function PortalPage() {
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
+                        {error && (
+                            <div className="mb-4 p-3 rounded bg-red-500/10 border border-red-500/20 text-red-500 text-sm flex items-center gap-2">
+                                <AlertCircle className="w-4 h-4" />
+                                {error}
+                            </div>
+                        )}
                         <form onSubmit={handleSubmit} className="space-y-4">
                             {isSignup && (
                                 <div className="space-y-2 animate-in slide-in-from-top-2">
@@ -134,8 +153,12 @@ export default function PortalPage() {
                                     required
                                 />
                             </div>
-                            <Button className={`w-full font-bold ${activeTab === 'artist' ? 'bg-green-600 hover:bg-green-700' : 'bg-white text-black hover:bg-gray-200'}`}>
-                                {isSignup ? "Create Account" : "Log In"}
+                            <Button
+                                disabled={isLoading}
+                                variant={activeTab === 'artist' ? 'default' : 'white'}
+                                className="w-full font-bold"
+                            >
+                                {isLoading ? "Processing..." : (isSignup ? "Create Account" : "Log In")}
                             </Button>
                         </form>
                     </CardContent>

@@ -3,9 +3,11 @@
 import Link from "next/link";
 import { useState } from "react";
 import { Menu, X, Music } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
 
 export function Navbar() {
     const [isOpen, setIsOpen] = useState(false);
+    const { user, logout } = useAuth();
 
     const navLinks = [
         { name: "Home", href: "/" },
@@ -15,6 +17,11 @@ export function Navbar() {
         { name: "Trust", href: "/trust" },
         { name: "Contact", href: "/contact" },
     ];
+
+    const handleLogout = async () => {
+        await logout();
+        setIsOpen(false);
+    };
 
     return (
         <nav className="fixed w-full z-50 bg-background/80 backdrop-blur-md border-b border-white/10">
@@ -47,6 +54,30 @@ export function Navbar() {
                             >
                                 Submit Song
                             </Link>
+
+                            {user ? (
+                                <>
+                                    <Link
+                                        href={`/dashboard/${user.role}`}
+                                        className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-bold transition-colors border border-white/10"
+                                    >
+                                        Dashboard
+                                    </Link>
+                                    <button
+                                        onClick={handleLogout}
+                                        className="text-gray-300 hover:text-red-400 px-3 py-2 rounded-md text-sm font-medium transition-colors"
+                                    >
+                                        Logout
+                                    </button>
+                                </>
+                            ) : (
+                                <Link
+                                    href="/portal"
+                                    className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors"
+                                >
+                                    Login
+                                </Link>
+                            )}
                         </div>
                     </div>
                     <div className="-mr-2 flex md:hidden">
@@ -86,6 +117,31 @@ export function Navbar() {
                         >
                             Submit Song
                         </Link>
+                        {user ? (
+                            <>
+                                <Link
+                                    href={`/dashboard/${user.role}`}
+                                    className="mt-2 w-full text-center border border-white/10 text-white block px-3 py-2 rounded-md text-base font-bold"
+                                    onClick={() => setIsOpen(false)}
+                                >
+                                    Dashboard
+                                </Link>
+                                <button
+                                    onClick={handleLogout}
+                                    className="mt-2 w-full text-center text-red-400 block px-3 py-2 rounded-md text-base font-bold"
+                                >
+                                    Logout
+                                </button>
+                            </>
+                        ) : (
+                            <Link
+                                href="/portal"
+                                className="mt-2 w-full text-center text-gray-300 hover:text-white block px-3 py-2 rounded-md text-base font-medium"
+                                onClick={() => setIsOpen(false)}
+                            >
+                                Login
+                            </Link>
+                        )}
                     </div>
                 </div>
             )}

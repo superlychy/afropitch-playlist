@@ -390,60 +390,79 @@ function SubmitForm() {
                                         </div>
                                     </div>
 
-                                    <div className="w-full space-y-3">
-                                        <Label>Payment Method</Label>
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <Button
-                                                type="button"
-                                                variant={paymentMethod === "direct" ? "default" : "outline"}
-                                                className={paymentMethod === "direct" ? "bg-white text-black hover:bg-gray-200" : ""}
-                                                onClick={() => setPaymentMethod("direct")}
-                                            >
-                                                <CreditCard className="w-4 h-4 mr-2" /> Pay Now
-                                            </Button>
-                                            <Button
-                                                type="button"
-                                                variant={paymentMethod === "wallet" ? "default" : "outline"}
-                                                className={paymentMethod === "wallet" ? "bg-green-600 hover:bg-green-700" : ""}
-                                                onClick={() => setPaymentMethod("wallet")}
-                                                disabled={!user}
-                                            >
-                                                <Wallet className="w-4 h-4 mr-2" /> Wallet {user ? `(${pricingConfig.currency}${user.balance.toLocaleString()})` : "(Login)"}
-                                            </Button>
+                                    {total > 0 && (
+                                        <div className="w-full space-y-3">
+                                            <Label>Payment Method</Label>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <Button
+                                                    type="button"
+                                                    variant={paymentMethod === "direct" ? "default" : "outline"}
+                                                    className={paymentMethod === "direct" ? "bg-white text-black hover:bg-gray-200" : ""}
+                                                    onClick={() => setPaymentMethod("direct")}
+                                                >
+                                                    <CreditCard className="w-4 h-4 mr-2" /> Pay Now
+                                                </Button>
+                                                <Button
+                                                    type="button"
+                                                    variant={paymentMethod === "wallet" ? "default" : "outline"}
+                                                    className={paymentMethod === "wallet" ? "bg-green-600 hover:bg-green-700" : ""}
+                                                    onClick={() => setPaymentMethod("wallet")}
+                                                    disabled={!user}
+                                                >
+                                                    <Wallet className="w-4 h-4 mr-2" /> Wallet {user ? `(${pricingConfig.currency}${user.balance.toLocaleString()})` : "(Login)"}
+                                                </Button>
+                                            </div>
                                         </div>
-                                    </div>
+                                    )}
 
-                                    <Button
-                                        type="submit"
-                                        className="w-full bg-green-600 hover:bg-green-700 text-lg py-6 font-bold shadow-lg shadow-green-900/20"
-                                        disabled={isSubmitting || (paymentMethod === "wallet" && (user?.balance ?? 0) < total)}
-                                    >
-                                        {isSubmitting ? (
-                                            <>
-                                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                                Processing...
-                                            </>
-                                        ) : (
-                                            <>
-                                                {paymentMethod === "direct" ? (
-                                                    <div className="w-full">
-                                                        <PayWithPaystack
-                                                            email="user@test.com"
-                                                            amount={total * 100}
-                                                            onSuccess={(ref) => {
-                                                                setIsSubmitting(false);
-                                                                setIsSuccess(true);
-                                                                console.log("Payment success:", ref);
-                                                            }}
-                                                            onClose={() => setIsSubmitting(false)}
-                                                        />
-                                                    </div>
-                                                ) : (
-                                                    <span>PAY {pricingConfig.currency}{total.toLocaleString()}</span>
-                                                )}
-                                            </>
-                                        )}
-                                    </Button>
+                                    {total === 0 ? (
+                                        <Button
+                                            type="submit"
+                                            className="w-full bg-green-600 hover:bg-green-700 text-lg py-6 font-bold shadow-lg shadow-green-900/20"
+                                            disabled={isSubmitting}
+                                        >
+                                            {isSubmitting ? (
+                                                <>
+                                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                                    Processing...
+                                                </>
+                                            ) : (
+                                                <span>Submit Free</span>
+                                            )}
+                                        </Button>
+                                    ) : (
+                                        <>
+                                            {paymentMethod === "direct" ? (
+                                                <div className="w-full">
+                                                    <PayWithPaystack
+                                                        email="user@test.com"
+                                                        amount={total * 100}
+                                                        onSuccess={(ref: any) => {
+                                                            console.log("Payment success:", ref);
+                                                            setIsSubmitting(false);
+                                                            setIsSuccess(true);
+                                                        }}
+                                                        onClose={() => setIsSubmitting(false)}
+                                                    />
+                                                </div>
+                                            ) : (
+                                                <Button
+                                                    type="submit"
+                                                    className="w-full bg-green-600 hover:bg-green-700 text-lg py-6 font-bold shadow-lg shadow-green-900/20"
+                                                    disabled={isSubmitting || (paymentMethod === "wallet" && (!user || user.balance < total))}
+                                                >
+                                                    {isSubmitting ? (
+                                                        <>
+                                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                                            Processing...
+                                                        </>
+                                                    ) : (
+                                                        <span>PAY {pricingConfig.currency}{total.toLocaleString()}</span>
+                                                    )}
+                                                </Button>
+                                            )}
+                                        </>
+                                    )}
                                 </CardFooter>
                             </form>
                         </Card>

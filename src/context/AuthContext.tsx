@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 
 export type UserRole = "artist" | "curator" | "admin" | null;
 
+// Update interface
 export interface User {
     id?: string;
     name: string;
@@ -14,6 +15,10 @@ export interface User {
     role: UserRole;
     balance: number; // For artists (Credits)
     earnings: number; // For curators (Net Income)
+    bio?: string;
+    instagram?: string;
+    twitter?: string;
+    website?: string;
 }
 
 interface AuthContextType {
@@ -54,7 +59,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                             email: profile.email || session.user.email || "",
                             role: (profile.role as UserRole) || "artist",
                             balance: profile.balance || 0,
-                            earnings: 0 // In real app, this might be separate table or field
+                            earnings: 0, // In real app, this might be separate table or field
+                            bio: profile.bio,
+                            instagram: profile.instagram,
+                            twitter: profile.twitter,
+                            website: profile.website
                         });
                         return;
                     }
@@ -107,16 +116,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         };
 
         const getSession = async () => {
-            const { data: { session } } = await supabase.auth.getSession();
-            await syncProfile(session);
-            setIsLoading(false);
+            try {
+                const { data: { session }, error } = await supabase.auth.getSession();
+                if (error) console.error("getSession error:", error);
+                await syncProfile(session);
+            } catch (error) {
+                console.error("Auth initialization error:", error);
+            } finally {
+                setIsLoading(false);
+            }
         };
 
         getSession();
 
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
             await syncProfile(session);
-            setIsLoading(false);
+            setIsLoading(false); // Ensure loading is cleared on auth change
         });
 
         return () => subscription.unsubscribe();
@@ -124,36 +139,48 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const login = async (email: string, password: string) => {
         setIsLoading(true);
-        const { error } = await supabase.auth.signInWithPassword({
-            email,
-            password
-        });
+        try {
+            const { error } = await supabase.auth.signInWithPassword({
+                email,
+                password
+            });
 
-        if (error) {
-            alert("Error logging in: " + error.message);
+            if (error) {
+                console.error("Login error:", error.message);
+                throw error; // Re-throw to let component handle UI feedback
+            }
+        } catch (error) {
+            // Error is handled by caller or logged
+        } finally {
+            setIsLoading(false);
         }
-        setIsLoading(false);
     };
 
     const signup = async (email: string, password: string, role: UserRole, name: string) => {
         setIsLoading(true);
-        const { error } = await supabase.auth.signUp({
-            email,
-            password,
-            options: {
-                data: {
-                    full_name: name,
-                    role: role
+        try {
+            const { error } = await supabase.auth.signUp({
+                email,
+                password,
+                options: {
+                    data: {
+                        full_name: name,
+                        role: role
+                    }
                 }
-            }
-        });
+            });
 
-        if (error) {
-            alert("Error signing up: " + error.message);
-        } else {
-            alert("Account created! You can now log in.");
+            if (error) {
+                console.error("Signup error:", error.message);
+                throw error;
+            } else {
+                console.log("Signup successful, check email for confirmation if enabled.");
+            }
+        } catch (error) {
+            // Error handled by caller
+        } finally {
+            setIsLoading(false);
         }
-        setIsLoading(false);
     };
 
     const logout = async () => {
