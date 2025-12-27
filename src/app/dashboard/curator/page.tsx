@@ -9,7 +9,7 @@ import { DollarSign, CheckCircle, XCircle, Clock, Settings, User, Plus, ListMusi
 import { pricingConfig } from "@/../config/pricing";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/lib/supabase";
 
@@ -83,6 +83,7 @@ export default function CuratorDashboard() {
     const [newFollowers, setNewFollowers] = useState(0);
     const [songsCount, setSongsCount] = useState(0);
     const [newPlaylistType, setNewPlaylistType] = useState<"free" | "standard" | "exclusive">("free");
+    const [newGenre, setNewGenre] = useState("");
     const [customPrice, setCustomPrice] = useState(0);
     const [isCreating, setIsCreating] = useState(false);
 
@@ -289,6 +290,7 @@ export default function CuratorDashboard() {
         const { data, error } = await supabase.from('playlists').insert({
             curator_id: user.id,
             name: newName,
+            genre: newGenre,
             cover_image: newCoverImage,
             followers: newFollowers,
             type: newPlaylistType,
@@ -301,6 +303,7 @@ export default function CuratorDashboard() {
             alert("Playlist created!");
             setShowAddPlaylist(false);
             setNewName("");
+            setNewGenre("");
             setNewCoverImage("");
             fetchCuratorData();
         }
@@ -337,6 +340,7 @@ export default function CuratorDashboard() {
             setIsFetchingInfo(true);
             setTimeout(() => {
                 setNewName("Spotify Playlist (Imported)");
+                setNewGenre("Afrobeats");
                 setNewCoverImage("https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=300&h=300&fit=crop");
                 setNewFollowers(1234);
                 setSongsCount(50);
@@ -751,6 +755,15 @@ export default function CuratorDashboard() {
                                     />
                                 </div>
                                 <div className="space-y-2">
+                                    <Label>Genre</Label>
+                                    <Input
+                                        placeholder="e.g. Afrobeats, Amapiano"
+                                        className="bg-white/5 border-white/10"
+                                        value={newGenre}
+                                        onChange={(e) => setNewGenre(e.target.value)}
+                                    />
+                                </div>
+                                <div className="space-y-2">
                                     <Label>Number of Songs</Label>
                                     <Input
                                         type="number"
@@ -763,16 +776,12 @@ export default function CuratorDashboard() {
                                     <Label>Playlist Type</Label>
                                     <Select
                                         value={newPlaylistType}
-                                        onValueChange={(val) => setNewPlaylistType(val as "free" | "standard" | "exclusive")}
+                                        onChange={(e) => setNewPlaylistType(e.target.value as "free" | "standard" | "exclusive")}
+                                        className="bg-white/5 border-white/10 text-white"
                                     >
-                                        <SelectTrigger className="bg-white/5 border-white/10 text-white">
-                                            <SelectValue placeholder="Select type" />
-                                        </SelectTrigger>
-                                        <SelectContent className="bg-zinc-900 border-white/10 text-white">
-                                            <SelectItem value="free" className="focus:bg-white/10">Free</SelectItem>
-                                            <SelectItem value="standard" className="focus:bg-white/10">Standard</SelectItem>
-                                            <SelectItem value="exclusive" className="focus:bg-white/10">Exclusive</SelectItem>
-                                        </SelectContent>
+                                        <option value="free" className="bg-zinc-900">Free</option>
+                                        <option value="standard" className="bg-zinc-900">Standard</option>
+                                        <option value="exclusive" className="bg-zinc-900">Exclusive</option>
                                     </Select>
                                 </div>
                             </div>
