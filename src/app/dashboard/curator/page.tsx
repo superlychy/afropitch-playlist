@@ -40,6 +40,21 @@ export default function CuratorDashboard() {
 
     // Withdraw Modal State
     const [showWithdraw, setShowWithdraw] = useState(false);
+
+    // Decline Logic
+    const [showDeclineModal, setShowDeclineModal] = useState(false);
+    const [selectedSubmissionId, setSelectedSubmissionId] = useState<string | null>(null);
+    const [declineReason, setDeclineReason] = useState("");
+    const [customDeclineReason, setCustomDeclineReason] = useState("");
+
+    const declineOptions = [
+        "Does not fit playlist vibe",
+        "Production quality improperly mixed",
+        "Song structure needs work",
+        "Vocals are off-key or unclear",
+        "Wrong genre for this playlist",
+        "Other (See notes)"
+    ];
     const [withdrawAmount, setWithdrawAmount] = useState("");
     const [bankName, setBankName] = useState("");
     const [accountNumber, setAccountNumber] = useState("");
@@ -359,6 +374,21 @@ export default function CuratorDashboard() {
         }
     };
 
+    const openDeclineModal = (id: string) => {
+        setSelectedSubmissionId(id);
+        setDeclineReason(declineOptions[0]);
+        setCustomDeclineReason("");
+        setShowDeclineModal(true);
+    };
+
+    const confirmDecline = async () => {
+        if (!selectedSubmissionId) return;
+        const finalFeedback = declineReason === "Other (See notes)" ? customDeclineReason : declineReason;
+        await handleReviewAction(selectedSubmissionId, 'declined', finalFeedback || "Declined");
+        setShowDeclineModal(false);
+        setSelectedSubmissionId(null);
+    };
+
     if (isLoading) return <div className="p-8 text-center text-gray-500">Loading dashboard...</div>;
     // if (!user || user.role !== 'curator') ... logic handled by AuthContext or Router usually.
 
@@ -552,10 +582,10 @@ export default function CuratorDashboard() {
                                         review.status === 'pending' ? (
                                             <div className="flex flex-col gap-2 min-w-[140px]">
                                                 <p className="text-right font-bold text-white mb-2">{pricingConfig.currency}{review.amount_paid}</p>
-                                                <Button className="bg-green-600 hover:bg-green-700 w-full" onClick={() => handleReviewAction(review.id, 'accepted', 'Great track!')}>
+                                                <Button className="bg-green-600 hover:bg-green-700 w-full" onClick={() => handleReviewAction(review.id, 'accepted', 'Great track! Added to playlist.')}>
                                                     <CheckCircle className="w-4 h-4 mr-2" /> Accept
                                                 </Button>
-                                                <Button variant="destructive" className="w-full" onClick={() => handleReviewAction(review.id, 'declined', 'Not a fit.')}>
+                                                <Button variant="destructive" className="w-full" onClick={() => openDeclineModal(review.id)}>
                                                     <XCircle className="w-4 h-4 mr-2" /> Decline
                                                 </Button>
                                             </div>
@@ -616,6 +646,49 @@ export default function CuratorDashboard() {
                     </div>
                 )
             }
+
+            {/* Decline Reason Modal */}
+            {showDeclineModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in">
+                    <div className="bg-zinc-900 border border-white/10 p-6 rounded-lg w-full max-w-md space-y-4">
+                        <h3 className="font-bold text-white text-lg text-red-500 flex items-center gap-2">
+                            <XCircle className="w-5 h-5" /> Decline Submission
+                        </h3>
+                        <p className="text-sm text-gray-400">Please provide a reason for the artist. This helps them improve.</p>
+
+                        <div className="space-y-3">
+                            <Label>Reason</Label>
+                            <div className="grid grid-cols-1 gap-2">
+                                {declineOptions.map((option) => (
+                                    <div key={option}
+                                        className={`p-3 rounded border cursor-pointer transition-colors ${declineReason === option ? 'bg-red-500/20 border-red-500 text-white' : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'}`}
+                                        onClick={() => setDeclineReason(option)}
+                                    >
+                                        {option}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {(declineReason === "Other (See notes)" || true) && (
+                            <div className="space-y-2">
+                                <Label>Additional Notes (Optional)</Label>
+                                <Textarea
+                                    value={customDeclineReason}
+                                    onChange={e => setCustomDeclineReason(e.target.value)}
+                                    placeholder="Add specific feedback here..."
+                                    className="min-h-[80px]"
+                                />
+                            </div>
+                        )}
+
+                        <div className="flex justify-end gap-2 pt-4">
+                            <Button variant="ghost" onClick={() => setShowDeclineModal(false)}>Cancel</Button>
+                            <Button variant="destructive" onClick={confirmDecline}>Confirm Decline</Button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Add Playlist Modal */}
             {
