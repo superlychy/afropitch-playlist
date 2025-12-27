@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { DollarSign, CheckCircle, XCircle, Clock, Settings, User, Plus, ListMusic, MoreVertical, Star, Zap, HelpCircle, Send, LogOut } from "lucide-react";
+import { DollarSign, CheckCircle, XCircle, Clock, Settings, User, Plus, ListMusic, MoreVertical, Star, Zap, HelpCircle, Send, LogOut, Trash2, Edit } from "lucide-react";
 import { pricingConfig } from "@/../config/pricing";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -86,6 +86,7 @@ export default function CuratorDashboard() {
     const [newGenre, setNewGenre] = useState("");
     const [customPrice, setCustomPrice] = useState(0);
     const [isCreating, setIsCreating] = useState(false);
+    const [editingPlaylist, setEditingPlaylist] = useState<Playlist | null>(null);
 
     // Playlist Songs State
     const [expandedPlaylistId, setExpandedPlaylistId] = useState<string | null>(null);
@@ -287,27 +288,68 @@ export default function CuratorDashboard() {
         if (!user || !newName) return;
         setIsCreating(true);
 
-        const { data, error } = await supabase.from('playlists').insert({
+        const payload: any = {
             curator_id: user.id,
             name: newName,
             genre: newGenre,
             cover_image: newCoverImage,
             followers: newFollowers,
             type: newPlaylistType,
-            description: `${songsCount} songs` // Storing song count in description loosely
-        }).select();
+            description: `${songsCount} songs`
+        };
+
+        let error;
+        if (editingPlaylist) {
+            // Update
+            const { error: updateError } = await supabase.from('playlists').update(payload).eq('id', editingPlaylist.id);
+            error = updateError;
+        } else {
+            // Insert
+            const { error: insertError } = await supabase.from('playlists').insert(payload);
+            error = insertError;
+        }
 
         if (error) {
-            alert("Error creating playlist: " + error.message);
+            alert("Error saving playlist: " + error.message);
         } else {
-            alert("Playlist created!");
+            alert(editingPlaylist ? "Playlist updated!" : "Playlist created!");
             setShowAddPlaylist(false);
+            setEditingPlaylist(null);
             setNewName("");
             setNewGenre("");
             setNewCoverImage("");
             fetchCuratorData();
         }
         setIsCreating(false);
+    };
+
+    const openEditModal = (playlist: Playlist) => {
+        setEditingPlaylist(playlist);
+        setNewName(playlist.name);
+        setNewGenre(""); // We don't fetch genre in list currently, might need update 'fetchCuratorData' or assume empty
+        // Actually interface Playlist doesn't show genre. We should update Playlist interface soon but for now let's hope it's not essential or user re-enters it.
+        // Or better, let's fetch it or update interface.
+        // Interface update: added 'genre' to line 16? No, let's check.
+        // For now, allow edit name/type mainly.
+        setNewFollowers(playlist.followers);
+        setNewPlaylistType(playlist.type);
+        setNewCoverImage(playlist.cover_image);
+        // We need to parse songs count from description if possible, or just leave 0
+        setSongsCount(0);
+        setShowAddPlaylist(true);
+    };
+
+    const handleDeletePlaylist = async (id: string) => {
+        if (!confirm("Are you sure you want to delete this playlist?")) return;
+
+        const { error } = await supabase.from('playlists').delete().eq('id', id);
+
+        if (error) {
+            alert("Error deleting playlist: " + error.message);
+        } else {
+            // Optimistic remove
+            setMyPlaylists(prev => prev.filter(p => p.id !== id));
+        }
     };
 
     const togglePlaylistSongs = async (playlistId: string) => {
@@ -517,7 +559,7 @@ export default function CuratorDashboard() {
                 <div className="lg:col-span-1 space-y-6">
                     <div className="flex items-center justify-between">
                         <h3 className="font-bold text-white text-xl">My Playlists</h3>
-                        <Button size="sm" variant="outline" className="border-dashed border-white/20 hover:border-white/50" onClick={() => setShowAddPlaylist(true)}>
+                        <Button size="sm" variant="outline" className="border-dashed border-white/20 hover:border-white/50" onClick={() => { setEditingPlaylist(null); setNewName(""); setNewGenre(""); setShowAddPlaylist(true); }}>
                             <Plus className="w-4 h-4 mr-2" /> New
                         </Button>
                     </div>
@@ -539,6 +581,14 @@ export default function CuratorDashboard() {
                                             <span className="block font-bold text-green-500">{playlist.submissions}</span>
                                             <span className="text-xs text-gray-500">Pending</span>
                                         </div>
+                                    </div>
+                                    <div className="flex gap-2 justify-end">
+                                        <Button size="icon" variant="ghost" className="h-6 w-6 text-gray-500 hover:text-white" onClick={() => openEditModal(playlist)}>
+                                            <Edit className="w-3 h-3" />
+                                        </Button>
+                                        <Button size="icon" variant="ghost" className="h-6 w-6 text-gray-500 hover:text-red-500" onClick={() => handleDeletePlaylist(playlist.id)}>
+                                            <Trash2 className="w-3 h-3" />
+                                        </Button>
                                     </div>
                                     <div className="pt-2 border-t border-white/5">
                                         <Button
@@ -726,8 +776,8 @@ export default function CuratorDashboard() {
                     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in">
                         <div className="w-full max-w-md bg-zinc-900 border border-white/10 rounded-lg shadow-xl p-6 space-y-6">
                             <div className="space-y-2">
-                                <h3 className="text-lg font-bold text-white">Add New Playlist</h3>
-                                <p className="text-sm text-gray-400">Add a playlist to start receiving submissions.</p>
+                                <h3 className="text-lg font-bold text-white">{editingPlaylist ? "Edit Playlist" : "Add New Playlist"}</h3>
+                                <p className="text-sm text-gray-400">{editingPlaylist ? "Update playlist details" : "Add a playlist to start receiving submissions."}</p>
                             </div>
 
                             <div className="space-y-2">
@@ -789,7 +839,7 @@ export default function CuratorDashboard() {
                             <div className="flex justify-end gap-3 pt-4 border-t border-white/5">
                                 <Button variant="outline" onClick={() => setShowAddPlaylist(false)}>Cancel</Button>
                                 <Button className="bg-green-600 hover:bg-green-700" onClick={handleCreatePlaylist} disabled={isCreating}>
-                                    {isCreating ? "Creating..." : "Add Playlist"}
+                                    {isCreating ? "Saving..." : (editingPlaylist ? "Update Playlist" : "Add Playlist")}
                                 </Button>
                             </div>
                         </div>

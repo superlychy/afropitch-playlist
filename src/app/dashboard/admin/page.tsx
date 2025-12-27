@@ -52,15 +52,26 @@ interface ChatMessage {
     is_admin: boolean;
 }
 
+interface AdminPlaylist {
+    id: string;
+    curator_id: string;
+    curator_name?: string;
+    name: string;
+    followers: number;
+    type: string;
+    created_at: string;
+}
+
 export default function AdminDashboard() {
     const { user, isLoading, logout } = useAuth();
     const router = useRouter();
-    const [activeTab, setActiveTab] = useState<"overview" | "users" | "withdrawals" | "support">("overview");
+    const [activeTab, setActiveTab] = useState<"overview" | "users" | "withdrawals" | "support" | "playlists">("overview");
 
     // DATA STATE
     const [usersList, setUsersList] = useState<AdminUser[]>([]);
     const [withdrawals, setWithdrawals] = useState<WithdrawalRequest[]>([]);
     const [tickets, setTickets] = useState<SupportTicket[]>([]);
+    const [allPlaylists, setAllPlaylists] = useState<AdminPlaylist[]>([]);
 
     // Chat State
     const [showChat, setShowChat] = useState(false);
@@ -76,6 +87,13 @@ export default function AdminDashboard() {
     const [newName, setNewName] = useState("");
     const [newRole, setNewRole] = useState<"artist" | "curator" | "admin">("curator");
     const [isAddingUser, setIsAddingUser] = useState(false);
+
+    // Edit Playlist State
+    const [showEditPlaylist, setShowEditPlaylist] = useState(false);
+    const [adminEditingPlaylist, setAdminEditingPlaylist] = useState<AdminPlaylist | null>(null);
+    const [adminNewName, setAdminNewName] = useState("");
+    const [adminNewFollowers, setAdminNewFollowers] = useState(0);
+    const [adminIsSaving, setAdminIsSaving] = useState(false);
 
     useEffect(() => {
         if (!isLoading && (!user || user.role !== "admin")) {
@@ -133,8 +151,26 @@ export default function AdminDashboard() {
                     user_name: t.profiles?.full_name || 'Unknown',
                     subject: t.subject,
                     status: t.status,
-                    last_message: t.message, // Initial message as last message for now
+                    last_message: t.message,
                     date: new Date(t.created_at).toLocaleDateString()
+                })));
+            }
+
+            // 4. Fetch All Playlists
+            const { data: playlistsData } = await supabase
+                .from('playlists')
+                .select('*, profiles(full_name)')
+                .order('created_at', { ascending: false });
+
+            if (playlistsData) {
+                setAllPlaylists(playlistsData.map((p: any) => ({
+                    id: p.id,
+                    curator_id: p.curator_id,
+                    curator_name: p.profiles?.full_name || 'Unknown',
+                    name: p.name,
+                    followers: p.followers,
+                    type: p.type,
+                    created_at: new Date(p.created_at).toLocaleDateString()
                 })));
             }
         };
@@ -248,7 +284,7 @@ export default function AdminDashboard() {
         const optimMsg: ChatMessage = {
             id: Math.random().toString(),
             ticket_id: activeTicket.id,
-            sender_id: user.id,
+            sender_id: user.id!,
             message: text,
             created_at: new Date().toISOString(),
             is_admin: true
@@ -315,271 +351,308 @@ export default function AdminDashboard() {
     if (isLoading) return <div className="p-10 text-center text-white">Loading Admin...</div>;
 
     return (
-        <div className="container mx-auto px-4 max-w-7xl py-12 min-h-screen">
-            <div className="flex justify-between items-center mb-8">
-                <div>
-                    <h1 className="text-3xl font-bold text-white">Admin Dashboard</h1>
-                    <p className="text-gray-400">Platform Management System</p>
-                </div>
-                <div className="flex items-center gap-4">
-                    <div className="flex bg-white/5 p-1 rounded-lg border border-white/10">
-                        {["overview", "users", "withdrawals", "support"].map((tab) => (
-                            <button
-                                key={tab}
-                                onClick={() => setActiveTab(tab as any)}
-                                className={`px-4 py-2 rounded-md text-sm font-medium capitalize transition-all ${activeTab === tab ? "bg-green-600 text-white" : "text-gray-400 hover:text-white"}`}
-                            >
-                                {tab}
-                            </button>
-                        ))}
+        <>
+            <div className="container mx-auto px-4 max-w-7xl py-12 min-h-screen">
+                <div className="flex justify-between items-center mb-8">
+                    <div>
+                        <h1 className="text-3xl font-bold text-white">Admin Dashboard</h1>
+                        <p className="text-gray-400">Platform Management System</p>
                     </div>
-                    <Button variant="outline" size="icon" className="border-white/10 hover:bg-red-500/20 h-10 w-10 group" title="Logout" onClick={logout}>
-                        <LogOut className="w-5 h-5 text-gray-400 group-hover:text-red-500" />
-                    </Button>
+                    <div className="flex items-center gap-4">
+                        <div className="flex bg-white/5 p-1 rounded-lg border border-white/10">
+                            {["overview", "users", "withdrawals", "support", "playlists"].map((tab) => (
+                                <button
+                                    key={tab}
+                                    onClick={() => setActiveTab(tab as any)}
+                                    className={`px-4 py-2 rounded-md text-sm font-medium capitalize transition-all ${activeTab === tab ? "bg-green-600 text-white" : "text-gray-400 hover:text-white"}`}
+                                >
+                                    {tab}
+                                </button>
+                            ))}
+                        </div>
+                        <Button variant="outline" size="icon" className="border-white/10 hover:bg-red-500/20 h-10 w-10 group" title="Logout" onClick={logout}>
+                            <LogOut className="w-5 h-5 text-gray-400 group-hover:text-red-500" />
+                        </Button>
+                    </div>
                 </div>
-            </div>
 
-            {/* OVERVIEW CONTENT */}
-            {activeTab === "overview" && (
-                <div className="space-y-8">
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                        <Card className="bg-blue-600/10 border-blue-500/20">
-                            <CardHeader className="pb-2"><CardTitle className="text-sm text-gray-400">Total Users</CardTitle></CardHeader>
-                            <CardContent><div className="text-2xl font-bold text-white">{usersList.length}</div></CardContent>
-                        </Card>
-                        <Card className="bg-green-600/10 border-green-500/20">
-                            <CardHeader className="pb-2"><CardTitle className="text-sm text-gray-400">Total Revenue</CardTitle></CardHeader>
-                            <CardContent><div className="text-2xl font-bold text-white">{pricingConfig.currency}45,000</div></CardContent>
-                        </Card>
-                        <Card className="bg-yellow-600/10 border-yellow-500/20">
-                            <CardHeader className="pb-2"><CardTitle className="text-sm text-gray-400">Pending Withdrawals</CardTitle></CardHeader>
-                            <CardContent><div className="text-2xl font-bold text-white">{withdrawals.filter(w => w.status === 'pending').length}</div></CardContent>
-                        </Card>
-                        <Card className="bg-red-600/10 border-red-500/20">
-                            <CardHeader className="pb-2"><CardTitle className="text-sm text-gray-400">Open Tickets</CardTitle></CardHeader>
-                            <CardContent><div className="text-2xl font-bold text-white">{tickets.filter(t => t.status === 'open').length}</div></CardContent>
+                {/* OVERVIEW CONTENT */}
+                {activeTab === "overview" && (
+                    <div className="space-y-8">
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                            <Card className="bg-blue-600/10 border-blue-500/20">
+                                <CardHeader className="pb-2"><CardTitle className="text-sm text-gray-400">Total Users</CardTitle></CardHeader>
+                                <CardContent><div className="text-2xl font-bold text-white">{usersList.length}</div></CardContent>
+                            </Card>
+                            <Card className="bg-green-600/10 border-green-500/20">
+                                <CardHeader className="pb-2"><CardTitle className="text-sm text-gray-400">Total Revenue</CardTitle></CardHeader>
+                                <CardContent><div className="text-2xl font-bold text-white">{pricingConfig.currency}45,000</div></CardContent>
+                            </Card>
+                            <Card className="bg-yellow-600/10 border-yellow-500/20">
+                                <CardHeader className="pb-2"><CardTitle className="text-sm text-gray-400">Pending Withdrawals</CardTitle></CardHeader>
+                                <CardContent><div className="text-2xl font-bold text-white">{withdrawals.filter(w => w.status === 'pending').length}</div></CardContent>
+                            </Card>
+                            <Card className="bg-red-600/10 border-red-500/20">
+                                <CardHeader className="pb-2"><CardTitle className="text-sm text-gray-400">Open Tickets</CardTitle></CardHeader>
+                                <CardContent><div className="text-2xl font-bold text-white">{tickets.filter(t => t.status === 'open').length}</div></CardContent>
+                            </Card>
+                        </div>
+
+                        <Card className="bg-black/40 border-white/10">
+                            <CardHeader>
+                                <CardTitle className="text-white">Recent Activity</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="text-gray-400 text-sm">No recent activity logged.</div>
+                            </CardContent>
                         </Card>
                     </div>
+                )}
 
+                {/* USERS MANAGEMENT */}
+                {activeTab === "users" && (
                     <Card className="bg-black/40 border-white/10">
-                        <CardHeader>
-                            <CardTitle className="text-white">Recent Activity</CardTitle>
+                        <CardHeader className="flex flex-row items-center justify-between">
+                            <CardTitle className="text-white">User Management</CardTitle>
+                            <Button size="sm" className="bg-white text-black hover:bg-gray-200" onClick={() => setShowAddUser(true)}>
+                                <Users className="w-4 h-4 mr-2" /> Add User
+                            </Button>
                         </CardHeader>
                         <CardContent>
-                            <div className="text-gray-400 text-sm">No recent activity logged.</div>
-                        </CardContent>
-                    </Card>
-                </div>
-            )}
-
-            {/* USERS MANAGEMENT */}
-            {activeTab === "users" && (
-                <Card className="bg-black/40 border-white/10">
-                    <CardHeader className="flex flex-row items-center justify-between">
-                        <CardTitle className="text-white">User Management</CardTitle>
-                        <Button size="sm" className="bg-white text-black hover:bg-gray-200" onClick={() => setShowAddUser(true)}>
-                            <Users className="w-4 h-4 mr-2" /> Add User
-                        </Button>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="space-y-4">
-                            {usersList.map(u => (
-                                <div key={u.id} className="flex items-center justify-between p-4 bg-white/5 rounded-lg border border-white/5">
-                                    <div className="flex items-center gap-4">
-                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${u.role === 'artist' ? 'bg-purple-500/20 text-purple-500' : 'bg-green-500/20 text-green-500'}`}>
-                                            {u.full_name[0]}
+                            <div className="space-y-4">
+                                {usersList.map(u => (
+                                    <div key={u.id} className="flex items-center justify-between p-4 bg-white/5 rounded-lg border border-white/5">
+                                        <div className="flex items-center gap-4">
+                                            <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${u.role === 'artist' ? 'bg-purple-500/20 text-purple-500' : 'bg-green-500/20 text-green-500'}`}>
+                                                {u.full_name[0]}
+                                            </div>
+                                            <div>
+                                                <p className="font-bold text-white flex items-center gap-2">
+                                                    {u.full_name}
+                                                    <span className={`text-[10px] px-2 py-0.5 rounded-full border ${u.role === 'artist' ? 'border-purple-500 text-purple-500' : 'border-green-500 text-green-500'}`}>{u.role}</span>
+                                                    {u.is_blocked && <span className="text-[10px] bg-red-500 text-white px-2 rounded">BLOCKED</span>}
+                                                </p>
+                                                <p className="text-sm text-gray-500">{u.email}</p>
+                                            </div>
                                         </div>
-                                        <div>
-                                            <p className="font-bold text-white flex items-center gap-2">
-                                                {u.full_name}
-                                                <span className={`text-[10px] px-2 py-0.5 rounded-full border ${u.role === 'artist' ? 'border-purple-500 text-purple-500' : 'border-green-500 text-green-500'}`}>{u.role}</span>
-                                                {u.is_blocked && <span className="text-[10px] bg-red-500 text-white px-2 rounded">BLOCKED</span>}
-                                            </p>
-                                            <p className="text-sm text-gray-500">{u.email}</p>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <Button size="sm" variant="outline" className={`border-red-500/20 ${u.is_blocked ? 'text-green-500 hover:text-green-400' : 'text-red-500 hover:text-red-400'}`} onClick={() => toggleUserBlock(u.id)}>
-                                            {u.is_blocked ? "Unblock" : "Block"}
-                                        </Button>
-                                        <Button size="sm" variant="ghost" className="text-red-500 hover:text-red-400 hover:bg-red-500/10" onClick={() => deleteUser(u.id)}>Delete</Button>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </CardContent>
-                </Card>
-            )}
-
-            {/* WITHDRAWALS MANAGEMENT */}
-            {activeTab === "withdrawals" && (
-                <Card className="bg-black/40 border-white/10">
-                    <CardHeader>
-                        <CardTitle className="text-white">Withdrawal Requests</CardTitle>
-                        <CardDescription>Manage fund payout requests from curators.</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="space-y-4">
-                            {withdrawals.length === 0 && <p className="text-gray-500 text-center py-4">No requests found.</p>}
-                            {withdrawals.map(w => (
-                                <div key={w.id} className="flex flex-col md:flex-row md:items-center justify-between p-4 bg-white/5 rounded-lg border border-white/5 gap-4">
-                                    <div className="flex items-center gap-4">
-                                        <div className="bg-green-500/20 p-2 rounded-full text-green-500">
-                                            <DollarSign className="w-6 h-6" />
-                                        </div>
-                                        <div>
-                                            <p className="font-bold text-white flex items-center gap-2">
-                                                {pricingConfig.currency}{w.amount.toLocaleString()}
-                                                <span className={`text-[10px] px-2 py-0.5 rounded-full uppercase ${w.status === 'pending' ? 'bg-yellow-500 text-black' : w.status === 'approved' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'}`}>
-                                                    {w.status}
-                                                </span>
-                                            </p>
-                                            <p className="text-sm text-gray-400">Requested by <span className="text-white">{w.user_name}</span> • {w.date}</p>
-                                            <p className="text-xs text-gray-500 mt-1 font-mono">{w.bank_details}</p>
-                                        </div>
-                                    </div>
-                                    {w.status === 'pending' && (
                                         <div className="flex items-center gap-2">
-                                            <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={() => handleWithdrawal(w.id, 'approve')}>
-                                                <CheckCircle className="w-4 h-4 mr-1" /> Approve
+                                            <Button size="sm" variant="outline" className={`border-red-500/20 ${u.is_blocked ? 'text-green-500 hover:text-green-400' : 'text-red-500 hover:text-red-400'}`} onClick={() => toggleUserBlock(u.id)}>
+                                                {u.is_blocked ? "Unblock" : "Block"}
                                             </Button>
-                                            <Button size="sm" variant="ghost" className="text-red-500 hover:text-red-400 hover:bg-red-500/10" onClick={() => handleWithdrawal(w.id, 'reject')}>
-                                                <XCircle className="w-4 h-4 mr-1" /> Reject
-                                            </Button>
-                                        </div>
-                                    )}
-                                </div>
-                            ))}
-                        </div>
-                    </CardContent>
-                </Card>
-            )}
-
-            {/* SUPPORT SYSTEM */}
-            {activeTab === "support" && (
-                <Card className="bg-black/40 border-white/10">
-                    <CardHeader>
-                        <CardTitle className="text-white">Support Tickets</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="space-y-4">
-                            {tickets.map(t => (
-                                <div key={t.id} className="flex items-center justify-between p-4 bg-white/5 rounded-lg border border-white/5 hover:bg-white/10 cursor-pointer transition-colors">
-                                    <div className="flex items-center gap-4">
-                                        <div className="bg-blue-500/20 p-2 rounded-full text-blue-500">
-                                            <MessageSquare className="w-6 h-6" />
-                                        </div>
-                                        <div>
-                                            <p className="font-bold text-white">{t.subject}</p>
-                                            <p className="text-sm text-gray-400">From: {t.user_name} • {t.date}</p>
-                                            <p className="text-xs text-gray-500 mt-1 line-clamp-1">{t.last_message}</p>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-3">
-                                        <span className={`text-[10px] px-2 py-1 rounded-full uppercase ${t.status === 'open' ? 'bg-green-500 text-white' : 'bg-gray-500 text-white'}`}>
-                                            {t.status}
-                                        </span>
-                                        <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); openChat(t); }}>Chat</Button>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </CardContent>
-                </Card>
-            )}
-
-
-
-            {/* CHAT MODAL */}
-            {
-                showChat && activeTicket && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in">
-                        <div className="bg-zinc-900 border border-white/10 w-full max-w-2xl h-[600px] flex flex-col rounded-xl shadow-2xl">
-                            {/* Header */}
-                            <div className="p-4 border-b border-white/10 flex justify-between items-center bg-zinc-900 rounded-t-xl">
-                                <div>
-                                    <h3 className="font-bold text-white text-lg">{activeTicket?.subject}</h3>
-                                    <p className="text-sm text-gray-400">Chat with {activeTicket?.user_name}</p>
-                                </div>
-                                <Button variant="ghost" size="icon" onClick={() => setShowChat(false)}><XCircle className="w-6 h-6 text-gray-400" /></Button>
-                            </div>
-
-                            {/* Messages */}
-                            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-black/20">
-                                {chatMessages.length === 0 && (
-                                    <div className="text-center text-gray-500 mt-10">No messages yet. Start the conversation.</div>
-                                )}
-                                {chatMessages.map((msg) => (
-                                    <div key={msg.id} className={`flex ${msg.is_admin ? 'justify-end' : 'justify-start'}`}>
-                                        <div className={`max-w-[70%] p-3 rounded-xl ${msg.is_admin ? 'bg-green-600 text-white' : 'bg-zinc-800 text-gray-200'}`}>
-                                            <p className="text-sm">{msg.message}</p>
-                                            <p className="text-[10px] opacity-50 mt-1 text-right">{new Date(msg.created_at).toLocaleTimeString()}</p>
+                                            <Button size="sm" variant="ghost" className="text-red-500 hover:text-red-400 hover:bg-red-500/10" onClick={() => deleteUser(u.id)}>Delete</Button>
                                         </div>
                                     </div>
                                 ))}
                             </div>
+                        </CardContent>
+                    </Card>
+                )}
 
-                            {/* Input */}
-                            <div className="p-4 border-t border-white/10 bg-zinc-900 rounded-b-xl flex gap-2">
-                                <Input
-                                    value={chatInput}
-                                    onChange={(e) => setChatInput(e.target.value)}
-                                    placeholder="Type a message..."
-                                    className="bg-zinc-800 border-zinc-700 text-white"
-                                    onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
-                                />
-                                <Button className="bg-green-600 hover:bg-green-700" onClick={sendMessage} disabled={sendingMsg}>
-                                    <MessageSquare className="w-4 h-4" />
-                                </Button>
-                            </div>
-                        </div>
-                    </div>
-                )
-            }
-
-            {/* ADD USER MODAL */}
-            {
-                showAddUser && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in">
-                        <div className="bg-zinc-900 border border-white/10 w-full max-w-md p-6 rounded-lg space-y-4">
-                            <h3 className="text-xl font-bold text-white">Add New User</h3>
-                            <p className="text-sm text-gray-400">Invite a new user to the platform.</p>
-
-                            <div className="space-y-3">
-                                <div>
-                                    <label className="text-xs text-gray-400 mb-1 block">Full Name</label>
-                                    <Input value={newName} onChange={e => setNewName(e.target.value)} placeholder="John Doe" className="bg-zinc-800 border-zinc-700" />
-                                </div>
-                                <div>
-                                    <label className="text-xs text-gray-400 mb-1 block">Email</label>
-                                    <Input value={newUserEmail} onChange={e => setNewUserEmail(e.target.value)} placeholder="john@example.com" className="bg-zinc-800 border-zinc-700" />
-                                </div>
-                                <div>
-                                    <label className="text-xs text-gray-400 mb-1 block">Role</label>
-                                    <div className="flex gap-2">
-                                        {(['artist', 'curator', 'admin'] as const).map(r => (
-                                            <div
-                                                key={r}
-                                                className={`px-3 py-1.5 rounded cursor-pointer border ${newRole === r ? 'bg-green-600 border-green-500 text-white' : 'bg-zinc-800 border-zinc-700 text-gray-400'}`}
-                                                onClick={() => setNewRole(r)}
-                                            >
-                                                <span className="capitalize text-xs font-bold">{r}</span>
+                {/* WITHDRAWALS MANAGEMENT */}
+                {activeTab === "withdrawals" && (
+                    <Card className="bg-black/40 border-white/10">
+                        <CardHeader>
+                            <CardTitle className="text-white">Withdrawal Requests</CardTitle>
+                            <CardDescription>Manage fund payout requests from curators.</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="space-y-4">
+                                {withdrawals.length === 0 && <p className="text-gray-500 text-center py-4">No requests found.</p>}
+                                {withdrawals.map(w => (
+                                    <div key={w.id} className="flex flex-col md:flex-row md:items-center justify-between p-4 bg-white/5 rounded-lg border border-white/5 gap-4">
+                                        <div className="flex items-center gap-4">
+                                            <div className="bg-green-500/20 p-2 rounded-full text-green-500">
+                                                <DollarSign className="w-6 h-6" />
                                             </div>
-                                        ))}
+                                            <div>
+                                                <p className="font-bold text-white flex items-center gap-2">
+                                                    {pricingConfig.currency}{w.amount.toLocaleString()}
+                                                    <span className={`text-[10px] px-2 py-0.5 rounded-full uppercase ${w.status === 'pending' ? 'bg-yellow-500 text-black' : w.status === 'approved' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'}`}>
+                                                        {w.status}
+                                                    </span>
+                                                </p>
+                                                <p className="text-sm text-gray-400">Requested by <span className="text-white">{w.user_name}</span> • {w.date}</p>
+                                                <p className="text-xs text-gray-500 mt-1 font-mono">{w.bank_details}</p>
+                                            </div>
+                                        </div>
+                                        {w.status === 'pending' && (
+                                            <div className="flex items-center gap-2">
+                                                <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={() => handleWithdrawal(w.id, 'approve')}>
+                                                    <CheckCircle className="w-4 h-4 mr-1" /> Approve
+                                                </Button>
+                                                <Button size="sm" variant="ghost" className="text-red-500 hover:text-red-400 hover:bg-red-500/10" onClick={() => handleWithdrawal(w.id, 'reject')}>
+                                                    <XCircle className="w-4 h-4 mr-1" /> Reject
+                                                </Button>
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
+
+                {/* SUPPORT SYSTEM */}
+                {activeTab === "support" && (
+                    <Card className="bg-black/40 border-white/10">
+                        <CardHeader>
+                            <CardTitle className="text-white">Support Tickets</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="space-y-4">
+                                {tickets.map(t => (
+                                    <div key={t.id} className="flex items-center justify-between p-4 bg-white/5 rounded-lg border border-white/5 hover:bg-white/10 cursor-pointer transition-colors">
+                                        <div className="flex items-center gap-4">
+                                            <div className="bg-blue-500/20 p-2 rounded-full text-blue-500">
+                                                <MessageSquare className="w-6 h-6" />
+                                            </div>
+                                            <div>
+                                                <p className="font-bold text-white">{t.subject}</p>
+                                                <p className="text-sm text-gray-400">From: {t.user_name} • {t.date}</p>
+                                                <p className="text-xs text-gray-500 mt-1 line-clamp-1">{t.last_message}</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-3">
+                                            <span className={`text-[10px] px-2 py-1 rounded-full uppercase ${t.status === 'open' ? 'bg-green-500 text-white' : 'bg-gray-500 text-white'}`}>
+                                                {t.status}
+                                            </span>
+                                            <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); openChat(t); }}>Chat</Button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
+
+
+
+            </div>
+
+            {/* CHAT MODAL */}
+            {showChat && activeTicket && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in">
+                    <div className="bg-zinc-900 border border-white/10 w-full max-w-2xl h-[600px] flex flex-col rounded-xl shadow-2xl">
+                        {/* Header */}
+                        <div className="p-4 border-b border-white/10 flex justify-between items-center bg-zinc-900 rounded-t-xl">
+                            <div>
+                                <h3 className="font-bold text-white text-lg">{activeTicket?.subject}</h3>
+                                <p className="text-sm text-gray-400">Chat with {activeTicket?.user_name}</p>
+                            </div>
+                            <Button variant="ghost" size="icon" onClick={() => setShowChat(false)}><XCircle className="w-6 h-6 text-gray-400" /></Button>
+                        </div>
+
+                        {/* Messages */}
+                        <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-black/20">
+                            {chatMessages.length === 0 && (
+                                <div className="text-center text-gray-500 mt-10">No messages yet. Start the conversation.</div>
+                            )}
+                            {chatMessages.map((msg) => (
+                                <div key={msg.id} className={`flex ${msg.is_admin ? 'justify-end' : 'justify-start'}`}>
+                                    <div className={`max-w-[70%] p-3 rounded-xl ${msg.is_admin ? 'bg-green-600 text-white' : 'bg-zinc-800 text-gray-200'}`}>
+                                        <p className="text-sm">{msg.message}</p>
+                                        <p className="text-[10px] opacity-50 mt-1 text-right">{new Date(msg.created_at).toLocaleTimeString()}</p>
                                     </div>
                                 </div>
-                            </div>
+                            ))}
+                        </div>
 
-                            <div className="flex justify-end gap-2 pt-2">
-                                <Button variant="ghost" onClick={() => setShowAddUser(false)}>Cancel</Button>
-                                <Button className="bg-green-600" onClick={handleAddUser} disabled={isAddingUser}>
-                                    {isAddingUser ? "Sending Invite..." : "Send Invite"}
-                                </Button>
-                            </div>
+                        {/* Input */}
+                        <div className="p-4 border-t border-white/10 bg-zinc-900 rounded-b-xl flex gap-2">
+                            <Input
+                                value={chatInput}
+                                onChange={(e) => setChatInput(e.target.value)}
+                                placeholder="Type a message..."
+                                className="bg-zinc-800 border-zinc-700 text-white"
+                                onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
+                            />
+                            <Button className="bg-green-600 hover:bg-green-700" onClick={sendMessage} disabled={sendingMsg}>
+                                <MessageSquare className="w-4 h-4" />
+                            </Button>
                         </div>
                     </div>
-                )
-            }
-        </div>
+                </div>
+            )}
+
+            {/* ADD USER MODAL */}
+            {showAddUser && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in">
+                    <div className="bg-zinc-900 border border-white/10 w-full max-w-md p-6 rounded-lg space-y-4">
+                        <h3 className="text-xl font-bold text-white">Add New User</h3>
+                        <p className="text-sm text-gray-400">Invite a new user to the platform.</p>
+
+                        <div className="space-y-3">
+                            <div>
+                                <label className="text-xs text-gray-400 mb-1 block">Full Name</label>
+                                <Input value={newName} onChange={e => setNewName(e.target.value)} placeholder="John Doe" className="bg-zinc-800 border-zinc-700" />
+                            </div>
+                            <div>
+                                <label className="text-xs text-gray-400 mb-1 block">Email</label>
+                                <Input value={newUserEmail} onChange={e => setNewUserEmail(e.target.value)} placeholder="john@example.com" className="bg-zinc-800 border-zinc-700" />
+                            </div>
+                            <div>
+                                <label className="text-xs text-gray-400 mb-1 block">Role</label>
+                                <div className="flex gap-2">
+                                    {(['artist', 'curator', 'admin'] as const).map(r => (
+                                        <div
+                                            key={r}
+                                            className={`px-3 py-1.5 rounded cursor-pointer border ${newRole === r ? 'bg-green-600 border-green-500 text-white' : 'bg-zinc-800 border-zinc-700 text-gray-400'}`}
+                                            onClick={() => setNewRole(r)}
+                                        >
+                                            <span className="capitalize text-xs font-bold">{r}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex justify-end gap-2 pt-2">
+                            <Button variant="ghost" onClick={() => setShowAddUser(false)}>Cancel</Button>
+                            <Button className="bg-green-600" onClick={handleAddUser} disabled={isAddingUser}>
+                                {isAddingUser ? "Sending Invite..." : "Send Invite"}
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* EDIT PLAYLIST MODAL */}
+            {showEditPlaylist && adminEditingPlaylist && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in">
+                    <div className="bg-zinc-900 border border-white/10 w-full max-w-md p-6 rounded-lg space-y-4">
+                        <h3 className="text-xl font-bold text-white">Edit Playlist</h3>
+                        <div className="space-y-4">
+                            <div>
+                                <label className="text-xs text-gray-400 mb-1 block">Name</label>
+                                <Input value={adminNewName} onChange={e => setAdminNewName(e.target.value)} className="bg-zinc-800 border-zinc-700" />
+                            </div>
+                            <div>
+                                <label className="text-xs text-gray-400 mb-1 block">Followers</label>
+                                <Input type="number" value={adminNewFollowers} onChange={e => setAdminNewFollowers(Number(e.target.value))} className="bg-zinc-800 border-zinc-700" />
+                            </div>
+                        </div>
+                        <div className="flex justify-end gap-2 pt-4">
+                            <Button variant="ghost" onClick={() => setShowEditPlaylist(false)}>Cancel</Button>
+                            <Button className="bg-green-600" disabled={adminIsSaving} onClick={async () => {
+                                setAdminIsSaving(true);
+                                const { error } = await supabase.from('playlists').update({
+                                    name: adminNewName,
+                                    followers: adminNewFollowers
+                                }).eq('id', adminEditingPlaylist.id);
+
+                                if (error) {
+                                    alert(error.message);
+                                } else {
+                                    alert("Playlist updated!");
+                                    setAllPlaylists(prev => prev.map(p => p.id === adminEditingPlaylist.id ? { ...p, name: adminNewName, followers: adminNewFollowers } : p));
+                                    setShowEditPlaylist(false);
+                                }
+                                setAdminIsSaving(false);
+                            }}>Save Changes</Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </>
     );
 }
