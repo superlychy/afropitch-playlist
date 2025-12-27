@@ -58,6 +58,8 @@ create table public.submissions (
   amount_paid numeric not null,
   status text check (status in ('pending', 'accepted', 'declined')) default 'pending',
   feedback text,
+  tracking_slug text,
+  clicks int default 0,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
