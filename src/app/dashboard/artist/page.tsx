@@ -12,6 +12,9 @@ import { Copy, ExternalLink, BarChart3, TrendingUp, AlertCircle } from "lucide-r
 import { supabase } from "@/lib/supabase";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import dynamic from "next/dynamic";
+
+const PayWithPaystack = dynamic(() => import("@/components/PaystackButton"), { ssr: false });
 
 // Type for fetched submissions
 interface Submission {
@@ -133,14 +136,25 @@ export default function ArtistDashboard() {
     if (isLoading) return <div className="p-8 text-center text-gray-500">Loading dashboard...</div>;
     if (!user) return null;
 
-    const handleLoadFunds = (e: React.FormEvent) => {
-        e.preventDefault();
+    const handlePaymentSuccess = async (reference: any) => {
         const val = parseInt(amount);
-        if (val > 0) {
-            loadFunds(val);
-            setAmount("");
-            alert(`Successfully loaded ${pricingConfig.currency}${val.toLocaleString()}`);
+        if (val <= 0) return;
+
+        // 1. Update Database
+        const { error } = await supabase.from('profiles').update({
+            balance: (user.balance || 0) + val
+        }).eq('id', user.id);
+
+        if (error) {
+            alert("Payment successful but failed to update balance. Please contact support.");
+            console.error(error);
+            return;
         }
+
+        // 2. Update Local State
+        loadFunds(val);
+        setAmount("");
+        alert(`Successfully loaded ${pricingConfig.currency}${val.toLocaleString()}`);
     };
 
     return (
@@ -240,7 +254,7 @@ export default function ArtistDashboard() {
                         <CardDescription>Top up your wallet for faster checkout.</CardDescription>
                     </CardHeader>
                     <CardContent>
-                        <form onSubmit={handleLoadFunds} className="space-y-4">
+                        <div className="space-y-4">
                             <div className="space-y-2">
                                 <Input
                                     type="number"
@@ -248,13 +262,23 @@ export default function ArtistDashboard() {
                                     value={amount}
                                     onChange={(e) => setAmount(e.target.value)}
                                     min="1000"
-                                    required
                                 />
                             </div>
-                            <Button className="w-full bg-white text-black hover:bg-gray-200">
-                                <Plus className="w-4 h-4 mr-2" /> Add Funds
-                            </Button>
-                        </form>
+                            {parseInt(amount) > 0 ? (
+                                <div className="w-full">
+                                    <PayWithPaystack
+                                        email={user.email}
+                                        amount={parseInt(amount) * 100}
+                                        onSuccess={handlePaymentSuccess}
+                                        onClose={() => console.log("Payment closed")}
+                                    />
+                                </div>
+                            ) : (
+                                <Button className="w-full bg-white text-black hover:bg-gray-200" disabled>
+                                    <Plus className="w-4 h-4 mr-2" /> Enter Amount
+                                </Button>
+                            )}
+                        </div>
                         <div className="mt-6 p-3 bg-white/5 rounded text-xs text-gray-400">
                             <span className="text-green-400 font-bold block mb-1">PRO TIP:</span>
                             Load funds to get bulk discounts on playlist submissions.
