@@ -339,7 +339,7 @@ export default function CuratorDashboard() {
             const sub = reviews.find(r => r.id === submissionId);
             if (sub) {
                 const cleanTitle = sub.song_title.replace(/[^a-z0-9]/gi, '-').toLowerCase();
-                trackingSlug = `${cleanTitle} -${Math.random().toString(36).substring(2, 7)} `;
+                trackingSlug = `${cleanTitle}-${Math.random().toString(36).substring(2, 7)}`;
             }
         }
 
