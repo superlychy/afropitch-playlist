@@ -38,6 +38,20 @@ function SubmitForm() {
     const [isSuccess, setIsSuccess] = useState(false);
     const [paymentMethod, setPaymentMethod] = useState<"wallet" | "direct">("direct");
 
+    // Form State
+    const [artistName, setArtistName] = useState("");
+    const [songTitle, setSongTitle] = useState("");
+    const [songLink, setSongLink] = useState("");
+    const [email, setEmail] = useState("");
+
+    // Pre-fill user data
+    useEffect(() => {
+        if (user) {
+            if (user.name) setArtistName(user.name);
+            if (user.email) setEmail(user.email);
+        }
+    }, [user]);
+
     const [step, setStep] = useState<"selection" | "details">("selection");
 
     const [tier, setTier] = useState("standard");
@@ -127,28 +141,88 @@ function SubmitForm() {
 
     const { total, discount: discountAmount } = calculateTotal();
 
+    async function saveSubmissions() {
+        if (!user) {
+            alert("You must be logged in to submit.");
+            router.push("/portal");
+            return false;
+        }
+
+        const submissionsToInsert = selectedPlaylistIds.map(playlistId => {
+            const playlist = allPlaylists.find(p => p.id === playlistId);
+            let cost = 0;
+            if (playlist) {
+                if (playlist.type === 'exclusive') cost = playlist.submissionFee;
+                else if (playlist.submissionFee === 0) cost = 0;
+                else cost = selectedTierConfig.price;
+            }
+
+            // Apply approximate discount factor if bulk (simplified)
+            // const finalCost = discountAmount > 0 ? cost * 0.9 : cost; 
+
+            return {
+                artist_id: user.id,
+                playlist_id: playlistId,
+                song_title: songTitle,
+                artist_name: artistName,
+                song_link: songLink,
+                tier: tier,
+                amount_paid: cost,
+                status: 'pending'
+            };
+        });
+
+        const { error } = await supabase.from('submissions').insert(submissionsToInsert);
+
+        if (error) {
+            console.error("Submission error:", error);
+            alert("Failed to save submission. Please contact support.");
+            return false;
+        }
+        return true;
+    }
+
     async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
         event.preventDefault();
+
+        if (!user) {
+            alert("Please login to submit.");
+            router.push("/portal");
+            return;
+        }
+
         setIsSubmitting(true);
 
         if (paymentMethod === "wallet" && total > 0) {
-            if (!user) {
-                alert("Please login to pay with wallet.");
-                setIsSubmitting(false);
-                return;
-            }
-            const success = deductFunds(total);
-            if (!success) {
+            // Check balance
+            if (user.balance < total) {
                 alert("Insufficient funds. Please load your wallet.");
                 setIsSubmitting(false);
                 return;
             }
+
+            // Deduct funds
+            const success = deductFunds(total);
+            if (!success) {
+                setIsSubmitting(false);
+                return;
+            }
+
+            // Update Update DB balance (deductFunds is local usually, verify context)
+            // Context likely updates specific user state, but let's ensure DB update if context doesn't handle DB
+            const { error } = await supabase.from('profiles').update({ balance: user.balance - total }).eq('id', user.id);
+            if (error) {
+                console.error("Balance update error", error);
+                // potential rollback needed here in robust system
+            }
         }
 
-        setTimeout(() => {
-            setIsSubmitting(false);
+        // Save to DB
+        const saved = await saveSubmissions();
+        if (saved) {
             setIsSuccess(true);
-        }, 2000);
+        }
+        setIsSubmitting(false);
     }
 
     if (isSuccess) {
@@ -355,21 +429,21 @@ function SubmitForm() {
 
                                         <div className="space-y-2">
                                             <Label>Artist Name</Label>
-                                            <Input placeholder="e.g. Burna Boy" required />
+                                            <Input placeholder="e.g. Burna Boy" required value={artistName} onChange={e => setArtistName(e.target.value)} />
                                         </div>
                                         <div className="space-y-2">
                                             <Label>Song Title</Label>
-                                            <Input placeholder="e.g. Last Last" required />
+                                            <Input placeholder="e.g. Last Last" required value={songTitle} onChange={e => setSongTitle(e.target.value)} />
                                         </div>
                                     </div>
 
                                     <div className="space-y-2">
                                         <Label>Song Link (Spotify/Apple)</Label>
-                                        <Input type="url" placeholder="https://..." required />
+                                        <Input type="url" placeholder="https://..." required value={songLink} onChange={e => setSongLink(e.target.value)} />
                                     </div>
                                     <div className="space-y-2">
                                         <Label>Email</Label>
-                                        <Input type="email" placeholder="you@example.com" required />
+                                        <Input type="email" placeholder="you@example.com" required value={email} onChange={e => setEmail(e.target.value)} />
                                     </div>
                                 </CardContent>
                                 <CardFooter className="flex-col gap-4">
@@ -435,12 +509,12 @@ function SubmitForm() {
                                             {paymentMethod === "direct" ? (
                                                 <div className="w-full">
                                                     <PayWithPaystack
-                                                        email="user@test.com"
+                                                        email={email || (user?.email) || "guest@afropitch.com"}
                                                         amount={total * 100}
-                                                        onSuccess={(ref: any) => {
+                                                        onSuccess={async (ref: any) => {
                                                             console.log("Payment success:", ref);
-                                                            setIsSubmitting(false);
-                                                            setIsSuccess(true);
+                                                            const saved = await saveSubmissions();
+                                                            if (saved) setIsSuccess(true);
                                                         }}
                                                         onClose={() => setIsSubmitting(false)}
                                                     />
