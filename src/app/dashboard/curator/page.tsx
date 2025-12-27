@@ -358,6 +358,8 @@ export default function CuratorDashboard() {
             }
         }
 
+
+
         const updateData: any = { status: action, feedback };
         if (trackingSlug) updateData.tracking_slug = trackingSlug;
 
@@ -369,6 +371,30 @@ export default function CuratorDashboard() {
         if (error) {
             alert("Error updating submission: " + error.message);
         } else {
+            // If APPROVED, credit curator wallet
+            if (action === 'accepted') {
+                const sub = reviews.find(r => r.id === submissionId);
+                // Credit logic: 100% of amount_paid (or platform fee could be deducted here)
+                if (sub && sub.amount_paid > 0) {
+                    const { error: creditError } = await supabase.rpc('increment_balance', {
+                        user_id: user.id,
+                        amount: sub.amount_paid
+                    });
+
+                    if (creditError) {
+                        // Fallback direct update if RPC missing (less safe but works for now)
+                        await supabase.from('profiles').update({
+                            balance: (user.balance || 0) + sub.amount_paid
+                        }).eq('id', user.id);
+                    }
+                    // Update local state to reflect balance immediately
+                    // (Assuming AuthContext handles user state, but we might need a manual refresh or rely on context reload)
+                    // Since user obj is from context, we can't mutate it easily without a setter exposed.
+                    // The dashboard shows `user.balance` from context.
+                    // We should ideally reload auth user or just wait for next fetch.
+                }
+            }
+
             // Refresh data
             fetchCuratorData();
         }

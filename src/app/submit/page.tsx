@@ -148,6 +148,20 @@ function SubmitForm() {
             return false;
         }
 
+        // Calculate total and discount distribution
+        const { total: grandTotal, discount: totalDiscount } = calculateTotal();
+
+        // Count how many playlists have a cost > 0 to distribute discount
+        const paidPlaylistsCount = selectedPlaylistIds.filter(id => {
+            const p = allPlaylists.find(pl => pl.id === id);
+            if (!p) return false;
+            if (p.type === 'exclusive') return p.submissionFee > 0;
+            if (p.submissionFee === 0) return false;
+            return selectedTierConfig.price > 0;
+        }).length;
+
+        const discountPerItem = paidPlaylistsCount > 0 ? totalDiscount / paidPlaylistsCount : 0;
+
         const submissionsToInsert = selectedPlaylistIds.map(playlistId => {
             const playlist = allPlaylists.find(p => p.id === playlistId);
             let cost = 0;
@@ -157,8 +171,8 @@ function SubmitForm() {
                 else cost = selectedTierConfig.price;
             }
 
-            // Apply approximate discount factor if bulk (simplified)
-            // const finalCost = discountAmount > 0 ? cost * 0.9 : cost; 
+            // Apply distributed discount if this item has a cost
+            const finalCost = cost > 0 ? Math.max(0, cost - discountPerItem) : 0;
 
             return {
                 artist_id: user.id,
@@ -167,7 +181,7 @@ function SubmitForm() {
                 artist_name: artistName,
                 song_link: songLink,
                 tier: tier,
-                amount_paid: cost,
+                amount_paid: finalCost,
                 status: 'pending'
             };
         });

@@ -55,8 +55,7 @@ export default function AdminDashboard() {
 
     useEffect(() => {
         if (!isLoading && (!user || user.role !== "admin")) {
-            // In a real app, strict redirect. For demo/dev, we might allow viewing if we manually set role in DB
-            // router.push("/portal"); 
+            router.push("/portal");
         }
 
         const fetchData = async () => {
