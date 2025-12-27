@@ -53,7 +53,8 @@ export default function PortalPage() {
     // However, to avoid "Cannot update during render" warnings, let's use a small effect or just keep it simple.
     // The previous code had it in render. I'll stick to that but maybe safer.
     if (user) {
-        if (user.role === 'curator') router.push("/dashboard/curator");
+        if (user.role === 'admin') router.push("/dashboard/admin");
+        else if (user.role === 'curator') router.push("/dashboard/curator");
         else router.push("/dashboard/artist");
     }
 
