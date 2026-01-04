@@ -10,7 +10,7 @@ const supabase = createClient(
 );
 
 const CURRENCY = '₦';
-const SITE_URL = Deno.env.get('SITE_URL') ?? 'https://afropitch.vercel.app'; // Default to Vercel, override with Env Var
+const SITE_URL = Deno.env.get('SITE_URL') ?? 'https://afropitch-playlist.vercel.app'; // Default to Vercel, override with Env Var
 
 Deno.serve(async (req) => {
     // 1. Verify Request
