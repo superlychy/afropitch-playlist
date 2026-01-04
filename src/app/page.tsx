@@ -27,8 +27,8 @@ export default function Home() {
           </h1>
 
           <p className="text-lg md:text-xl text-gray-400 max-w-2xl mx-auto">
-            The trusted platform for Amapiano, Afrobeats, and Afro-Pop artists.
-            Real human feedback and playlist consideration starting at{" "}
+            The trusted platform for Amapiano, Afrobeats, and Francophone African artists.
+            Real human feedback, free Afrobeat playlist options, and premium paid playlist pitching starting at{" "}
             <span className="text-white font-semibold">
               {pricingConfig.currency}{pricingConfig.tiers.standard.price.toLocaleString()}
             </span>.
@@ -84,7 +84,7 @@ export default function Home() {
           </p>
           <ul className="space-y-4">
             {[
-              "Strictly for Afro genres (Afrobeats, Amapiano, etc.)",
+              "Strictly for Afro genres (Afrobeats, Amapiano, Francophone African)",
               "Direct feedback from real curators",
               "Honest pricing - no hidden fees",
               "Secure platform"
