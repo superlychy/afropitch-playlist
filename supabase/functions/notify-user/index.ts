@@ -107,7 +107,7 @@ async function handleTransaction(record: any) {
         referenceId: record.id.split('-')[0], // Short ID
         description: record.description || 'Transaction',
         paymentMethod: 'Wallet/System',
-        dashboardLink: 'https://afropitch.vercel.app/dashboard/artist' // Generic link, role detection tough here without more queries
+        dashboardLink: 'http://localhost:3000/dashboard/artist' // Generic link, role detection tough here without more queries
     });
 
     await sendEmail(user.email, subject, html);
@@ -137,7 +137,7 @@ async function handleSubmissionUpdate(record: any) {
             playlistName: playlistName,
             curatorName: curatorName,
             playlistLink: playlistLink,
-            dashboardLink: 'https://afropitch.vercel.app/dashboard/artist'
+            dashboardLink: 'http://localhost:3000/dashboard/artist'
         });
         await sendEmail(user.email, subject, html);
     }
@@ -149,7 +149,7 @@ async function handleSubmissionUpdate(record: any) {
             playlistName: playlistName,
             feedback: record.feedback || 'No specific feedback provided.',
             refundAmount: `${CURRENCY}${record.amount_paid}`,
-            dashboardLink: 'https://afropitch.vercel.app/dashboard/artist'
+            dashboardLink: 'http://localhost:3000/dashboard/artist'
         });
         await sendEmail(user.email, subject, html);
     }
@@ -186,7 +186,7 @@ async function handleSupportUpdate(record: any) {
         name: user.full_name || 'User',
         subject: record.subject,
         status: record.status,
-        dashboardLink: 'https://afropitch.vercel.app/dashboard' // generic
+        dashboardLink: 'http://localhost:3000/dashboard' // generic
     });
 
     await sendEmail(user.email, subject, html);
