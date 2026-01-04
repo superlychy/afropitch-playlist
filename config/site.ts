@@ -1,6 +1,6 @@
 export const siteConfig = {
   name: "AfroPitch Playlist",
-  description: "Get Your Afro Music Reviewed & Pitched to Playlists in 48 Hours. The trusted platform for Afro-based artists.",
+  description: "The #1 African Music Promotion Platform. Free submit your music to top curated Afrobeat, Amapiano, and Francophone African playlists.",
   url: "https://afropitchplay.best",
   ogImage: "https://afropitchplaylist.com/og.jpg", // Placeholder
   links: {
