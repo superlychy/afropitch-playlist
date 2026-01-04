@@ -18,7 +18,37 @@ export default function CuratorProfile() {
 
     useEffect(() => {
         const fetchCuratorData = async () => {
-            // Fetch Profile
+            if (id === 'admin') {
+                // Mock Admin Profile
+                setCurator({
+                    id: 'admin',
+                    full_name: 'AfroPitch Team',
+                    bio: 'Official in-house curation team. We manage the top editorial playlists on the platform.',
+                    avatar_url: '/logo-icon.png',
+                    verification_status: 'verified'
+                });
+
+                // Fetch All Admin Playlists
+                // First get admin IDs
+                const { data: admins } = await supabase.from('profiles').select('id').eq('role', 'admin');
+                const adminIds = admins?.map(a => a.id) || [];
+
+                if (adminIds.length > 0) {
+                    const { data: plData } = await supabase
+                        .from('playlists')
+                        .select('*')
+                        .in('curator_id', adminIds)
+                        .eq('is_active', true);
+
+                    if (plData) setPlaylists(plData);
+                } else {
+                    setPlaylists([]);
+                }
+                setIsLoading(false);
+                return;
+            }
+
+            // Fetch Real Profile
             const { data: profile, error } = await supabase
                 .from('profiles')
                 .select('*')

@@ -13,21 +13,40 @@ export default function CuratorsPage() {
 
     useEffect(() => {
         const fetchCurators = async () => {
-            const { data } = await supabase
+            // 1. Fetch Real Curators
+            const { data: realCurators } = await supabase
                 .from('profiles')
                 .select('*, playlists(*)')
                 .eq('role', 'curator');
 
-            if (data) {
-                setCuratorList(data.map(c => ({
-                    id: c.id,
-                    name: c.full_name || 'Curator',
-                    bio: c.bio || 'Music Curator on AfroPitch.',
-                    verified: c.verification_status === 'verified',
-                    playlistCount: c.playlists?.length || 0,
-                    avatar: c.avatar_url
-                })));
-            }
+            // 2. Fetch Admin Playlists Count (for AfroPitch Team)
+            const { count } = await supabase
+                .from('playlists')
+                .select('*', { count: 'exact', head: true })
+                .eq('is_active', true)
+                .in('curator_id', (await supabase.from('profiles').select('id').eq('role', 'admin')).data?.map(a => a.id) || []);
+
+            const afropitchTeam = {
+                id: 'admin', // Virtual ID for routing
+                name: 'AfroPitch Team',
+                bio: 'Official in-house curation team. We manage the top editorial playlists on the platform.',
+                verified: true,
+                playlistCount: count || 0,
+                avatar: '/logo-icon.png', // Assuming site icon exists or use a placeholder
+                isTeam: true
+            };
+
+            const mappedCurators = realCurators ? realCurators.map(c => ({
+                id: c.id,
+                name: c.full_name || 'Curator',
+                bio: c.bio || 'Music Curator on AfroPitch.',
+                verified: c.verification_status === 'verified',
+                playlistCount: c.playlists?.length || 0,
+                avatar: c.avatar_url
+            })) : [];
+
+            // Prepend Team
+            setCuratorList([afropitchTeam, ...mappedCurators]);
             setLoading(false);
         };
         fetchCurators();
