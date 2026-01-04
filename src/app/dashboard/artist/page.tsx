@@ -246,15 +246,7 @@ export default function ArtistDashboard() {
                             <span className="absolute top-3 right-3 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-zinc-950 animate-pulse"></span>
                         )}
                     </Button>
-                    <div className="bg-green-600/10 border border-green-500/20 px-6 py-4 rounded-xl flex items-center gap-4">
-                        <div className="bg-green-600 p-2 rounded-full text-white">
-                            <Wallet className="w-6 h-6" />
-                        </div>
-                        <div>
-                            <span className="block text-xs text-gray-400 uppercase tracking-widest">Available Credits</span>
-                            <span className="text-2xl font-bold text-white">{pricingConfig.currency}{user.balance.toLocaleString()}</span>
-                        </div>
-                    </div>
+
                     {/* Support Button */}
                     <Button variant="outline" size="icon" className="border-white/10 hover:bg-white/10 h-12 w-12" title="Contact Support" onClick={() => setShowSupport(true)}>
                         <HelpCircle className="w-6 h-6 text-gray-400" />
@@ -288,9 +280,9 @@ export default function ArtistDashboard() {
                 )
             }
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+            <div className="grid grid-cols-1 mb-8">
                 {/* Submit New Music CTA */}
-                <Card className="bg-gradient-to-br from-green-900/40 to-black border-green-500/30 lg:col-span-2">
+                <Card className="bg-gradient-to-br from-green-900/40 to-black border-green-500/30">
                     <CardContent className="p-8 flex flex-col md:flex-row items-center justify-between gap-6">
                         <div className="space-y-2">
                             <h2 className="text-2xl font-bold text-white">Submit New Music</h2>
@@ -299,34 +291,6 @@ export default function ArtistDashboard() {
                         <Button size="lg" className="bg-green-600 hover:bg-green-700 font-bold text-lg px-8 py-6 shadow-lg shadow-green-900/20" onClick={() => router.push("/submit")}>
                             Start Campaign
                         </Button>
-                    </CardContent>
-                </Card>
-
-                {/* Load Funds */}
-                <Card className="bg-white/5 border-white/10">
-                    <CardHeader>
-                        <CardTitle className="text-white text-lg flex items-center gap-2"><CreditCard className="w-5 h-5 text-green-500" /> Load Funds</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className="flex gap-2">
-                            <Input
-                                type="number"
-                                placeholder="Amount (NGN)"
-                                value={amount}
-                                onChange={(e) => setAmount(e.target.value)}
-                                className="bg-black/40 border-white/10 text-white"
-                            />
-                        </div>
-                        {parseInt(amount) > 0 ? (
-                            <PayWithPaystack
-                                email={user.email}
-                                amount={parseInt(amount) * 100}
-                                onSuccess={handlePaymentSuccess}
-                                onClose={() => { }}
-                            />
-                        ) : (
-                            <Button className="w-full bg-white/10 text-gray-500 cursor-not-allowed">Enter Amount</Button>
-                        )}
                     </CardContent>
                 </Card>
             </div>
@@ -406,13 +370,49 @@ export default function ArtistDashboard() {
                     )}
                 </div>
 
-                {/* Right Column: Transaction History */}
+                {/* Right Column: Wallet & History */}
                 <div className="space-y-6">
-                    <div className="flex items-center justify-between">
-                        <h2 className="text-xl font-bold text-white flex items-center gap-2"><CreditCard className="w-5 h-5 text-gray-400" /> Transaction History</h2>
-                        <Button variant="ghost" size="sm" className="text-green-500 hover:text-green-400">View All</Button>
+                    {/* Integrated Wallet Card */}
+                    <Card className="bg-zinc-900 border-white/10 overflow-hidden">
+                        <div className="bg-gradient-to-r from-green-900/40 to-black p-6 border-b border-green-500/10">
+                            <h3 className="text-xs font-medium text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-2">
+                                <Wallet className="w-4 h-4 text-green-500" /> Available Balance
+                            </h3>
+                            <div className="text-3xl font-bold text-white tracking-tight">
+                                {pricingConfig.currency}{user.balance.toLocaleString()}
+                            </div>
+                        </div>
+                        <CardContent className="p-6">
+                            <h4 className="text-sm font-medium text-gray-300 mb-3">Load Credits</h4>
+                            <div className="space-y-3">
+                                <Input
+                                    type="number"
+                                    placeholder="Amount (NGN)"
+                                    value={amount}
+                                    onChange={(e) => setAmount(e.target.value)}
+                                    className="bg-black/40 border-white/10 text-white"
+                                />
+                                {parseInt(amount) > 0 ? (
+                                    <PayWithPaystack
+                                        email={user.email}
+                                        amount={parseInt(amount) * 100}
+                                        onSuccess={handlePaymentSuccess}
+                                        onClose={() => { }}
+                                    />
+                                ) : (
+                                    <Button className="w-full bg-white/5 text-gray-500 cursor-not-allowed hover:bg-white/5">Enter Amount</Button>
+                                )}
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    <div className="pt-4">
+                        <div className="flex items-center justify-between mb-4">
+                            <h2 className="text-lg font-bold text-white flex items-center gap-2"><History className="w-5 h-5 text-gray-400" /> Recent Transactions</h2>
+                            {/* View All logic to be implemented fully later or simple routing */}
+                        </div>
+                        <TransactionsList userId={user.id} />
                     </div>
-                    <TransactionsList userId={user.id} />
                 </div>
             </div>
             {

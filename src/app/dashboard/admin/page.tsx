@@ -755,6 +755,29 @@ export default function AdminDashboard() {
                             <h2 className="text-2xl font-bold text-white">Platform Transactions</h2>
                             <p className="text-gray-400">View all financial activity across the platform.</p>
                         </div>
+
+                        {/* Financial Snapshot */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                            <Card className="bg-blue-600/10 border-blue-500/20">
+                                <CardHeader className="pb-2"><CardTitle className="text-sm text-gray-400">Total Volume</CardTitle></CardHeader>
+                                <CardContent><div className="text-2xl font-bold text-white">{pricingConfig.currency}{finStats.totalRevenue.toLocaleString()}</div></CardContent>
+                            </Card>
+                            <Card className="bg-purple-600/10 border-purple-500/20">
+                                <CardHeader className="pb-2"><CardTitle className="text-sm text-gray-400">Net Holdings</CardTitle></CardHeader>
+                                <CardContent>
+                                    <div className="text-2xl font-bold text-white">{pricingConfig.currency}{finStats.totalHoldings.toLocaleString()}</div>
+                                    <p className="text-xs text-gray-400">Curator + Artist Funds</p>
+                                </CardContent>
+                            </Card>
+                            <Card className="bg-orange-600/10 border-orange-500/20">
+                                <CardHeader className="pb-2"><CardTitle className="text-sm text-gray-400">Pending Payouts</CardTitle></CardHeader>
+                                <CardContent>
+                                    <div className="text-2xl font-bold text-white">{pricingConfig.currency}{finStats.totalPending.toLocaleString()}</div>
+                                    <p className="text-xs text-gray-400">{withdrawals.filter(w => w.status === 'pending').length} requests</p>
+                                </CardContent>
+                            </Card>
+                        </div>
+
                         <TransactionsList />
                     </div>
                 )}
