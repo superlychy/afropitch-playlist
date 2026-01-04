@@ -1,6 +1,6 @@
 # How to Configure Environment Variables in Vercel
 
-To fix the database connection and ensure your app works in production, you must set the Supabase environment variables in Vercel.
+To fix the database connection AND payment processing in production, you must set these variables in Vercel.
 
 ## Steps
 
@@ -17,25 +17,20 @@ To fix the database connection and ensure your app works in production, you must
     Click on **"Environment Variables"** in the left sidebar.
 
 5.  **Add `NEXT_PUBLIC_SUPABASE_URL`**:
-    *   **Key**: `NEXT_PUBLIC_SUPABASE_URL`
-    *   **Value**: *[Your unique Supabase Project URL]* (e.g., `https://xyzxyzxyz.supabase.co`)
-    *   **Environments**: Check **Production**, **Preview**, and **Development**.
-    *   Click **"Save"** or **"Add"**.
+    *   **Value**: `https://gildytqinnntmtvbagxm.supabase.co`
 
 6.  **Add `NEXT_PUBLIC_SUPABASE_ANON_KEY`**:
-    *   **Key**: `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-    *   **Value**: *[Your Supabase Anon/Public Key]* (This is a long string starting with `ey...`)
-    *   **Environments**: Check **Production**, **Preview**, and **Development**.
-    *   Click **"Save"** or **"Add"**.
+    *   **Value**: `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdpbGR5dHFpbm5udG10dmJhZ3htIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY3MDIzOTEsImV4cCI6MjA4MjI3ODM5MX0.9x7utKiltdD8zzwWWi_8D2PTW0Y17Pi9dHQ5eTnX7fg`
 
-7.  **Redeploy**:
+7.  **Add `NEXT_PUBLIC_PAYSTACK_KEY`**: (LIVE KEY)
+    *   **Key**: `NEXT_PUBLIC_PAYSTACK_KEY`
+    *   **Value**: `pk_live_c6da51f7f1185e311f7356f586f5817ed6c69591`
+
+8.  **Redeploy**:
     *   Go to the **"Deployments"** tab.
-    *   Click the **three dots (...)** next to the latest failed or active deployment.
-    *   Select **"Redeploy"** to rebuild the app with the new variables.
+    *   Click the **three dots (...)** next to the latest deployment.
+    *   Select **"Redeploy"** to apply these live keys.
 
-## Where to find these keys?
-
-1.  Log in to your **Supabase Dashboard**.
-2.  Go to **Project Settings** (Cog icon at bottom left).
-3.  Click on **API**.
-4.  You will see the **Project URL** and **Project API keys** (anon public).
+## Notes
+*   We have updated the Paystack keys to **LIVE** mode. Real money will be charged.
+*   Ensure your Paystack Dashboard is also toggled to "Live Mode".
