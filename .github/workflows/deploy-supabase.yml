@@ -1,0 +1,27 @@
+name: Deploy to Supabase
+
+on:
+  push:
+    branches:
+      - master
+      - main
+    paths:
+      - 'supabase/functions/**'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      PROJECT_ID: gildytqinnntmtvbagxm
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Deploy Edge Functions
+        run: supabase functions deploy notify-user --project-ref $PROJECT_ID
