@@ -10,6 +10,7 @@ const supabase = createClient(
 );
 
 const CURRENCY = '₦';
+const SITE_URL = Deno.env.get('SITE_URL') ?? 'https://afropitch.vercel.app'; // Default to Vercel, override with Env Var
 
 Deno.serve(async (req) => {
     // 1. Verify Request
@@ -107,7 +108,7 @@ async function handleTransaction(record: any) {
         referenceId: record.id.split('-')[0], // Short ID
         description: record.description || 'Transaction',
         paymentMethod: 'Wallet/System',
-        dashboardLink: 'http://localhost:3000/dashboard/artist' // Generic link, role detection tough here without more queries
+        dashboardLink: `${SITE_URL}/dashboard/artist` // Generic link, role detection tough here without more queries
     });
 
     await sendEmail(user.email, subject, html);
@@ -137,7 +138,7 @@ async function handleSubmissionUpdate(record: any) {
             playlistName: playlistName,
             curatorName: curatorName,
             playlistLink: playlistLink,
-            dashboardLink: 'http://localhost:3000/dashboard/artist'
+            dashboardLink: `${SITE_URL}/dashboard/artist`
         });
         await sendEmail(user.email, subject, html);
     }
@@ -149,7 +150,7 @@ async function handleSubmissionUpdate(record: any) {
             playlistName: playlistName,
             feedback: record.feedback || 'No specific feedback provided.',
             refundAmount: `${CURRENCY}${record.amount_paid}`,
-            dashboardLink: 'http://localhost:3000/dashboard/artist'
+            dashboardLink: `${SITE_URL}/dashboard/artist`
         });
         await sendEmail(user.email, subject, html);
     }
@@ -186,7 +187,7 @@ async function handleSupportUpdate(record: any) {
         name: user.full_name || 'User',
         subject: record.subject,
         status: record.status,
-        dashboardLink: 'http://localhost:3000/dashboard' // generic
+        dashboardLink: `${SITE_URL}/dashboard` // generic
     });
 
     await sendEmail(user.email, subject, html);
