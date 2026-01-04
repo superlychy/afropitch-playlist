@@ -124,7 +124,7 @@ export default function AdminDashboard() {
     const [newPlaylistLink, setNewPlaylistLink] = useState("");
     const [isFetchingInfo, setIsFetchingInfo] = useState(false);
     const [fetchedPlaylistInfo, setFetchedPlaylistInfo] = useState<any>(null);
-    const [newPlaylistType, setNewPlaylistType] = useState<"standard" | "express" | "exclusive">("standard");
+    const [newPlaylistType, setNewPlaylistType] = useState<"standard" | "express" | "exclusive" | "free">("standard");
     const [isSavingPlaylist, setIsSavingPlaylist] = useState(false);
 
     useEffect(() => {
@@ -1113,8 +1113,8 @@ export default function AdminDashboard() {
 
                                     <div className="mt-3">
                                         <label className="text-[10px] text-gray-400 uppercase font-bold mb-2 block">Playlist Tier</label>
-                                        <div className="grid grid-cols-3 gap-2">
-                                            {(['standard', 'express', 'exclusive'] as const).map(t => (
+                                        <div className="grid grid-cols-4 gap-2">
+                                            {(['standard', 'express', 'exclusive', 'free'] as const).map(t => (
                                                 <div
                                                     key={t}
                                                     onClick={() => setNewPlaylistType(t)}

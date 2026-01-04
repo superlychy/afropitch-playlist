@@ -40,6 +40,19 @@ export const pricingConfig = {
                 "Direct curator feedback",
                 "Social media shoutout"
             ]
+        },
+        free: {
+            id: "free",
+            price: 0,
+            duration: "7-14 days",
+            title: "Free Submission",
+            description: "Submit for consideration. No guarantee.",
+            features: [
+                "Review within 14 days",
+                "Standard submission queue",
+                "No feedback guarantee",
+                "Playlist consideration"
+            ]
         }
     }
 };

@@ -675,7 +675,7 @@ function SubmitForm() {
                                         <Button
                                             type="submit"
                                             className="w-full bg-green-600 hover:bg-green-700 text-lg py-6 font-bold shadow-lg shadow-green-900/20"
-                                            disabled={isSubmitting || !user || user.balance < total}
+                                            disabled={isSubmitting || !user || (total > 0 && user.balance < total)}
                                         >
                                             {isSubmitting ? (
                                                 <>
@@ -684,7 +684,7 @@ function SubmitForm() {
                                                 </>
                                             ) : (
                                                 <span>
-                                                    {!user ? "Login to Pay" : user.balance < total ? "Insufficient Balance" : `PAY ${pricingConfig.currency}${total.toLocaleString()}`}
+                                                    {!user ? "Login to Pay" : (total > 0 && user.balance < total) ? "Insufficient Balance" : total === 0 ? "SUBMIT FREE" : `PAY ${pricingConfig.currency}${total.toLocaleString()}`}
                                                 </span>
                                             )}
                                         </Button>
