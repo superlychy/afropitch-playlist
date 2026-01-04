@@ -64,12 +64,21 @@ Deno.serve(async (req) => {
 // --- Handlers ---
 
 async function getUserEmail(userId: string) {
-    const { data: profile, error } = await supabase.from('profiles').select('email, full_name').eq('id', userId).single();
-    if (error || !profile) {
-        console.error("Could not find user profile:", userId);
+    // 1. Fetch Email from Auth (Reliable)
+    const { data: userData, error: userError } = await supabase.auth.admin.getUserById(userId);
+
+    if (userError || !userData.user) {
+        console.error("Could not find auth user:", userId, userError);
         return null;
     }
-    return profile;
+
+    // 2. Fetch Name from Profile (Optional but nice)
+    const { data: profile } = await supabase.from('profiles').select('full_name').eq('id', userId).single();
+
+    return {
+        email: userData.user.email,
+        full_name: profile?.full_name || 'AfroPitch User'
+    };
 }
 
 async function handleTransaction(record: any) {

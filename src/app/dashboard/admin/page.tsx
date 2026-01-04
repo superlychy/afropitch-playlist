@@ -330,19 +330,30 @@ export default function AdminDashboard() {
         }
 
         if (action === 'reject') {
-            // Refund the user
+            // Refund the user with atomic transaction ideally, but here sequential is better than nothing until we migrate admin triggers.
             const { data: profile } = await supabase.from('profiles').select('balance').eq('id', withdrawal.user_id).single();
             if (profile) {
                 const newBalance = (profile.balance || 0) + withdrawal.amount;
+
+                // 1. Refund Balance
                 const { error: refundError } = await supabase.from('profiles').update({ balance: newBalance }).eq('id', withdrawal.user_id);
 
                 if (refundError) {
                     alert("Error refunding user: " + refundError.message);
                 } else {
+                    // 2. Create Refund Transaction
+                    await supabase.from('transactions').insert({
+                        user_id: withdrawal.user_id,
+                        amount: withdrawal.amount,
+                        type: 'refund',
+                        description: `Refund: Withdrawal Rejected`
+                    });
+
                     alert("Withdrawal rejected and funds refunded.");
                 }
             }
         } else {
+            // Approved - The withdrawal status update is enough, as the money was already deducted when requested.
             alert(`Withdrawal approved.`);
         }
     };

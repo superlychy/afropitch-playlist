@@ -12,7 +12,9 @@ create table if not exists public.withdrawals (
 
 -- RLS
 alter table public.withdrawals enable row level security;
+drop policy if exists "Users can view own withdrawals" on public.withdrawals;
 create policy "Users can view own withdrawals" on public.withdrawals for select using (auth.uid() = user_id);
+drop policy if exists "Users can insert withdrawals" on public.withdrawals;
 create policy "Users can insert withdrawals" on public.withdrawals for insert with check (auth.uid() = user_id);
 
 -- Ensure profiles have social columns if not already (safeguard)

@@ -18,7 +18,7 @@ Go to your **Supabase Dashboard** > **Database** > **Webhooks** and create the f
 *   **Table**: `transactions`
 *   **Events**: `INSERT`
 *   **Type**: HTTP Request
-*   **URL**: `[YOUR_FUNCTION_URL]/notify-user` (e.g. `https://projectref.supabase.co/functions/v1/notify-user`)
+*   **URL**: `https://gildytqinnntmtvbagxm.supabase.co/functions/v1/notify-user`
 *   **Method**: POST
 *   **HTTP Headers**: `Authorization: Bearer [YOUR_ANON_KEY]` (or Service Role Key if needed)
 

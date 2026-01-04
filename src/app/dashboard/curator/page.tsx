@@ -238,39 +238,29 @@ export default function CuratorDashboard() {
             return;
         }
 
-        // 1. Deduct from Profile
-        const { error: profileError } = await supabase
-            .from('profiles')
-            .update({ balance: user.balance - amount })
-            .eq('id', user.id);
-
-        if (profileError) {
-            alert("Error updating balance: " + profileError.message);
-            setIsWithdrawing(false);
-            return;
-        }
-
-        // 2. Create Withdrawal Request
-        const { error: withdrawError } = await supabase.from('withdrawals').insert({
-            user_id: user.id,
-            amount: amount,
-            bank_name: bankName,
-            account_number: accountNumber,
-            account_name: accountName,
-            status: 'pending'
+        // Use Atomic RPC to prevent "Ghost Deductions" and ensure History
+        const { data, error } = await supabase.rpc('request_payout', {
+            p_user_id: user.id,
+            p_amount: amount,
+            p_bank_name: bankName,
+            p_account_number: accountNumber,
+            p_account_name: accountName
         });
 
-        if (withdrawError) {
-            // Rollback balance if withdrawal request fails
-            await supabase.from('profiles').update({ balance: user.balance }).eq('id', user.id);
-            alert("Error requesting withdrawal: " + withdrawError.message);
+        if (error) {
+            alert("System Error: " + error.message);
+        } else if (data && !data.success) {
+            alert("Error: " + data.message);
         } else {
+            // Success
             alert("Withdrawal requested successfully! It will be processed within 1-24 hours.");
-            // Update local state via Context if possible, or just visual update relies on page reload or effect
+
+            // Update local state
             if (deductFunds) deductFunds(amount);
 
             setShowWithdraw(false);
             setWithdrawAmount("");
+            // Ideally verify transaction list updates (if it uses real-time or if we trigger re-fetch)
         }
         setIsWithdrawing(false);
     };
@@ -548,11 +538,10 @@ export default function CuratorDashboard() {
 
     const handleReviewAction = async (submissionId: string, action: 'accepted' | 'declined', feedback: string) => {
         if (!user) return;
+
         // Create tracking slug if accepted
         let trackingSlug = null;
         if (action === 'accepted') {
-            // Simple slug generation: song-title-random
-            // We need to fetch the submission title first but we have it in memory 'reviews'
             const sub = reviews.find(r => r.id === submissionId);
             if (sub) {
                 const cleanTitle = sub.song_title.replace(/[^a-z0-9]/gi, '-').toLowerCase();
@@ -560,78 +549,22 @@ export default function CuratorDashboard() {
             }
         }
 
-
-
-        const updateData: any = { status: action, feedback };
-        if (trackingSlug) updateData.tracking_slug = trackingSlug;
-
-        const { error } = await supabase
-            .from('submissions')
-            .update(updateData)
-            .eq('id', submissionId);
+        // Use Secure RPC
+        const { data, error } = await supabase.rpc('process_submission_review', {
+            p_submission_id: submissionId,
+            p_action: action,
+            p_feedback: feedback,
+            p_curator_id: user.id,
+            p_tracking_slug: trackingSlug
+        });
 
         if (error) {
-            alert("Error updating submission: " + error.message);
+            console.error("RPC Error:", error);
+            alert("Error processing review: " + error.message);
+        } else if (data && !data.success) {
+            alert("Error: " + data.message);
         } else {
-            // If APPROVED, credit curator wallet
-            if (action === 'accepted') {
-                const sub = reviews.find(r => r.id === submissionId);
-                if (sub && sub.amount_paid > 0) {
-                    // 1. Credit Balance
-                    const { error: creditError } = await supabase.rpc('increment_balance', {
-                        user_id: user.id,
-                        amount: sub.amount_paid
-                    });
-
-                    if (creditError) {
-                        // Fallback
-                        await supabase.from('profiles').update({
-                            balance: (user.balance || 0) + sub.amount_paid
-                        }).eq('id', user.id);
-                    }
-
-                    // 2. Log Earning Transaction
-                    await supabase.from('transactions').insert({
-                        user_id: user.id,
-                        amount: sub.amount_paid,
-                        type: 'earning',
-                        description: `Earning for reviewing: ${sub.song_title}`,
-                        related_submission_id: sub.id
-                    });
-                }
-            }
-            // If DECLINED, REFUND the artist
-            else if (action === 'declined') {
-                const sub = reviews.find(r => r.id === submissionId);
-                if (sub && sub.amount_paid > 0) {
-                    // 1. Refund Balance
-                    const { error: refundError } = await supabase.rpc('increment_balance', {
-                        user_id: sub.artist_id,
-                        amount: sub.amount_paid
-                    });
-
-                    if (refundError) {
-                        // Fallback: Fetch then update
-                        const { data: artistProfile } = await supabase.from('profiles').select('balance').eq('id', sub.artist_id).single();
-                        if (artistProfile) {
-                            await supabase.from('profiles').update({
-                                balance: (artistProfile.balance || 0) + sub.amount_paid
-                            }).eq('id', sub.artist_id);
-                        }
-                    }
-
-                    // 2. Log Refund Transaction
-                    await supabase.from('transactions').insert({
-                        user_id: sub.artist_id,
-                        amount: sub.amount_paid,
-                        type: 'refund',
-                        description: `Refund for declined submission: ${sub.song_title}`,
-                        related_submission_id: sub.id
-                    });
-                }
-            }
-
-            // Refresh data
+            // Success
             fetchCuratorData();
         }
     };

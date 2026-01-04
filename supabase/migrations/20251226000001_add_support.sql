@@ -11,7 +11,11 @@ create table if not exists public.support_tickets (
 
 -- RLS for Tickets
 alter table public.support_tickets enable row level security;
+
+drop policy if exists "Users can view own tickets" on public.support_tickets;
 create policy "Users can view own tickets" on public.support_tickets for select using (auth.uid() = user_id);
+
+drop policy if exists "Users can insert tickets" on public.support_tickets;
 create policy "Users can insert tickets" on public.support_tickets for insert with check (auth.uid() = user_id);
 -- Admin RLS (assumes admin role checks in application logic or separate policy if robust admin role exists in auth.users)
 -- ideally: create policy "Admins can view all tickets" on public.support_tickets for select using (exists (select 1 from profiles where id = auth.uid() and role = 'admin'));
@@ -26,9 +30,11 @@ create table if not exists public.support_messages (
 );
 
 alter table public.support_messages enable row level security;
+drop policy if exists "Users can view messages for own tickets" on public.support_messages;
 create policy "Users can view messages for own tickets" on public.support_messages for select using (
   exists (select 1 from support_tickets where id = ticket_id and user_id = auth.uid())
 );
+drop policy if exists "Users can insert messages for own tickets" on public.support_messages;
 create policy "Users can insert messages for own tickets" on public.support_messages for insert with check (
   exists (select 1 from support_tickets where id = ticket_id and user_id = auth.uid())
 );
