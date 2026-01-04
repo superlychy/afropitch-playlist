@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <style>
+        body {
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            background-color: #0d0d0d;
+            color: #ffffff;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #1a1a1a;
+            border-radius: 10px;
+            overflow: hidden;
+            border: 1px solid #333;
+        }
+
+        .header {
+            background-color: #000;
+            padding: 20px;
+            text-align: center;
+            border-bottom: 2px solid #22c55e;
+        }
+
+        .content {
+            padding: 30px;
+            line-height: 1.6;
+            color: #cccccc;
+        }
+
+        .success-box {
+            background-color: rgba(34, 197, 94, 0.1);
+            border: 1px solid #22c55e;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+            text-align: center;
+        }
+
+        .tip-box {
+            background-color: #2a2a2a;
+            border-left: 4px solid #f59e0b;
+            padding: 15px;
+            margin-top: 20px;
+            font-size: 14px;
+        }
+
+        .button {
+            display: inline-block;
+            padding: 12px 24px;
+            background-color: #22c55e;
+            color: #000;
+            text-decoration: none;
+            border-radius: 5px;
+            font-weight: bold;
+            margin-top: 20px;
+        }
+
+        .footer {
+            padding: 20px;
+            text-align: center;
+            font-size: 12px;
+            color: #666;
+            background-color: #111;
+            border-top: 1px solid #333;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>AfroPitch</h1>
+        </div>
+        <div class="content">
+            <h2>Good News! Your Song was Approved! 🚀</h2>
+            <p>Hi {{ .Name }},</p>
+            <p>We are thrilled to inform you that your song <strong>{{ .SongTitle }}</strong> has been accepted into the
+                following playlist:</p>
+
+            <div class="success-box">
+                <h3 style="margin: 0; color: #fff;">{{ .PlaylistName }}</h3>
+                <p style="margin: 5px 0 0 0; font-size: 12px; color: #22c55e;">Curated by {{ .CuratorName }}</p>
+            </div>
+
+            <p>This is a huge step! Now, let's make sure you get the most out of this placement.</p>
+
+            <div class="tip-box">
+                <strong>📈 Ranking Tips:</strong>
+                <ul style="margin: 10px 0; padding-left: 20px;">
+                    <li><strong>Share the Link:</strong> Post the playlist link on your Instagram Stories, Twitter, and
+                        TikTok. Tag us @AfroPitch!</li>
+                    <li><strong>Encourage Saves:</strong> Ask your fans to "Like" the playlist and "Save" your song.
+                        This signals the algorithm to boost your track.</li>
+                    <li><strong>Stay Active:</strong> Keep streaming the playlist to support other artists. Only active
+                        listeners grow.</li>
+                </ul>
+            </div>
+
+            <center>
+                <a href="{{ .PlaylistLink }}" class="button">Listen to Playlist</a>
+            </center>
+        </div>
+        <div class="footer">
+            &copy; 2026 AfroPitch. Keep soaring.<br>
+            <a href="{{ .DashboardLink }}" style="color: #666;">View Dashboard</a>
+        </div>
+    </div>
+</body>
+
+</html>
