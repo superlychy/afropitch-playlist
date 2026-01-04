@@ -4,8 +4,8 @@ import { createClient } from '@supabase/supabase-js';
 // Initialize Supabase Client (Preferably with Service Role if available, else Anon)
 // Note: For public tracking to work without Service Role, we need an RPC function or Public RLS.
 // We will assume an RPC function `increment_submission_clicks` exists.
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!; // Using Anon for now
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder.supabase.co";
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "placeholder"; // Using Anon for now
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 export async function GET(
