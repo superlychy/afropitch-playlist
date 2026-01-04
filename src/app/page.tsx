@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { pricingConfig } from "@/../config/pricing";
 import { ArrowRight, CheckCircle2 } from "lucide-react";
+import { RecentApprovals } from "@/components/RecentApprovals";
 
 export default function Home() {
   return (
@@ -105,25 +106,7 @@ export default function Home() {
         </div>
         <div className="relative">
           <div className="absolute inset-0 bg-gradient-to-tr from-green-500/20 to-orange-500/20 rounded-2xl blur-2xl -z-10" />
-          <div className="border border-white/10 bg-black/50 backdrop-blur-sm rounded-2xl p-8 shadow-2xl">
-            {/* Mockup of a review card */}
-            <div className="flex items-center gap-4 mb-6">
-              <div className="w-12 h-12 rounded-lg bg-gray-800 animate-pulse" />
-              <div className="space-y-2">
-                <div className="h-4 w-32 bg-gray-800 rounded animate-pulse" />
-                <div className="h-3 w-24 bg-gray-800/60 rounded animate-pulse" />
-              </div>
-            </div>
-            <div className="space-y-3">
-              <div className="h-3 w-full bg-gray-800/60 rounded animate-pulse" />
-              <div className="h-3 w-5/6 bg-gray-800/60 rounded animate-pulse" />
-              <div className="h-3 w-4/6 bg-gray-800/60 rounded animate-pulse" />
-            </div>
-            <div className="mt-6 pt-6 border-t border-white/5 flex justify-between items-center text-sm">
-              <span className="text-green-500 font-medium">Approved for Playlist</span>
-              <span className="text-gray-500">Just now</span>
-            </div>
-          </div>
+          <RecentApprovals />
         </div>
       </section>
     </div>

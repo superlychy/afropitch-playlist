@@ -124,6 +124,7 @@ export default function AdminDashboard() {
     const [newPlaylistLink, setNewPlaylistLink] = useState("");
     const [isFetchingInfo, setIsFetchingInfo] = useState(false);
     const [fetchedPlaylistInfo, setFetchedPlaylistInfo] = useState<any>(null);
+    const [newPlaylistType, setNewPlaylistType] = useState<"standard" | "express" | "exclusive">("standard");
     const [isSavingPlaylist, setIsSavingPlaylist] = useState(false);
 
     useEffect(() => {
@@ -434,9 +435,10 @@ export default function AdminDashboard() {
             followers: fetchedPlaylistInfo.followers,
             playlist_link: newPlaylistLink,
             curator_id: user.id,
+
             genre: "Multi-Genre", // Default or add selector
-            type: "standard", // Default
-            submission_fee: 3000, // Default for standard
+            type: newPlaylistType,
+            submission_fee: pricingConfig.tiers[newPlaylistType].price,
             is_active: true
         }).select().single();
 
@@ -1108,6 +1110,24 @@ export default function AdminDashboard() {
                                             />
                                         </div>
                                     </div>
+
+                                    <div className="mt-3">
+                                        <label className="text-[10px] text-gray-400 uppercase font-bold mb-2 block">Playlist Tier</label>
+                                        <div className="grid grid-cols-3 gap-2">
+                                            {(['standard', 'express', 'exclusive'] as const).map(t => (
+                                                <div
+                                                    key={t}
+                                                    onClick={() => setNewPlaylistType(t)}
+                                                    className={`cursor-pointer border rounded p-2 text-center transition-all ${newPlaylistType === t
+                                                        ? 'bg-green-600 border-green-500 text-white'
+                                                        : 'bg-black/20 border-white/10 text-gray-400 hover:bg-white/5'}`}
+                                                >
+                                                    <span className="block text-xs font-bold capitalize">{t}</span>
+                                                    <span className="block text-[10px] opacity-70">{pricingConfig.currency}{pricingConfig.tiers[t].price.toLocaleString()}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
                                 </div>
 
                                 <div className="bg-green-500/10 border border-green-500/20 p-3 rounded text-xs text-green-400">
@@ -1122,8 +1142,9 @@ export default function AdminDashboard() {
                             </div>
                         )}
                     </div>
-                </div>
+                </div >
             )}
+
         </>
     );
 }
