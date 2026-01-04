@@ -9,6 +9,8 @@ export const genres = [
     "Dancehall / Reggae",
     "Gospel",
     "Traditional",
+    "Francophone African",
+    "Afro-House",
     "Other",
 ] as const;
 

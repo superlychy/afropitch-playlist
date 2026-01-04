@@ -33,7 +33,7 @@ export const pricingConfig = {
             price: 13500,
             duration: "24 hours",
             title: "Exclusive Placement",
-            description: "Premium placement on top-tier lists.",
+            description: "Premium paid playlist placement on top-tier Afrobeat & Amapiano lists.",
             features: [
                 "Guaranteed review within 24 hours",
                 "Top position placement",
@@ -46,7 +46,7 @@ export const pricingConfig = {
             price: 0,
             duration: "7-14 days",
             title: "Free Submission",
-            description: "Submit for consideration. No guarantee.",
+            description: "Free submit to free Afrobeat playlist options. No guarantee.",
             features: [
                 "Review within 14 days",
                 "Standard submission queue",
