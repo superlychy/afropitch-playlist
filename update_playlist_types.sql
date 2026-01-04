@@ -2,10 +2,10 @@
 ALTER TABLE public.playlists 
 DROP CONSTRAINT IF EXISTS playlists_type_check;
 
--- Add new check constraint supporting 'free', 'standard', 'exclusive'
+-- Add new check constraint supporting 'free', 'standard', 'express', 'exclusive'
 ALTER TABLE public.playlists 
 ADD CONSTRAINT playlists_type_check 
-CHECK (type IN ('free', 'standard', 'exclusive'));
+CHECK (type IN ('free', 'standard', 'express', 'exclusive'));
 
 -- Set default to 'free'
 ALTER TABLE public.playlists 

@@ -15,7 +15,7 @@ interface PayProps {
 const PayWithPaystack = ({ email, amount, onSuccess, onClose }: PayProps) => {
 
     // REPLACE THIS WITH YOUR OWN PUBLIC KEY FROM PAYSTACK DASHBOARD
-    const publicKey = process.env.NEXT_PUBLIC_PAYSTACK_KEY || "pk_test_xxxxxxxxxxxxxxxxxxxxxxxx";
+    const publicKey = process.env.NEXT_PUBLIC_PAYSTACK_KEY || "pk_test_0e3dd68677c77840131496660e5361362e697858";
 
     const componentProps = {
         email,

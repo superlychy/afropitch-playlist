@@ -28,19 +28,24 @@ export async function POST(req: NextRequest) {
         // because spotify-url-info often breaks without updates.
         // Let's try a direct fetch approach for reliability without keys first.
 
-        const response = await fetch(url);
+        const response = await fetch(url, {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            }
+        });
         const htmlText = await response.text();
 
         // Regex for basic metadata (Open Graph tags are usually present)
         // <meta property="og:title" content="Playlist Name" />
-        // <meta property="og:description" content="... · 1234 likes · 50 songs" />
-        // <meta property="og:image" content="..." />
 
         const titleMatch = htmlText.match(/<meta property="og:title" content="([^"]*)"/);
         const descMatch = htmlText.match(/<meta property="og:description" content="([^"]*)"/);
         const imageMatch = htmlText.match(/<meta property="og:image" content="([^"]*)"/);
 
-        const name = titleMatch ? titleMatch[1] : '';
+        let name = titleMatch ? titleMatch[1] : '';
+        // Clean up " | Spotify Playlist" from title if present
+        name = name.replace(/ \| Spotify Playlist$/i, '').trim();
+
         const description = descMatch ? descMatch[1] : '';
         const coverImage = imageMatch ? imageMatch[1] : '';
 

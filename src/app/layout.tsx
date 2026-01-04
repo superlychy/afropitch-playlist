@@ -10,15 +10,40 @@ export const metadata: Metadata = {
     default: siteConfig.name,
     template: `%s | ${siteConfig.name}`,
   },
-  description: siteConfig.description,
+  description: "The #1 African Music Promotion Platform. Submit your music to top curated playlists on Spotify, Apple Music, Audiomack, Boomplay, and Deezer. Reach millions of listeners in Nigeria, Ghana, South Africa, and globally.",
+  keywords: [
+    "African music", "Afrobeats playlist submission", "promote african music",
+    "submit music to playlists", "Spotify playlist pitch", "Apple Music promotion",
+    "Audiomack playlists", "Boomplay curation", "Deezer playlists",
+    "Nigerian music promotion", "Ghanaian music", "South African Amapiano",
+    "music marketing africa", "independent artist", "Afropitch"
+  ],
   openGraph: {
     type: "website",
     locale: "en_US",
     url: siteConfig.url,
-    title: siteConfig.name,
-    description: siteConfig.description,
+    title: "AfroPitch | Promote Your African Music to Global Playlists",
+    description: "Submit your songs to top curators on Spotify, Apple Music, Audiomack, Boomplay & Deezer. Guaranteed reviews and real growth for African artists.",
     siteName: siteConfig.name,
+    images: [
+      {
+        url: "/og-image.jpg", // Ensure this exists or use a placeholder
+        width: 1200,
+        height: 630,
+        alt: "AfroPitch Music Promotion",
+      },
+    ],
   },
+  twitter: {
+    card: "summary_large_image",
+    title: "AfroPitch | #1 African Music Promotion",
+    description: "Get your music heard. Submit to playlists on Spotify, Apple Music, Audiomack & more.",
+    creator: "@afropitch",
+  },
+  robots: {
+    index: true,
+    follow: true,
+  }
 };
 
 import { AuthProvider } from "@/context/AuthContext";

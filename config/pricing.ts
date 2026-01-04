@@ -27,6 +27,19 @@ export const pricingConfig = {
                 "Detailed email feedback",
                 "Playlist consideration (Fast-track)"
             ]
+        },
+        exclusive: {
+            id: "exclusive",
+            price: 13500,
+            duration: "24 hours",
+            title: "Exclusive Placement",
+            description: "Premium placement on top-tier lists.",
+            features: [
+                "Guaranteed review within 24 hours",
+                "Top position placement",
+                "Direct curator feedback",
+                "Social media shoutout"
+            ]
         }
     }
 };

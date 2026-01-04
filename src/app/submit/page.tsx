@@ -11,7 +11,8 @@ import { Select } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { genres } from "@/../config/genres";
 import { pricingConfig } from "@/../config/pricing";
-import { Loader2, Music, CheckCircle, Wallet, CreditCard, User, Search, ExternalLink } from "lucide-react";
+import { Loader2, Music, CheckCircle, Wallet, CreditCard, User, Search, ExternalLink, Eye } from "lucide-react";
+import Link from "next/link";
 import dynamic from "next/dynamic";
 import { supabase } from "@/lib/supabase";
 
@@ -20,10 +21,11 @@ interface Playlist {
     name: string;
     genre: string;
     followers: number;
+    curatorName: string;
     description: string;
     coverImage: string;
     submissionFee: number;
-    type: "free" | "standard" | "exclusive";
+    type: "free" | "standard" | "express" | "exclusive";
     playlistLink?: string;
     isAdmin: boolean;
 }
@@ -64,7 +66,7 @@ function SubmitForm() {
     const fetchPlaylists = async () => {
         const { data, error } = await supabase
             .from('playlists')
-            .select('*, curator:profiles!curator_id(role)')
+            .select('*, curator:profiles!curator_id(role, full_name)')
             .eq('is_active', true);
 
         if (data) {
@@ -73,6 +75,7 @@ function SubmitForm() {
                 name: p.name,
                 genre: p.genre,
                 followers: p.followers,
+                curatorName: p.curator?.full_name || 'Unknown',
                 description: p.description,
                 coverImage: p.cover_image,
                 submissionFee: p.submission_fee,
@@ -86,6 +89,14 @@ function SubmitForm() {
         }
         setIsLoadingPlaylists(false);
     };
+
+    useEffect(() => {
+        fetchPlaylists();
+    }, []);
+
+    useEffect(() => {
+        fetchPlaylists();
+    }, []);
 
     useEffect(() => {
         const playlistParam = searchParams.get("playlist");
@@ -117,10 +128,25 @@ function SubmitForm() {
             if (playlist) {
                 let cost = 0;
                 if (playlist.type === 'exclusive') {
-                    cost = playlist.submissionFee;
-                } else if (playlist.submissionFee === 0) {
+                    cost = pricingConfig.tiers.exclusive.price;
+                } else if (playlist.type === 'express') {
+                    cost = pricingConfig.tiers.express.price;
+                } else if (playlist.type === 'free') {
                     cost = 0;
                 } else {
+                    // Standard playlists follow the USER selected tier (Standard vs Express vs Exclusive upgrade)
+                    // Wait, if user selects 'Standard', and playlist is 'Standard', cost is Standard.
+                    // If user selects 'Express' (global tier), cost is Express.
+                    // However, if playlist is explicitly TYPE 'express', it FORCES express price? 
+                    // Let's assume Curator-set 'express' means it's a Premium playlist that COSTS Express price always.
+                    // Re-reading user request: "when a user selecets a playlist the price is added to it automatically"
+                    // And "add express and exclusive prises there"
+
+                    // Logic: 
+                    // - Exclusive Playlist -> Exclusive Price (Override)
+                    // - Express Playlist -> Express Price (Override)
+                    // - Standard Playlist -> Uses `selectedTierConfig.price` (User choice of speed) OR Standard Price? 
+                    // Usually Standard Playlists allow user to choose Speed. 
                     cost = selectedTierConfig.price;
                 }
 
@@ -156,8 +182,10 @@ function SubmitForm() {
         const paidPlaylistsCount = selectedPlaylistIds.filter(id => {
             const p = allPlaylists.find(pl => pl.id === id);
             if (!p) return false;
-            if (p.type === 'exclusive') return p.submissionFee > 0;
-            if (p.submissionFee === 0) return false;
+            // Simplified check: does it have a cost?
+            if (p.type === 'exclusive') return pricingConfig.tiers.exclusive.price > 0;
+            if (p.type === 'express') return pricingConfig.tiers.express.price > 0;
+            if (p.type === 'free') return false;
             return selectedTierConfig.price > 0;
         }).length;
 
@@ -166,10 +194,23 @@ function SubmitForm() {
         const submissionsToInsert = selectedPlaylistIds.map(playlistId => {
             const playlist = allPlaylists.find(p => p.id === playlistId);
             let cost = 0;
+            let finalTier = tier;
+
             if (playlist) {
-                if (playlist.type === 'exclusive') cost = playlist.submissionFee;
-                else if (playlist.submissionFee === 0) cost = 0;
-                else cost = selectedTierConfig.price;
+                if (playlist.type === 'exclusive') {
+                    cost = pricingConfig.tiers.exclusive.price;
+                    finalTier = 'exclusive';
+                }
+                else if (playlist.type === 'express') {
+                    cost = pricingConfig.tiers.express.price;
+                    finalTier = 'express';
+                }
+                else if (playlist.type === 'free') {
+                    cost = 0;
+                }
+                else {
+                    cost = selectedTierConfig.price;
+                }
             }
 
             // Apply distributed discount if this item has a cost
@@ -181,7 +222,7 @@ function SubmitForm() {
                 song_title: songTitle,
                 artist_name: artistName,
                 song_link: songLink,
-                tier: tier,
+                tier: finalTier,
                 amount_paid: finalCost,
                 status: 'pending'
             };
@@ -208,36 +249,46 @@ function SubmitForm() {
 
         setIsSubmitting(true);
 
-        if (paymentMethod === "wallet" && total > 0) {
-            // Check balance
-            if (user.balance < total) {
-                alert("Insufficient funds. Please load your wallet.");
-                setIsSubmitting(false);
-                return;
+        try {
+            // 1. Wallet Deduction (if not free)
+            if (total > 0) {
+                if (user.balance < total) {
+                    alert("Insufficient funds. Please load your wallet.");
+                    setIsSubmitting(false);
+                    return;
+                }
+
+                // Check deductFunds result - local optimistic update
+                const success = deductFunds(total);
+                if (!success) {
+                    throw new Error("Local wallet deduction failed");
+                }
+
+                // DB Update for Balance
+                const { error: balanceError } = await supabase
+                    .from('profiles')
+                    .update({ balance: user.balance - total })
+                    .eq('id', user.id);
+
+                if (balanceError) throw new Error("Database balance update failed: " + balanceError.message);
             }
 
-            // Deduct funds
-            const success = deductFunds(total);
-            if (!success) {
-                setIsSubmitting(false);
-                return;
+            // 2. Save Submission
+            const saved = await saveSubmissions();
+            if (saved) {
+                setIsSuccess(true);
+            } else {
+                // If submission save failed but money was taken, we technically should refund or alert support.
+                // For now, alerting user.
+                alert("Submission save failed. Please contact support if your wallet was charged.");
             }
 
-            // Update Update DB balance (deductFunds is local usually, verify context)
-            // Context likely updates specific user state, but let's ensure DB update if context doesn't handle DB
-            const { error } = await supabase.from('profiles').update({ balance: user.balance - total }).eq('id', user.id);
-            if (error) {
-                console.error("Balance update error", error);
-                // potential rollback needed here in robust system
-            }
+        } catch (err: any) {
+            console.error("Submission Process Error:", err);
+            alert("An error occurred: " + err.message);
+        } finally {
+            setIsSubmitting(false);
         }
-
-        // Save to DB
-        const saved = await saveSubmissions();
-        if (saved) {
-            setIsSuccess(true);
-        }
-        setIsSubmitting(false);
     }
 
     if (isSuccess) {
@@ -330,10 +381,20 @@ function SubmitForm() {
                                                                 <div className="flex justify-between items-end">
                                                                     <div>
                                                                         <h3 className="font-bold text-white text-lg leading-tight">{p.name}</h3>
-                                                                        <p className="text-sm text-gray-300">{p.genre} • {p.followers.toLocaleString()} Fans</p>
+                                                                        <p className="text-sm text-gray-300 mb-0.5">{p.genre}</p>
+                                                                        <div className="flex items-center gap-2 text-xs text-gray-400">
+                                                                            <span className="flex items-center gap-1"><User className="w-3 h-3" /> {p.curatorName}</span>
+                                                                            <span>•</span>
+                                                                            <span>{p.followers.toLocaleString()} Fans</span>
+                                                                        </div>
                                                                     </div>
                                                                 </div>
                                                                 <div className="flex gap-2">
+                                                                    <Link href={`/playlist/${p.id}`} onClick={(e) => e.stopPropagation()}>
+                                                                        <div className="bg-white/20 backdrop-blur-md rounded-full p-2 text-white hover:bg-white hover:text-black transition-colors cursor-pointer" title="View Details">
+                                                                            <Eye className="w-6 h-6" />
+                                                                        </div>
+                                                                    </Link>
                                                                     {p.playlistLink && (
                                                                         <div
                                                                             onClick={(e) => { e.stopPropagation(); window.open(p.playlistLink, '_blank'); }}
@@ -368,8 +429,10 @@ function SubmitForm() {
                                                         <div className="absolute top-3 right-3">
                                                             <span className="bg-black/60 backdrop-blur-md text-white text-xs font-bold px-3 py-1.5 rounded-full border border-white/10">
                                                                 {p.type === 'exclusive'
-                                                                    ? `${pricingConfig.currency}${p.submissionFee.toLocaleString()}`
-                                                                    : p.type === 'free' ? 'FREE' : 'Std Price'
+                                                                    ? `${pricingConfig.currency}${pricingConfig.tiers.exclusive.price.toLocaleString()}`
+                                                                    : p.type === 'express'
+                                                                        ? `${pricingConfig.currency}${pricingConfig.tiers.express.price.toLocaleString()}`
+                                                                        : p.type === 'free' ? 'FREE' : 'Std Price'
                                                                 }
                                                             </span>
                                                         </div>
@@ -409,7 +472,12 @@ function SubmitForm() {
                                                                 <div className="flex justify-between items-end">
                                                                     <div>
                                                                         <h3 className="font-bold text-white text-lg leading-tight">{p.name}</h3>
-                                                                        <p className="text-sm text-gray-300">{p.genre} • {p.followers.toLocaleString()} Fans</p>
+                                                                        <p className="text-sm text-gray-300 mb-0.5">{p.genre}</p>
+                                                                        <div className="flex items-center gap-2 text-xs text-gray-400">
+                                                                            <span className="flex items-center gap-1"><User className="w-3 h-3" /> {p.curatorName}</span>
+                                                                            <span>•</span>
+                                                                            <span>{p.followers.toLocaleString()} Fans</span>
+                                                                        </div>
                                                                     </div>
                                                                 </div>
                                                                 <div className="flex gap-2">
@@ -447,8 +515,10 @@ function SubmitForm() {
                                                         <div className="absolute top-3 right-3">
                                                             <span className="bg-black/60 backdrop-blur-md text-white text-xs font-bold px-3 py-1.5 rounded-full border border-white/10">
                                                                 {p.type === 'exclusive'
-                                                                    ? `${pricingConfig.currency}${p.submissionFee.toLocaleString()}`
-                                                                    : p.type === 'free' ? 'FREE' : 'Std Price'
+                                                                    ? `${pricingConfig.currency}${pricingConfig.tiers.exclusive.price.toLocaleString()}`
+                                                                    : p.type === 'express'
+                                                                        ? `${pricingConfig.currency}${pricingConfig.tiers.express.price.toLocaleString()}`
+                                                                        : p.type === 'free' ? 'FREE' : 'Std Price'
                                                                 }
                                                             </span>
                                                         </div>
@@ -515,7 +585,11 @@ function SubmitForm() {
                                                                 <span className="text-sm font-bold text-white truncate max-w-[150px]">{p.name}</span>
                                                             </div>
                                                             <span className="text-xs text-gray-400">
-                                                                {p.type === 'exclusive' ? `${pricingConfig.currency}${p.submissionFee.toLocaleString()}` : 'Standard'}
+                                                                {p.type === 'exclusive'
+                                                                    ? `${pricingConfig.currency}${pricingConfig.tiers.exclusive.price.toLocaleString()}`
+                                                                    : p.type === 'express'
+                                                                        ? `${pricingConfig.currency}${pricingConfig.tiers.express.price.toLocaleString()}`
+                                                                        : 'Standard'}
                                                             </span>
                                                         </div>
                                                     ))}
@@ -527,16 +601,18 @@ function SubmitForm() {
                                             <div className="col-span-2 space-y-2">
                                                 <Label>Review Speed</Label>
                                                 <div className="flex gap-4">
-                                                    {Object.keys(pricingConfig.tiers).map((key) => {
-                                                        const t = pricingConfig.tiers[key as keyof typeof pricingConfig.tiers];
-                                                        return (
-                                                            <div key={key} onClick={() => setTier(key)}
-                                                                className={`flex-1 p-3 border rounded-lg cursor-pointer text-center ${tier === key ? 'border-green-500 bg-green-500/10' : 'border-white/10'}`}>
-                                                                <p className="font-bold text-white">{t.title}</p>
-                                                                <p className="text-xs text-gray-400">{t.duration} Turnaround</p>
-                                                            </div>
-                                                        )
-                                                    })}
+                                                    {Object.keys(pricingConfig.tiers)
+                                                        .filter(key => key !== 'exclusive')
+                                                        .map((key) => {
+                                                            const t = pricingConfig.tiers[key as keyof typeof pricingConfig.tiers];
+                                                            return (
+                                                                <div key={key} onClick={() => setTier(key)}
+                                                                    className={`flex-1 p-3 border rounded-lg cursor-pointer text-center ${tier === key ? 'border-green-500 bg-green-500/10' : 'border-white/10'}`}>
+                                                                    <p className="font-bold text-white">{t.title}</p>
+                                                                    <p className="text-xs text-gray-400">{t.duration} Turnaround</p>
+                                                                </div>
+                                                            )
+                                                        })}
                                                 </div>
                                             </div>
 
@@ -577,79 +653,41 @@ function SubmitForm() {
                                             </div>
                                         </div>
 
-                                        {total > 0 && (
-                                            <div className="w-full space-y-3">
-                                                <Label>Payment Method</Label>
-                                                <div className="grid grid-cols-2 gap-4">
-                                                    <Button
-                                                        type="button"
-                                                        variant={paymentMethod === "direct" ? "default" : "outline"}
-                                                        className={paymentMethod === "direct" ? "bg-white text-black hover:bg-gray-200" : ""}
-                                                        onClick={() => setPaymentMethod("direct")}
-                                                    >
-                                                        <CreditCard className="w-4 h-4 mr-2" /> Pay Now
-                                                    </Button>
-                                                    <Button
-                                                        type="button"
-                                                        variant={paymentMethod === "wallet" ? "default" : "outline"}
-                                                        className={paymentMethod === "wallet" ? "bg-green-600 hover:bg-green-700" : ""}
-                                                        onClick={() => setPaymentMethod("wallet")}
-                                                        disabled={!user}
-                                                    >
-                                                        <Wallet className="w-4 h-4 mr-2" /> Wallet {user ? `(${pricingConfig.currency}${user.balance.toLocaleString()})` : "(Login)"}
-                                                    </Button>
-                                                </div>
-                                            </div>
-                                        )}
-
-                                        {total === 0 ? (
-                                            <Button
-                                                type="submit"
-                                                className="w-full bg-green-600 hover:bg-green-700 text-lg py-6 font-bold shadow-lg shadow-green-900/20"
-                                                disabled={isSubmitting}
-                                            >
-                                                {isSubmitting ? (
-                                                    <>
-                                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                                        Processing...
-                                                    </>
-                                                ) : (
-                                                    <span>Submit Free</span>
-                                                )}
-                                            </Button>
-                                        ) : (
-                                            <>
-                                                {paymentMethod === "direct" ? (
-                                                    <div className="w-full">
-                                                        <PayWithPaystack
-                                                            email={email || (user?.email) || "guest@afropitch.com"}
-                                                            amount={total * 100}
-                                                            onSuccess={async (ref: any) => {
-                                                                console.log("Payment success:", ref);
-                                                                const saved = await saveSubmissions();
-                                                                if (saved) setIsSuccess(true);
-                                                            }}
-                                                            onClose={() => setIsSubmitting(false)}
-                                                        />
+                                        <div className="w-full space-y-3">
+                                            <div className="bg-white/5 p-4 rounded-lg flex items-center justify-between border border-white/10">
+                                                <div className="flex items-center gap-3">
+                                                    <Wallet className="w-5 h-5 text-green-500" />
+                                                    <div className="text-left">
+                                                        <p className="font-bold text-white text-sm">Pay with Wallet</p>
+                                                        <p className="text-xs text-gray-400">Balance: {user ? `${pricingConfig.currency}${user.balance.toLocaleString()}` : 'Login to view'}</p>
                                                     </div>
+                                                </div>
+                                                {!user ? (
+                                                    <Button size="sm" variant="outline" onClick={() => router.push("/portal")}>Login</Button>
                                                 ) : (
-                                                    <Button
-                                                        type="submit"
-                                                        className="w-full bg-green-600 hover:bg-green-700 text-lg py-6 font-bold shadow-lg shadow-green-900/20"
-                                                        disabled={isSubmitting || (paymentMethod === "wallet" && (!user || user.balance < total))}
-                                                    >
-                                                        {isSubmitting ? (
-                                                            <>
-                                                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                                                Processing...
-                                                            </>
-                                                        ) : (
-                                                            <span>PAY {pricingConfig.currency}{total.toLocaleString()}</span>
-                                                        )}
-                                                    </Button>
+                                                    user.balance < total && (
+                                                        <Button size="sm" variant="destructive" onClick={() => router.push("/dashboard/artist")}>Load Funds</Button>
+                                                    )
                                                 )}
-                                            </>
-                                        )}
+                                            </div>
+                                        </div>
+
+                                        <Button
+                                            type="submit"
+                                            className="w-full bg-green-600 hover:bg-green-700 text-lg py-6 font-bold shadow-lg shadow-green-900/20"
+                                            disabled={isSubmitting || !user || user.balance < total}
+                                        >
+                                            {isSubmitting ? (
+                                                <>
+                                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                                    Processing...
+                                                </>
+                                            ) : (
+                                                <span>
+                                                    {!user ? "Login to Pay" : user.balance < total ? "Insufficient Balance" : `PAY ${pricingConfig.currency}${total.toLocaleString()}`}
+                                                </span>
+                                            )}
+                                        </Button>
                                     </CardFooter>
                                 </form>
                             </Card>

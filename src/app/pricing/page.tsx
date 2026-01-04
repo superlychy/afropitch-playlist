@@ -83,12 +83,45 @@ export default function PricingPage() {
                         </Link>
                     </CardFooter>
                 </Card>
+
+
+                {/* Exclusive Tier */}
+                <Card className="flex-1 border-yellow-500/30 bg-black/40 backdrop-blur-md shadow-[0_0_40px_rgba(234,179,8,0.1)] relative overflow-hidden flex flex-col max-w-md">
+                    <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-yellow-500 to-purple-500" />
+
+                    <CardHeader>
+                        <CardTitle className="text-2xl mb-2">{tiers.exclusive.title}</CardTitle>
+                        <CardDescription>{tiers.exclusive.description}</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-6 flex-grow">
+                        <div className="flex justify-center items-baseline text-white">
+                            <span className="text-5xl font-extrabold tracking-tight">
+                                {currency}{tiers.exclusive.price.toLocaleString()}
+                            </span>
+                        </div>
+                        <ul className="space-y-3 text-left">
+                            {tiers.exclusive.features.map((feature, i) => (
+                                <li key={i} className="flex items-center gap-3">
+                                    <Check className="w-5 h-5 text-yellow-500 flex-shrink-0" />
+                                    <span className="text-gray-300">{feature}</span>
+                                </li>
+                            ))}
+                        </ul>
+                    </CardContent>
+                    <CardFooter>
+                        <Link href={`/submit?tier=exclusive`} className="w-full">
+                            <Button className="w-full bg-yellow-600 hover:bg-yellow-700 text-lg py-6" size="lg">
+                                Get {tiers.exclusive.title}
+                            </Button>
+                        </Link>
+                    </CardFooter>
+                </Card>
             </div>
 
             <p className="mt-12 text-sm text-gray-400 text-center">
                 Secure payment via Paystack/Flutterwave (Coming soon). <br />
                 Accepted: Debit Card, Bank Transfer, USSD.
             </p>
-        </div>
+        </div >
     );
 }

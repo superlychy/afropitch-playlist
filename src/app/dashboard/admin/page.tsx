@@ -6,8 +6,9 @@ import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { BarChart3, TrendingUp, Music, Users, Trophy, DollarSign, ShieldAlert, CheckCircle, XCircle, MessageSquare, LogOut } from "lucide-react";
+import { BarChart3, TrendingUp, Music, Users, Trophy, DollarSign, ShieldAlert, CheckCircle, XCircle, MessageSquare, LogOut, Bell, Plus, Search, Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { TransactionsList } from "@/components/TransactionsList";
 import { pricingConfig } from "@/../config/pricing";
 
 // ----------------------------------------------------------------------
@@ -62,16 +63,39 @@ interface AdminPlaylist {
     created_at: string;
 }
 
+interface TopPlaylist {
+    playlist_id: string;
+    playlist_name: string;
+    curator_name: string;
+    total_clicks: number;
+}
+
 export default function AdminDashboard() {
     const { user, isLoading, logout } = useAuth();
     const router = useRouter();
-    const [activeTab, setActiveTab] = useState<"overview" | "users" | "withdrawals" | "support" | "playlists">("overview");
+    const [activeTab, setActiveTab] = useState<"overview" | "users" | "withdrawals" | "transactions" | "support" | "playlists">("overview");
 
     // DATA STATE
     const [usersList, setUsersList] = useState<AdminUser[]>([]);
     const [withdrawals, setWithdrawals] = useState<WithdrawalRequest[]>([]);
     const [tickets, setTickets] = useState<SupportTicket[]>([]);
+
     const [allPlaylists, setAllPlaylists] = useState<AdminPlaylist[]>([]);
+    const [topCampaigns, setTopCampaigns] = useState<any[]>([]);
+    const [topPlaylists, setTopPlaylists] = useState<TopPlaylist[]>([]);
+
+    // Financial Stats
+    const [finStats, setFinStats] = useState({
+        totalRevenue: 0,
+        totalWithdrawn: 0,
+        totalPending: 0,
+        totalHoldings: 0,
+        curatorHoldings: 0,
+        artistHoldings: 0
+    });
+
+    const pendingWithdrawalsCount = withdrawals.filter(w => w.status === 'pending').length;
+    const openTicketsCount = tickets.filter(t => t.status === 'open').length;
 
     // Chat State
     const [showChat, setShowChat] = useState(false);
@@ -94,6 +118,13 @@ export default function AdminDashboard() {
     const [adminNewName, setAdminNewName] = useState("");
     const [adminNewFollowers, setAdminNewFollowers] = useState(0);
     const [adminIsSaving, setAdminIsSaving] = useState(false);
+
+    // Add Playlist State (Admin)
+    const [showAddPlaylist, setShowAddPlaylist] = useState(false);
+    const [newPlaylistLink, setNewPlaylistLink] = useState("");
+    const [isFetchingInfo, setIsFetchingInfo] = useState(false);
+    const [fetchedPlaylistInfo, setFetchedPlaylistInfo] = useState<any>(null);
+    const [isSavingPlaylist, setIsSavingPlaylist] = useState(false);
 
     useEffect(() => {
         if (!isLoading && (!user || user.role !== "admin")) {
@@ -170,9 +201,58 @@ export default function AdminDashboard() {
                     name: p.name,
                     followers: p.followers,
                     type: p.type,
+
                     created_at: new Date(p.created_at).toLocaleDateString()
                 })));
             }
+
+            // 5. Fetch Top Campaigns (by clicks)
+            const { data: topClicks } = await supabase
+                .from('submissions')
+                .select('*, artist:profiles!artist_id(full_name), playlist:playlists(name)')
+                .order('clicks', { ascending: false })
+                .limit(5);
+
+            if (topClicks) {
+                setTopCampaigns(topClicks);
+            }
+
+            // 6. Fetch Top Playlists (RPC)
+            const { data: topPl } = await supabase.rpc('get_top_playlists_by_clicks', { limit_count: 5 });
+            if (topPl) {
+                setTopPlaylists(topPl as TopPlaylist[]);
+            }
+            // 7. Calculate Financials
+            // Total Available (User Balances)
+            const { data: allProfiles } = await supabase.from('profiles').select('balance, role');
+
+            const curatorHoldings = allProfiles
+                ?.filter(p => p.role === 'curator')
+                .reduce((sum, p) => sum + (p.balance || 0), 0) || 0;
+
+            const artistHoldings = allProfiles
+                ?.filter(p => p.role === 'artist')
+                .reduce((sum, p) => sum + (p.balance || 0), 0) || 0;
+
+            const totalHoldings = curatorHoldings + artistHoldings;
+
+            // Total Withdrawn & Pending
+            const { data: allWithdrawals } = await supabase.from('withdrawals').select('amount, status');
+            const totalWithdrawn = allWithdrawals?.filter(w => w.status === 'approved').reduce((sum, w) => sum + w.amount, 0) || 0;
+            const totalPendingWithdrawal = allWithdrawals?.filter(w => w.status === 'pending').reduce((sum, w) => sum + w.amount, 0) || 0;
+
+            // Total Revenue (Volume) - Payments made by artists
+            const { data: allSubs } = await supabase.from('submissions').select('amount_paid');
+            const totalRevenue = allSubs?.reduce((sum, s) => sum + (s.amount_paid || 0), 0) || 0;
+
+            setFinStats({
+                totalRevenue,
+                totalWithdrawn,
+                totalPending: totalPendingWithdrawal,
+                totalHoldings,
+                curatorHoldings,
+                artistHoldings
+            });
         };
 
         fetchData();
@@ -217,6 +297,19 @@ export default function AdminDashboard() {
         }
     };
 
+    const deletePlaylist = async (id: string) => {
+        if (!confirm("Are you sure you want to delete this playlist? This action cannot be undone.")) return;
+
+        const { error } = await supabase.from('playlists').delete().eq('id', id);
+
+        if (error) {
+            alert("Error deleting playlist: " + error.message);
+        } else {
+            setAllPlaylists(prev => prev.filter(p => p.id !== id));
+            alert("Playlist deleted successfully.");
+        }
+    };
+
     const handleWithdrawal = async (id: string, action: 'approve' | 'reject') => {
         const withdrawal = withdrawals.find(w => w.id === id);
         if (!withdrawal) return;
@@ -251,6 +344,113 @@ export default function AdminDashboard() {
         } else {
             alert(`Withdrawal approved.`);
         }
+    };
+
+
+    const initiateChatWithUser = async (userId: string, userName: string) => {
+        if (!user) return;
+
+        const subject = `Regarding Withdrawal Request`;
+        const message = `Hello ${userName}, regarding your recent withdrawal request...`;
+
+        const { data: existingTicket } = await supabase
+            .from('support_tickets')
+            .select('*')
+            .eq('user_id', userId)
+            .eq('status', 'open')
+            .eq('subject', subject)
+            .single();
+
+        if (existingTicket) {
+            openChat(existingTicket);
+        } else {
+            const { data: newTicket, error } = await supabase
+                .from('support_tickets')
+                .insert({
+                    user_id: userId,
+                    subject: subject,
+                    message: message,
+                    status: 'open'
+                })
+                .select()
+                .single();
+
+            if (error) {
+                alert("Could not start chat (check Admin Policy): " + error.message);
+            } else if (newTicket) {
+                await supabase.from('support_messages').insert({
+                    ticket_id: newTicket.id,
+                    sender_id: user.id,
+                    message: message
+                });
+
+                openChat({
+                    ...newTicket,
+                    user_name: userName,
+                    last_message: message,
+                    date: new Date().toLocaleDateString()
+                });
+            }
+        }
+    };
+
+    // PLAYLIST FUNCTIONS
+    // PLAYLIST FUNCTIONS
+    const fetchPlaylistInfo = async () => {
+        setIsFetchingInfo(true);
+
+        // If it looks like a Spotify link, try to fetch info
+        if (newPlaylistLink.includes("spotify.com")) {
+            try {
+                const response = await fetch('/api/playlist-info', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url: newPlaylistLink }),
+                });
+                const data = await response.json();
+                if (data.error) throw new Error(data.error);
+                setFetchedPlaylistInfo(data);
+            } catch (err: any) {
+                console.warn("Auto-fetch failed, falling back to manual entry:", err.message);
+                // Fallback to manual
+                setFetchedPlaylistInfo({ name: "", description: "", coverImage: "", followers: 0 });
+            }
+        } else {
+            // Manual Entry for other platforms (Apple Music, Audiomack, etc.)
+            setFetchedPlaylistInfo({ name: "", description: "", coverImage: "", followers: 0 });
+        }
+
+        setIsFetchingInfo(false);
+    };
+
+    const addPlaylist = async () => {
+        if (!fetchedPlaylistInfo || !user) return;
+        setIsSavingPlaylist(true);
+
+        const { error } = await supabase.from('playlists').insert({
+            name: fetchedPlaylistInfo.name,
+            description: fetchedPlaylistInfo.description,
+            cover_image: fetchedPlaylistInfo.coverImage,
+            followers: fetchedPlaylistInfo.followers,
+            playlist_link: newPlaylistLink,
+            curator_id: user.id,
+            genre: "Multi-Genre", // Default or add selector
+            type: "standard", // Default
+            submission_fee: 3000, // Default for standard
+            is_active: true
+        }).select().single();
+
+        if (error) {
+            alert("Error adding playlist: " + error.message);
+        } else {
+            alert("Playlist added successfully! It will appear under 'AfroPitch Team Playlists'.");
+            setShowAddPlaylist(false);
+            setNewPlaylistLink("");
+            setFetchedPlaylistInfo(null);
+            // Reload page or re-fetch (simplest is reload for admin or optimistic add)
+            window.location.reload();
+        }
+        setIsSavingPlaylist(false);
     };
 
     // CHAT FUNCTIONS
@@ -355,20 +555,38 @@ export default function AdminDashboard() {
             <div className="container mx-auto px-4 max-w-7xl py-12 min-h-screen">
                 <div className="flex justify-between items-center mb-8">
                     <div>
-                        <h1 className="text-3xl font-bold text-white">Admin Dashboard</h1>
-                        <p className="text-gray-400">Platform Management System</p>
+                        <h1 className="text-3xl font-bold text-white flex items-center gap-3">
+                            Admin Dashboard
+                            {(pendingWithdrawalsCount + openTicketsCount) > 0 && (
+                                <span className="bg-red-500 text-white text-sm px-2 py-0.5 rounded-full animate-pulse shadow-lg shadow-red-500/20">
+                                    {pendingWithdrawalsCount + openTicketsCount} Updates
+                                </span>
+                            )}
+                        </h1>
+                        <p className="text-gray-400">Welcome, <span className="text-green-500">{user?.name || 'Admin'}</span>. Platform Management System</p>
                     </div>
                     <div className="flex items-center gap-4">
                         <div className="flex bg-white/5 p-1 rounded-lg border border-white/10">
-                            {["overview", "users", "withdrawals", "support", "playlists"].map((tab) => (
-                                <button
-                                    key={tab}
-                                    onClick={() => setActiveTab(tab as any)}
-                                    className={`px-4 py-2 rounded-md text-sm font-medium capitalize transition-all ${activeTab === tab ? "bg-green-600 text-white" : "text-gray-400 hover:text-white"}`}
-                                >
-                                    {tab}
-                                </button>
-                            ))}
+                            {["overview", "users", "withdrawals", "transactions", "support", "playlists"].map((tab) => {
+                                let count = 0;
+                                if (tab === 'withdrawals') count = pendingWithdrawalsCount;
+                                if (tab === 'support') count = openTicketsCount;
+
+                                return (
+                                    <button
+                                        key={tab}
+                                        onClick={() => setActiveTab(tab as any)}
+                                        className={`px-4 py-2 rounded-md text-sm font-medium capitalize transition-all relative ${activeTab === tab ? "bg-green-600 text-white" : "text-gray-400 hover:text-white"}`}
+                                    >
+                                        {tab}
+                                        {count > 0 && (
+                                            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] w-4 h-4 flex items-center justify-center rounded-full animate-pulse font-bold">
+                                                {count}
+                                            </span>
+                                        )}
+                                    </button>
+                                );
+                            })}
                         </div>
                         <Button variant="outline" size="icon" className="border-white/10 hover:bg-red-500/20 h-10 w-10 group" title="Logout" onClick={logout}>
                             <LogOut className="w-5 h-5 text-gray-400 group-hover:text-red-500" />
@@ -379,33 +597,98 @@ export default function AdminDashboard() {
                 {/* OVERVIEW CONTENT */}
                 {activeTab === "overview" && (
                     <div className="space-y-8">
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                            <Card className="bg-blue-600/10 border-blue-500/20">
-                                <CardHeader className="pb-2"><CardTitle className="text-sm text-gray-400">Total Users</CardTitle></CardHeader>
-                                <CardContent><div className="text-2xl font-bold text-white">{usersList.length}</div></CardContent>
+                        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                            <Card className="bg-blue-600/10 border-blue-500/20 lg:col-span-2">
+                                <CardHeader className="pb-2"><CardTitle className="text-sm text-gray-400">Total Volume</CardTitle></CardHeader>
+                                <CardContent><div className="text-2xl font-bold text-white">{pricingConfig.currency}{finStats.totalRevenue.toLocaleString()}</div></CardContent>
                             </Card>
-                            <Card className="bg-green-600/10 border-green-500/20">
-                                <CardHeader className="pb-2"><CardTitle className="text-sm text-gray-400">Total Revenue</CardTitle></CardHeader>
-                                <CardContent><div className="text-2xl font-bold text-white">{pricingConfig.currency}45,000</div></CardContent>
+                            <Card className="bg-purple-600/10 border-purple-500/20 lg:col-span-2">
+                                <CardHeader className="pb-2"><CardTitle className="text-sm text-gray-400">Total Holdings (Net)</CardTitle></CardHeader>
+                                <CardContent>
+                                    <div className="text-2xl font-bold text-white">{pricingConfig.currency}{finStats.totalHoldings.toLocaleString()}</div>
+                                    <p className="text-xs text-gray-400">Curator + Artist Funds</p>
+                                </CardContent>
                             </Card>
-                            <Card className="bg-yellow-600/10 border-yellow-500/20">
-                                <CardHeader className="pb-2"><CardTitle className="text-sm text-gray-400">Pending Withdrawals</CardTitle></CardHeader>
-                                <CardContent><div className="text-2xl font-bold text-white">{withdrawals.filter(w => w.status === 'pending').length}</div></CardContent>
+                            <Card className="bg-yellow-600/10 border-yellow-500/20 lg:col-span-2">
+                                <CardHeader className="pb-2"><CardTitle className="text-sm text-gray-400">Total Withdrawn</CardTitle></CardHeader>
+                                <CardContent><div className="text-2xl font-bold text-white">{pricingConfig.currency}{finStats.totalWithdrawn.toLocaleString()}</div></CardContent>
                             </Card>
-                            <Card className="bg-red-600/10 border-red-500/20">
-                                <CardHeader className="pb-2"><CardTitle className="text-sm text-gray-400">Open Tickets</CardTitle></CardHeader>
-                                <CardContent><div className="text-2xl font-bold text-white">{tickets.filter(t => t.status === 'open').length}</div></CardContent>
+
+                            <Card className="bg-green-600/10 border-green-500/20 lg:col-span-2">
+                                <CardHeader className="pb-2"><CardTitle className="text-sm text-gray-400">Curator Holdings</CardTitle></CardHeader>
+                                <CardContent>
+                                    <div className="text-xl font-bold text-white">{pricingConfig.currency}{finStats.curatorHoldings.toLocaleString()}</div>
+                                </CardContent>
+                            </Card>
+                            <Card className="bg-pink-600/10 border-pink-500/20 lg:col-span-2">
+                                <CardHeader className="pb-2"><CardTitle className="text-sm text-gray-400">Artist Holdings</CardTitle></CardHeader>
+                                <CardContent>
+                                    <div className="text-xl font-bold text-white">{pricingConfig.currency}{finStats.artistHoldings.toLocaleString()}</div>
+                                </CardContent>
+                            </Card>
+                            <Card className="bg-orange-600/10 border-orange-500/20 lg:col-span-2">
+                                <CardHeader className="pb-2"><CardTitle className="text-sm text-gray-400">Pending Payouts</CardTitle></CardHeader>
+                                <CardContent>
+                                    <div className="text-xl font-bold text-white">{pricingConfig.currency}{finStats.totalPending.toLocaleString()}</div>
+                                    <p className="text-xs text-gray-400">{pendingWithdrawalsCount} requests</p>
+                                </CardContent>
                             </Card>
                         </div>
 
-                        <Card className="bg-black/40 border-white/10">
-                            <CardHeader>
-                                <CardTitle className="text-white">Recent Activity</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="text-gray-400 text-sm">No recent activity logged.</div>
-                            </CardContent>
-                        </Card>
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            {/* TOP SONGS */}
+                            <Card className="bg-black/40 border-white/10">
+                                <CardHeader>
+                                    <CardTitle className="text-white flex items-center gap-2"><Trophy className="w-5 h-5 text-yellow-500" /> Top Songs</CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="space-y-4">
+                                        {topCampaigns.length === 0 && <p className="text-gray-500 text-sm">No campaigns data available.</p>}
+                                        {topCampaigns.map((c, idx) => (
+                                            <div key={c.id} className="flex items-center justify-between p-3 bg-white/5 rounded border border-white/5">
+                                                <div className="flex items-center gap-4">
+                                                    <div className="font-bold text-lg text-white/20 w-6">#{idx + 1}</div>
+                                                    <div>
+                                                        <p className="font-bold text-white">{c.song_title}</p>
+                                                        <p className="text-xs text-gray-400">by {c.artist?.full_name || 'Unknown'}</p>
+                                                        {c.playlist && <p className="text-[10px] text-green-400">on {c.playlist.name}</p>}
+                                                    </div>
+                                                </div>
+                                                <div className="text-right">
+                                                    <span className="block font-bold text-green-500">{c.clicks || 0} clicks</span>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </CardContent>
+                            </Card>
+
+                            {/* TOP PLAYLISTS */}
+                            <Card className="bg-black/40 border-white/10">
+                                <CardHeader>
+                                    <CardTitle className="text-white flex items-center gap-2"><Music className="w-5 h-5 text-purple-500" /> Top Playlists</CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="space-y-4">
+                                        {topPlaylists.length === 0 && <p className="text-gray-500 text-sm">No playlist data available.</p>}
+                                        {topPlaylists.map((p, idx) => (
+                                            <div key={p.playlist_id} className="flex items-center justify-between p-3 bg-white/5 rounded border border-white/5">
+                                                <div className="flex items-center gap-4">
+                                                    <div className="font-bold text-lg text-white/20 w-6">#{idx + 1}</div>
+                                                    <div>
+                                                        <p className="font-bold text-white">{p.playlist_name}</p>
+                                                        <p className="text-xs text-gray-400">Curator: {p.curator_name || 'Unknown'}</p>
+                                                    </div>
+                                                </div>
+                                                <div className="text-right">
+                                                    <span className="block font-bold text-purple-500">{p.total_clicks || 0} clicks</span>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </div>
                     </div>
                 )}
 
@@ -433,6 +716,10 @@ export default function AdminDashboard() {
                                                     {u.is_blocked && <span className="text-[10px] bg-red-500 text-white px-2 rounded">BLOCKED</span>}
                                                 </p>
                                                 <p className="text-sm text-gray-500">{u.email}</p>
+                                                <div className="mt-1 flex items-center gap-2">
+                                                    <span className="text-xs text-gray-400">Bal:</span>
+                                                    <span className="text-sm font-bold text-green-400">{pricingConfig.currency}{(u.balance || 0).toLocaleString()}</span>
+                                                </div>
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-2">
@@ -446,6 +733,17 @@ export default function AdminDashboard() {
                             </div>
                         </CardContent>
                     </Card>
+                )}
+
+                {/* TRANSACTIONS VIEW */}
+                {activeTab === "transactions" && (
+                    <div className="space-y-6">
+                        <div>
+                            <h2 className="text-2xl font-bold text-white">Platform Transactions</h2>
+                            <p className="text-gray-400">View all financial activity across the platform.</p>
+                        </div>
+                        <TransactionsList />
+                    </div>
                 )}
 
                 {/* WITHDRAWALS MANAGEMENT */}
@@ -485,11 +783,80 @@ export default function AdminDashboard() {
                                                 </Button>
                                             </div>
                                         )}
+                                        {/* Always show Message button */}
+                                        <div className="ml-2">
+                                            <Button size="sm" variant="outline" onClick={() => initiateChatWithUser(w.user_id, w.user_name)}>
+                                                <MessageSquare className="w-4 h-4 mr-1" /> Message
+                                            </Button>
+                                        </div>
                                     </div>
                                 ))}
                             </div>
                         </CardContent>
                     </Card>
+                )}
+
+                {/* PLAYLISTS MANAGEMENT */}
+                {activeTab === "playlists" && (
+                    <div className="space-y-6">
+                        <div className="flex justify-between items-center">
+                            <h2 className="text-2xl font-bold text-white">All Playlists</h2>
+                            <Button className="bg-green-600 hover:bg-green-700" onClick={() => setShowAddPlaylist(true)}>
+                                <Plus className="w-4 h-4 mr-2" /> Add Playlist
+                            </Button>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {allPlaylists.map((playlist) => (
+                                <Card key={playlist.id} className="bg-black/40 border-white/10 overflow-hidden hover:border-white/20 transition-all">
+                                    <div className="h-32 bg-gradient-to-br from-gray-800 to-black relative">
+                                        <div className="absolute inset-0 flex items-center justify-center">
+                                            <Music className="w-12 h-12 text-white/20" />
+                                        </div>
+                                        <div className="absolute top-2 right-2">
+                                            <span className={`px-2 py-1 rounded text-[10px] uppercase font-bold ${playlist.type === 'exclusive' ? 'bg-yellow-500 text-black' :
+                                                playlist.type === 'express' ? 'bg-orange-500 text-white' :
+                                                    'bg-blue-500 text-white'
+                                                }`}>
+                                                {playlist.type}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <CardContent className="p-4">
+                                        <h3 className="font-bold text-white text-lg truncate" title={playlist.name}>{playlist.name}</h3>
+                                        <p className="text-sm text-gray-400 mb-4 flex items-center gap-1">
+                                            <Users className="w-3 h-3" /> Curator: <span className="text-white">{playlist.curator_name || 'Unknown'}</span>
+                                        </p>
+
+                                        <div className="grid grid-cols-2 gap-2 text-xs text-gray-500 mb-4">
+                                            <div className="bg-white/5 p-2 rounded">
+                                                <span className="block font-bold text-white">{playlist.followers.toLocaleString()}</span>
+                                                Followers
+                                            </div>
+                                            <div className="bg-white/5 p-2 rounded">
+                                                <span className="block font-bold text-white max-w-[100px] truncate">{new Date(playlist.created_at).toLocaleDateString()}</span>
+                                                Created
+                                            </div>
+                                        </div>
+
+                                        <div className="flex gap-2">
+                                            <Button size="sm" variant="outline" className="flex-1 border-white/10 hover:bg-white/10" onClick={() => {
+                                                setAdminEditingPlaylist(playlist);
+                                                setAdminNewName(playlist.name);
+                                                setAdminNewFollowers(playlist.followers);
+                                                setShowEditPlaylist(true);
+                                            }}>
+                                                Edit
+                                            </Button>
+                                            <Button size="sm" variant="destructive" className="flex-1 opacity-80 hover:opacity-100" onClick={() => deletePlaylist(playlist.id)}>
+                                                Delete
+                                            </Button>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            ))}
+                            {allPlaylists.length === 0 && <p className="text-gray-500 col-span-3 text-center py-10">No playlists found.</p>}
+                        </div>
+                    </div>
                 )}
 
                 {/* SUPPORT SYSTEM */}
@@ -539,7 +906,28 @@ export default function AdminDashboard() {
                                 <h3 className="font-bold text-white text-lg">{activeTicket?.subject}</h3>
                                 <p className="text-sm text-gray-400">Chat with {activeTicket?.user_name}</p>
                             </div>
-                            <Button variant="ghost" size="icon" onClick={() => setShowChat(false)}><XCircle className="w-6 h-6 text-gray-400" /></Button>
+                            <div className="flex gap-2">
+                                {activeTicket?.status === 'open' && (
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="border-red-500/30 text-red-500 hover:bg-red-500/10"
+                                        onClick={async () => {
+                                            if (!activeTicket) return;
+                                            const { error } = await supabase.from('support_tickets').update({ status: 'closed' }).eq('id', activeTicket.id);
+                                            if (!error) {
+                                                alert("Ticket closed.");
+                                                setTickets(prev => prev.map(t => t.id === activeTicket.id ? { ...t, status: 'closed' } : t));
+                                                setActiveTicket(prev => prev ? { ...prev, status: 'closed' } : null);
+                                                setShowChat(false);
+                                            }
+                                        }}
+                                    >
+                                        Close Ticket
+                                    </Button>
+                                )}
+                                <Button variant="ghost" size="icon" onClick={() => setShowChat(false)}><XCircle className="w-6 h-6 text-gray-400" /></Button>
+                            </div>
                         </div>
 
                         {/* Messages */}
@@ -621,35 +1009,118 @@ export default function AdminDashboard() {
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in">
                     <div className="bg-zinc-900 border border-white/10 w-full max-w-md p-6 rounded-lg space-y-4">
                         <h3 className="text-xl font-bold text-white">Edit Playlist</h3>
-                        <div className="space-y-4">
+                        <div className="space-y-3">
                             <div>
-                                <label className="text-xs text-gray-400 mb-1 block">Name</label>
+                                <label className="text-xs text-gray-400 mb-1 block">Playlist Name</label>
                                 <Input value={adminNewName} onChange={e => setAdminNewName(e.target.value)} className="bg-zinc-800 border-zinc-700" />
                             </div>
                             <div>
                                 <label className="text-xs text-gray-400 mb-1 block">Followers</label>
-                                <Input type="number" value={adminNewFollowers} onChange={e => setAdminNewFollowers(Number(e.target.value))} className="bg-zinc-800 border-zinc-700" />
+                                <Input type="number" value={adminNewFollowers} onChange={e => setAdminNewFollowers(parseInt(e.target.value))} className="bg-zinc-800 border-zinc-700" />
                             </div>
                         </div>
                         <div className="flex justify-end gap-2 pt-4">
                             <Button variant="ghost" onClick={() => setShowEditPlaylist(false)}>Cancel</Button>
-                            <Button className="bg-green-600" disabled={adminIsSaving} onClick={async () => {
+                            <Button className="bg-green-600" onClick={async () => {
                                 setAdminIsSaving(true);
-                                const { error } = await supabase.from('playlists').update({
+                                await supabase.from('playlists').update({
                                     name: adminNewName,
                                     followers: adminNewFollowers
                                 }).eq('id', adminEditingPlaylist.id);
-
-                                if (error) {
-                                    alert(error.message);
-                                } else {
-                                    alert("Playlist updated!");
-                                    setAllPlaylists(prev => prev.map(p => p.id === adminEditingPlaylist.id ? { ...p, name: adminNewName, followers: adminNewFollowers } : p));
-                                    setShowEditPlaylist(false);
-                                }
                                 setAdminIsSaving(false);
-                            }}>Save Changes</Button>
+                                setShowEditPlaylist(false);
+                                window.location.reload();
+                            }} disabled={adminIsSaving}>
+                                {adminIsSaving ? "Saving..." : "Save Changes"}
+                            </Button>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ADD PLAYLIST MODAL (New) */}
+            {showAddPlaylist && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in">
+                    <div className="bg-zinc-900 border border-white/10 w-full max-w-md p-6 rounded-lg space-y-6">
+                        <div className="flex justify-between items-start">
+                            <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                                <Plus className="w-5 h-5 text-green-500" /> Add Team Playlist
+                            </h3>
+                            <button onClick={() => setShowAddPlaylist(false)} className="text-gray-400 hover:text-white"><XCircle className="w-6 h-6" /></button>
+                        </div>
+
+                        {!fetchedPlaylistInfo ? (
+                            <div className="space-y-4">
+                                <p className="text-sm text-gray-400">Enter a Playlist URL (Spotify, Apple Music, Audiomack, etc.)</p>
+                                <div className="flex gap-2">
+                                    <Input
+                                        placeholder="https://..."
+                                        value={newPlaylistLink}
+                                        onChange={(e) => setNewPlaylistLink(e.target.value)}
+                                        className="bg-black/50 border-white/10"
+                                    />
+                                    <Button onClick={fetchPlaylistInfo} disabled={isFetchingInfo || !newPlaylistLink}>
+                                        {isFetchingInfo ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                                    </Button>
+                                </div>
+                                <p className="text-[10px] text-gray-500">Note: Only Spotify links will auto-fill details. Others require manual entry.</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-4 animate-in fade-in">
+                                <div className="bg-white/5 p-4 rounded-lg border border-white/5 space-y-3">
+                                    <div className="flex gap-4">
+                                        <div className="w-16 h-16 bg-zinc-800 rounded flex-shrink-0 overflow-hidden relative group">
+                                            {fetchedPlaylistInfo.coverImage ? (
+                                                <img src={fetchedPlaylistInfo.coverImage} className="w-full h-full object-cover" alt="Cover" />
+                                            ) : (
+                                                <Music className="w-8 h-8 text-gray-600 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+                                            )}
+                                        </div>
+                                        <div className="flex-1 space-y-2">
+                                            <div>
+                                                <label className="text-[10px] text-gray-400 uppercase font-bold">Name</label>
+                                                <Input
+                                                    value={fetchedPlaylistInfo.name}
+                                                    onChange={e => setFetchedPlaylistInfo({ ...fetchedPlaylistInfo, name: e.target.value })}
+                                                    className="bg-black/20 border-white/10 h-8 text-sm"
+                                                    placeholder="Playlist Name"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="text-[10px] text-gray-400 uppercase font-bold">Followers</label>
+                                            <Input
+                                                type="number"
+                                                value={fetchedPlaylistInfo.followers}
+                                                onChange={e => setFetchedPlaylistInfo({ ...fetchedPlaylistInfo, followers: parseInt(e.target.value) || 0 })}
+                                                className="bg-black/20 border-white/10 h-8 text-sm"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] text-gray-400 uppercase font-bold">Cover Image URL</label>
+                                            <Input
+                                                value={fetchedPlaylistInfo.coverImage || ""}
+                                                onChange={e => setFetchedPlaylistInfo({ ...fetchedPlaylistInfo, coverImage: e.target.value })}
+                                                className="bg-black/20 border-white/10 h-8 text-sm"
+                                                placeholder="https://..."
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="bg-green-500/10 border border-green-500/20 p-3 rounded text-xs text-green-400">
+                                    This playlist will be added to <strong>AfroPitch Team Playlists</strong> category.
+                                </div>
+                                <Button className="w-full bg-green-600 hover:bg-green-700 font-bold" onClick={addPlaylist} disabled={isSavingPlaylist || !fetchedPlaylistInfo.name}>
+                                    {isSavingPlaylist ? <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Adding...</> : "Confirm & Add Playlist"}
+                                </Button>
+                                <Button variant="ghost" className="w-full text-gray-400 hover:text-white" onClick={() => setFetchedPlaylistInfo(null)}>
+                                    Back to Search
+                                </Button>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}

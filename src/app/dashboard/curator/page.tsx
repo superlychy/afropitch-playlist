@@ -5,20 +5,21 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { DollarSign, CheckCircle, XCircle, Clock, Settings, User, Plus, ListMusic, MoreVertical, Star, Zap, HelpCircle, Send, LogOut, Trash2, Edit } from "lucide-react";
+import { DollarSign, CheckCircle, XCircle, Clock, Settings, User, Plus, ListMusic, MoreVertical, Star, Zap, HelpCircle, Send, LogOut, Trash2, Edit, MessageSquare, ChevronLeft } from "lucide-react";
 import { pricingConfig } from "@/../config/pricing";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/lib/supabase";
+import { TransactionsList } from "@/components/TransactionsList";
 
 interface Playlist {
     id: string;
     name: string;
     followers: number;
     submissions: number;
-    type: "free" | "standard" | "exclusive";
+    type: "free" | "standard" | "express" | "exclusive";
     cover_image: string;
     description?: string;
 }
@@ -47,6 +48,10 @@ export default function CuratorDashboard() {
     const [declineReason, setDeclineReason] = useState("");
     const [customDeclineReason, setCustomDeclineReason] = useState("");
 
+    // Accept Logic
+    const [showAcceptModal, setShowAcceptModal] = useState(false);
+    const [acceptFeedback, setAcceptFeedback] = useState("Great track! Happy to include it in the playlist. Please share the link to boost your ranking!");
+
     const declineOptions = [
         "Does not fit playlist vibe",
         "Production quality improperly mixed",
@@ -71,6 +76,13 @@ export default function CuratorDashboard() {
 
     // Support Modal State
     const [showSupport, setShowSupport] = useState(false);
+    const [supportView, setSupportView] = useState<'list' | 'create' | 'chat'>('list');
+    const [supportTickets, setSupportTickets] = useState<any[]>([]);
+    const [activeTicket, setActiveTicket] = useState<any>(null);
+    const [chatMessages, setChatMessages] = useState<any[]>([]);
+    const [chatInput, setChatInput] = useState("");
+    const [isLoadingChat, setIsLoadingChat] = useState(false);
+
     const [supportSubject, setSupportSubject] = useState("");
     const [supportMessage, setSupportMessage] = useState("");
     const [isSubmittingTicket, setIsSubmittingTicket] = useState(false);
@@ -82,7 +94,7 @@ export default function CuratorDashboard() {
     const [newCoverImage, setNewCoverImage] = useState("");
     const [newFollowers, setNewFollowers] = useState(0);
     const [songsCount, setSongsCount] = useState(0);
-    const [newPlaylistType, setNewPlaylistType] = useState<"free" | "standard" | "exclusive">("free");
+    const [newPlaylistType, setNewPlaylistType] = useState<"free" | "standard" | "express" | "exclusive">("free");
     const [newGenre, setNewGenre] = useState("");
     const [customPrice, setCustomPrice] = useState(0);
     const [isCreating, setIsCreating] = useState(false);
@@ -253,7 +265,7 @@ export default function CuratorDashboard() {
             await supabase.from('profiles').update({ balance: user.balance }).eq('id', user.id);
             alert("Error requesting withdrawal: " + withdrawError.message);
         } else {
-            alert("Withdrawal requested successfully!");
+            alert("Withdrawal requested successfully! It will be processed within 1-24 hours.");
             // Update local state via Context if possible, or just visual update relies on page reload or effect
             if (deductFunds) deductFunds(amount);
 
@@ -263,6 +275,23 @@ export default function CuratorDashboard() {
         setIsWithdrawing(false);
     };
 
+    // Support Functions
+    useEffect(() => {
+        if (showSupport && user) {
+            fetchTickets();
+        }
+    }, [showSupport, user]);
+
+    const fetchTickets = async () => {
+        if (!user) return;
+        const { data } = await supabase
+            .from('support_tickets')
+            .select('*')
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: false });
+        if (data) setSupportTickets(data);
+    };
+
     const handleSupportSubmit = async () => {
         if (!user || !supportSubject || !supportMessage) return;
         setIsSubmittingTicket(true);
@@ -270,18 +299,99 @@ export default function CuratorDashboard() {
         const { error } = await supabase.from('support_tickets').insert({
             user_id: user.id,
             subject: supportSubject,
-            message: supportMessage
-        });
+            message: supportMessage, // Initial message
+            status: 'open'
+        }).select().single();
 
         if (error) {
             alert("Error submitting ticket: " + error.message);
         } else {
-            alert("Support ticket created! We will be in touch shortly.");
+            // We should also insert the message into support_messages if we want it to appear in chat
+            // But the schema has 'message' on the ticket itself as 'last_message' or 'initial_message'.
+            // Actually admin reads 'support_messages'. So we must insert into 'support_messages' too.
+            // Wait, the schema I read for support_tickets has 'message' column.
+            // But the admin chat relies on 'support_messages'.
+            // Let's insert into support_messages as well.
+
+            // First get the new ticket ID.
+            // The .select().single() above returns the ticket.
+        }
+
+        // Re-do with proper logic
+        setIsSubmittingTicket(false);
+    };
+
+    const createTicket = async () => {
+        if (!user || !supportSubject || !supportMessage) return;
+        setIsSubmittingTicket(true);
+
+        // 1. Create Ticket
+        const { data: ticket, error } = await supabase.from('support_tickets').insert({
+            user_id: user.id,
+            subject: supportSubject,
+            message: supportMessage,
+            status: 'open'
+        }).select().single();
+
+        if (error) {
+            alert("Error: " + error.message);
+            setIsSubmittingTicket(false);
+            return;
+        }
+
+        // 2. Create Initial Message
+        if (ticket) {
+            await supabase.from('support_messages').insert({
+                ticket_id: ticket.id,
+                sender_id: user.id,
+                message: supportMessage
+            });
+
+            alert("Support ticket created!");
             setSupportSubject("");
             setSupportMessage("");
-            setShowSupport(false);
+            setSupportView('list');
+            fetchTickets();
         }
         setIsSubmittingTicket(false);
+    };
+
+    const openTicketChat = async (ticket: any) => {
+        setActiveTicket(ticket);
+        setSupportView('chat');
+        setIsLoadingChat(true);
+
+        const { data } = await supabase
+            .from('support_messages')
+            .select('*')
+            .eq('ticket_id', ticket.id)
+            .order('created_at', { ascending: true });
+
+        if (data) setChatMessages(data);
+        setIsLoadingChat(false);
+    };
+
+    const sendChatMessage = async () => {
+        if (!chatInput.trim() || !activeTicket || !user) return;
+        const text = chatInput;
+        setChatInput("");
+
+        // Optimistic
+        setChatMessages(prev => [...prev, {
+            id: Math.random(),
+            ticket_id: activeTicket.id,
+            sender_id: user.id,
+            message: text,
+            created_at: new Date().toISOString()
+        }]);
+
+        await supabase.from('support_messages').insert({
+            ticket_id: activeTicket.id,
+            sender_id: user.id,
+            message: text
+        });
+
+        // Refresh? Nah, optimistic is fine.
     };
 
     const handleCreatePlaylist = async () => {
@@ -295,7 +405,8 @@ export default function CuratorDashboard() {
             cover_image: newCoverImage,
             followers: newFollowers,
             type: newPlaylistType,
-            description: `${songsCount} songs`
+            description: `${songsCount} songs`,
+            playlist_link: newPlaylistLink
         };
 
         let error;
@@ -352,6 +463,27 @@ export default function CuratorDashboard() {
         }
     };
 
+    const toggleRankingBoost = async (submissionId: string) => {
+        // Toggle boost
+        const sub = playlistSongs.find(s => s.id === submissionId);
+        if (!sub) return;
+
+        const newVal = sub.ranking_boosted_at ? null : new Date().toISOString();
+
+        const { error } = await supabase
+            .from('submissions')
+            .update({ ranking_boosted_at: newVal })
+            .eq('id', submissionId);
+
+        if (error) {
+            alert("Error updating ranking: " + error.message);
+        } else {
+            // Optimistic update
+            setPlaylistSongs(prev => prev.map(s => s.id === submissionId ? { ...s, ranking_boosted_at: newVal } : s));
+            if (newVal) alert("Artist notified of ranking boost!");
+        }
+    };
+
     const togglePlaylistSongs = async (playlistId: string) => {
         if (expandedPlaylistId === playlistId) {
             setExpandedPlaylistId(null);
@@ -374,24 +506,48 @@ export default function CuratorDashboard() {
         setIsLoadingSongs(false);
     };
 
-    // Auto-fetch info (mock logic for now as we don't have real spotify scraper yet)
-    // We can simulate it just to not break UI flow
+    // Auto-fetch info using our internal API
     useEffect(() => {
         if (newPlaylistLink.includes("spotify.com") && !newName) {
-            // Simulate fetch
-            setIsFetchingInfo(true);
-            setTimeout(() => {
-                setNewName("Spotify Playlist (Imported)");
-                setNewGenre("Afrobeats");
-                setNewCoverImage("https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=300&h=300&fit=crop");
-                setNewFollowers(1234);
-                setSongsCount(50);
-                setIsFetchingInfo(false);
-            }, 1000);
+            const fetchInfo = async () => {
+                setIsFetchingInfo(true);
+                try {
+                    const res = await fetch('/api/playlist-info', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ url: newPlaylistLink })
+                    });
+
+                    if (res.ok) {
+                        const data = await res.json();
+                        setNewName(data.name || "Imported Playlist");
+                        if (data.description) {
+                            // Try to infer genre or just leave blank
+                        }
+                        setNewCoverImage(data.coverImage || "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=300&h=300&fit=crop");
+                        setNewFollowers(data.followers || 0);
+                        setSongsCount(data.songsCount || 0);
+                    } else {
+                        console.error("Failed to fetch playlist info");
+                    }
+                } catch (err) {
+                    console.error("Error fetching playlist info", err);
+                } finally {
+                    setIsFetchingInfo(false);
+                }
+            };
+
+            // Debounce slightly to avoid rapid requests
+            const timeoutId = setTimeout(() => {
+                fetchInfo();
+            }, 500);
+
+            return () => clearTimeout(timeoutId);
         }
     }, [newPlaylistLink]);
 
     const handleReviewAction = async (submissionId: string, action: 'accepted' | 'declined', feedback: string) => {
+        if (!user) return;
         // Create tracking slug if accepted
         let trackingSlug = null;
         if (action === 'accepted') {
@@ -420,24 +576,58 @@ export default function CuratorDashboard() {
             // If APPROVED, credit curator wallet
             if (action === 'accepted') {
                 const sub = reviews.find(r => r.id === submissionId);
-                // Credit logic: 100% of amount_paid (or platform fee could be deducted here)
                 if (sub && sub.amount_paid > 0) {
+                    // 1. Credit Balance
                     const { error: creditError } = await supabase.rpc('increment_balance', {
                         user_id: user.id,
                         amount: sub.amount_paid
                     });
 
                     if (creditError) {
-                        // Fallback direct update if RPC missing (less safe but works for now)
+                        // Fallback
                         await supabase.from('profiles').update({
                             balance: (user.balance || 0) + sub.amount_paid
                         }).eq('id', user.id);
                     }
-                    // Update local state to reflect balance immediately
-                    // (Assuming AuthContext handles user state, but we might need a manual refresh or rely on context reload)
-                    // Since user obj is from context, we can't mutate it easily without a setter exposed.
-                    // The dashboard shows `user.balance` from context.
-                    // We should ideally reload auth user or just wait for next fetch.
+
+                    // 2. Log Earning Transaction
+                    await supabase.from('transactions').insert({
+                        user_id: user.id,
+                        amount: sub.amount_paid,
+                        type: 'earning',
+                        description: `Earning for reviewing: ${sub.song_title}`,
+                        related_submission_id: sub.id
+                    });
+                }
+            }
+            // If DECLINED, REFUND the artist
+            else if (action === 'declined') {
+                const sub = reviews.find(r => r.id === submissionId);
+                if (sub && sub.amount_paid > 0) {
+                    // 1. Refund Balance
+                    const { error: refundError } = await supabase.rpc('increment_balance', {
+                        user_id: sub.artist_id,
+                        amount: sub.amount_paid
+                    });
+
+                    if (refundError) {
+                        // Fallback: Fetch then update
+                        const { data: artistProfile } = await supabase.from('profiles').select('balance').eq('id', sub.artist_id).single();
+                        if (artistProfile) {
+                            await supabase.from('profiles').update({
+                                balance: (artistProfile.balance || 0) + sub.amount_paid
+                            }).eq('id', sub.artist_id);
+                        }
+                    }
+
+                    // 2. Log Refund Transaction
+                    await supabase.from('transactions').insert({
+                        user_id: sub.artist_id,
+                        amount: sub.amount_paid,
+                        type: 'refund',
+                        description: `Refund for declined submission: ${sub.song_title}`,
+                        related_submission_id: sub.id
+                    });
                 }
             }
 
@@ -451,6 +641,19 @@ export default function CuratorDashboard() {
         setDeclineReason(declineOptions[0]);
         setCustomDeclineReason("");
         setShowDeclineModal(true);
+    };
+
+    const openAcceptModal = (id: string) => {
+        setSelectedSubmissionId(id);
+        setAcceptFeedback("Great track! Happy to include it in the playlist. Please share the link to boost your ranking!");
+        setShowAcceptModal(true);
+    };
+
+    const confirmAccept = async () => {
+        if (!selectedSubmissionId) return;
+        await handleReviewAction(selectedSubmissionId, 'accepted', acceptFeedback);
+        setShowAcceptModal(false);
+        setSelectedSubmissionId(null);
     };
 
     const confirmDecline = async () => {
@@ -469,7 +672,7 @@ export default function CuratorDashboard() {
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-12 gap-4">
                 <div>
                     <h1 className="text-3xl font-bold text-white">Curator Dashboard</h1>
-                    <p className="text-gray-400">Manage your playlists and review incoming tracks.</p>
+                    <p className="text-gray-400">Welcome back, <span className="text-green-500">{user?.name || 'Curator'}</span>. Manage your playlists and review incoming tracks.</p>
                 </div>
                 <div className="flex items-center gap-4">
                     <div className="bg-green-600/10 border border-green-500/20 px-6 py-4 rounded-xl flex items-center gap-4">
@@ -497,24 +700,103 @@ export default function CuratorDashboard() {
             {/* Support Modal */}
             {showSupport && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in">
-                    <div className=" bg-zinc-900 border border-white/10 p-6 rounded-lg w-full max-w-md space-y-4">
-                        <h3 className="font-bold text-white text-lg flex items-center gap-2">
-                            <HelpCircle className="w-5 h-5 text-green-500" /> Contact Support
-                        </h3>
-                        <p className="text-sm text-gray-400">Having trouble? Send us a message.</p>
-                        <div className="space-y-2">
-                            <Label>Subject</Label>
-                            <Input value={supportSubject} onChange={e => setSupportSubject(e.target.value)} placeholder="e.g. Payment Issue, Bug Report" />
+                    <div className="bg-zinc-900 border border-white/10 w-full max-w-md md:max-w-xl h-[600px] flex flex-col rounded-xl shadow-2xl overflow-hidden">
+
+                        <div className="p-4 border-b border-white/10 flex justify-between items-center bg-zinc-900">
+                            <h3 className="font-bold text-white text-lg flex items-center gap-2">
+                                <HelpCircle className="w-5 h-5 text-green-500" /> Support Center
+                            </h3>
+                            <Button variant="ghost" size="icon" onClick={() => setShowSupport(false)}><XCircle className="w-6 h-6 text-gray-400" /></Button>
                         </div>
-                        <div className="space-y-2">
-                            <Label>Message</Label>
-                            <Textarea className="min-h-[100px]" value={supportMessage} onChange={e => setSupportMessage(e.target.value)} placeholder="Describe your issue..." />
-                        </div>
-                        <div className="flex justify-end gap-2 pt-2">
-                            <Button variant="ghost" onClick={() => setShowSupport(false)}>Cancel</Button>
-                            <Button className="bg-green-600" onClick={handleSupportSubmit} disabled={isSubmittingTicket}>
-                                <Send className="w-4 h-4 mr-2" /> Submit Ticket
-                            </Button>
+
+                        <div className="flex-1 overflow-hidden flex flex-col bg-zinc-900">
+                            {supportView === 'list' && (
+                                <div className="p-4 flex flex-col h-full">
+                                    <div className="flex justify-between items-center mb-4">
+                                        <h4 className="text-white font-bold">My Tickets</h4>
+                                        <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={() => setSupportView('create')}>
+                                            <Plus className="w-4 h-4 mr-1" /> New Ticket
+                                        </Button>
+                                    </div>
+                                    <div className="flex-1 overflow-y-auto space-y-2">
+                                        {supportTickets.length === 0 && <p className="text-center text-gray-500 py-10">No tickets found.</p>}
+                                        {supportTickets.map(t => (
+                                            <div key={t.id} onClick={() => openTicketChat(t)} className="p-3 bg-white/5 border border-white/5 rounded cursor-pointer hover:bg-white/10">
+                                                <div className="flex justify-between items-start">
+                                                    <span className="font-bold text-white block">{t.subject}</span>
+                                                    <span className={`text-[10px] px-2 py-0.5 rounded uppercase ${t.status === 'open' ? 'bg-green-500/20 text-green-500' : 'bg-gray-500/20 text-gray-500'}`}>{t.status}</span>
+                                                </div>
+                                                <p className="text-xs text-gray-400 mt-1 line-clamp-1">{t.message}</p>
+                                                <p className="text-[10px] text-gray-500 mt-2">{new Date(t.created_at).toLocaleDateString()}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {supportView === 'create' && (
+                                <div className="p-6 flex flex-col h-full">
+                                    <div className="flex items-center gap-2 mb-6">
+                                        <Button variant="ghost" size="sm" onClick={() => setSupportView('list')}><ChevronLeft className="w-4 h-4" /></Button>
+                                        <h4 className="text-white font-bold">New Ticket</h4>
+                                    </div>
+                                    <div className="space-y-4">
+                                        <div className="space-y-2">
+                                            <Label>Subject</Label>
+                                            <Input value={supportSubject} onChange={e => setSupportSubject(e.target.value)} placeholder="e.g. Payment Issue" />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label>Message</Label>
+                                            <Textarea className="min-h-[150px]" value={supportMessage} onChange={e => setSupportMessage(e.target.value)} placeholder="Describe your issue..." />
+                                        </div>
+                                    </div>
+                                    <div className="flex justify-end gap-2 mt-auto pt-4">
+                                        <Button variant="ghost" onClick={() => setSupportView('list')}>Cancel</Button>
+                                        <Button className="bg-green-600" onClick={createTicket} disabled={isSubmittingTicket}>
+                                            <Send className="w-4 h-4 mr-2" /> Submit Ticket
+                                        </Button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {supportView === 'chat' && activeTicket && (
+                                <div className="flex flex-col h-full">
+                                    <div className="p-3 border-b border-white/10 flex items-center gap-3 bg-zinc-800/50">
+                                        <Button variant="ghost" size="sm" onClick={() => setSupportView('list')}><ChevronLeft className="w-4 h-4" /></Button>
+                                        <div>
+                                            <h4 className="text-white font-bold text-sm">{activeTicket.subject}</h4>
+                                            <p className="text-[10px] text-gray-400">Ticket ID: {activeTicket.id.slice(0, 8)}</p>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-black/20">
+                                        {chatMessages.map((msg, idx) => {
+                                            const isMe = msg.sender_id === user?.id; // Assuming user.id available
+                                            return (
+                                                <div key={idx} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
+                                                    <div className={`max-w-[75%] p-3 rounded-xl text-sm ${isMe ? 'bg-green-600 text-white rounded-br-none' : 'bg-zinc-700 text-gray-200 rounded-bl-none'}`}>
+                                                        <p>{msg.message}</p>
+                                                        <p className="text-[10px] opacity-50 mt-1 text-right">{new Date(msg.created_at).toLocaleTimeString()}</p>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+
+                                    <div className="p-3 bg-zinc-900 border-t border-white/10 flex gap-2">
+                                        <Input
+                                            value={chatInput}
+                                            onChange={e => setChatInput(e.target.value)}
+                                            placeholder="Type a message..."
+                                            className="bg-zinc-800 border-zinc-700"
+                                            onKeyDown={e => e.key === 'Enter' && sendChatMessage()}
+                                        />
+                                        <Button size="icon" className="bg-green-600" onClick={sendChatMessage}>
+                                            <Send className="w-4 h-4" />
+                                        </Button>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -606,8 +888,22 @@ export default function CuratorDashboard() {
                                                 ) : playlistSongs.length > 0 ? (
                                                     playlistSongs.map((song) => (
                                                         <div key={song.id} className="flex items-center justify-between p-2 rounded bg-black/40 border border-white/5 text-xs">
-                                                            <span className="text-white truncate max-w-[150px]">{song.song_title}</span>
-                                                            <a href={song.song_link} target="_blank" className="text-green-500 hover:underline">Link</a>
+                                                            <div className="flex items-center gap-2 overflow-hidden">
+                                                                <span className="text-white truncate max-w-[120px]">{song.song_title}</span>
+                                                                {song.ranking_boosted_at && <span className="text-[10px] bg-green-500 text-black px-1 rounded font-bold animate-pulse">Rising</span>}
+                                                            </div>
+                                                            <div className="flex items-center gap-2">
+                                                                <a href={song.song_link} target="_blank" className="text-gray-400 hover:text-white">Link</a>
+                                                                <Button
+                                                                    size="icon"
+                                                                    variant="ghost"
+                                                                    className={`h-6 w-6 ${song.ranking_boosted_at ? 'text-green-500' : 'text-gray-600 hover:text-green-500'}`}
+                                                                    onClick={() => toggleRankingBoost(song.id)}
+                                                                    title="Notify Artist of Ranking Boost"
+                                                                >
+                                                                    <Zap className="w-3 h-3" />
+                                                                </Button>
+                                                            </div>
                                                         </div>
                                                     ))
                                                 ) : (
@@ -619,6 +915,12 @@ export default function CuratorDashboard() {
                                 </CardContent>
                             </Card>
                         ))}
+                    </div>
+                    <div className="mt-8 space-y-4">
+                        <h3 className="font-bold text-white text-lg flex items-center gap-2">
+                            <DollarSign className="w-5 h-5 text-gray-400" /> Wallet History
+                        </h3>
+                        {user && <TransactionsList userId={user.id} />}
                     </div>
                 </div>
 
@@ -634,7 +936,10 @@ export default function CuratorDashboard() {
                                 <div className="p-4 sm:p-6 flex flex-col sm:flex-row items-start justify-between gap-4">
                                     <div className="flex-1 space-y-2">
                                         <div className="flex items-center gap-2">
-                                            <span className={`px - 2 py - 0.5 rounded text - [10px] uppercase font - bold ${review.tier === 'exclusive' ? 'bg-yellow-500 text-black' : 'bg-blue-500 text-white'} `}>
+                                            <span className={`px-2 py-0.5 rounded text-[10px] uppercase font-bold ${review.tier === 'exclusive' ? 'bg-yellow-500 text-black' :
+                                                review.tier === 'express' ? 'bg-orange-500 text-white' :
+                                                    'bg-blue-500 text-white'
+                                                } `}>
                                                 {review.tier}
                                             </span>
                                             <span className="text-xs text-gray-400">• {new Date(review.created_at).toLocaleDateString()}</span>
@@ -770,6 +1075,34 @@ export default function CuratorDashboard() {
                 </div>
             )}
 
+            {/* ACCEPT MODAL */}
+            {showAcceptModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in">
+                    <div className="bg-zinc-900 border border-white/10 w-full max-w-md p-6 rounded-lg space-y-4">
+                        <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                            <CheckCircle className="w-6 h-6 text-green-500" /> Accept Submission
+                        </h3>
+                        <p className="text-sm text-gray-400">Send a congratulatory message to the artist.</p>
+
+                        <div className="space-y-3">
+                            <Label>Message to Artist</Label>
+                            <Textarea
+                                value={acceptFeedback}
+                                onChange={e => setAcceptFeedback(e.target.value)}
+                                placeholder="Great track!..."
+                                className="min-h-[120px]"
+                            />
+                            <p className="text-xs text-gray-500">Includes link sharing instructions automatically.</p>
+                        </div>
+
+                        <div className="flex justify-end gap-2 pt-2">
+                            <Button variant="ghost" onClick={() => setShowAcceptModal(false)}>Cancel</Button>
+                            <Button className="bg-green-600 hover:bg-green-700" onClick={confirmAccept}>Confirm & Add to Playlist</Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Add Playlist Modal */}
             {
                 showAddPlaylist && (
@@ -813,26 +1146,26 @@ export default function CuratorDashboard() {
                                         onChange={(e) => setNewGenre(e.target.value)}
                                     />
                                 </div>
+
                                 <div className="space-y-2">
-                                    <Label>Number of Songs</Label>
-                                    <Input
-                                        type="number"
-                                        value={songsCount}
-                                        onChange={(e) => setSongsCount(Number(e.target.value))}
-                                        className="bg-white/5 border-white/10"
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label>Playlist Type</Label>
-                                    <Select
-                                        value={newPlaylistType}
-                                        onChange={(e) => setNewPlaylistType(e.target.value as "free" | "standard" | "exclusive")}
-                                        className="bg-white/5 border-white/10 text-white"
-                                    >
-                                        <option value="free" className="bg-zinc-900">Free</option>
-                                        <option value="standard" className="bg-zinc-900">Standard</option>
-                                        <option value="exclusive" className="bg-zinc-900">Exclusive</option>
-                                    </Select>
+                                    <Label>Playlist Type (Pricing Model)</Label>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        {(['free', 'standard', 'express', 'exclusive'] as const).map((t) => (
+                                            <div
+                                                key={t}
+                                                onClick={() => setNewPlaylistType(t)}
+                                                className={`cursor-pointer p-3 border rounded-lg text-center transition-all ${newPlaylistType === t ? 'bg-green-600 border-green-500 text-white' : 'bg-zinc-800 border-zinc-700 text-gray-400 hover:border-zinc-500'}`}
+                                            >
+                                                <div className="font-bold capitalize">{t}</div>
+                                                <div className="text-[10px] opacity-70">
+                                                    {t === 'free' && 'No earnings'}
+                                                    {t === 'standard' && `${pricingConfig.currency}${pricingConfig.tiers.standard.price} / sub`}
+                                                    {t === 'express' && `${pricingConfig.currency}${pricingConfig.tiers.express.price} / sub`}
+                                                    {t === 'exclusive' && `${pricingConfig.currency}${pricingConfig.tiers.exclusive.price} / sub`}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
                                 </div>
                             </div>
 

@@ -99,7 +99,14 @@ export default function PlaylistDetail() {
                             </div>
                             <div className="flex flex-col">
                                 <span className="text-white font-bold text-lg">
-                                    {playlist.submission_fee > 0 ? `${pricingConfig.currency}${playlist.submission_fee.toLocaleString()}` : 'Free'}
+                                    {playlist.type === 'exclusive'
+                                        ? `${pricingConfig.currency}${pricingConfig.tiers.exclusive.price.toLocaleString()}`
+                                        : playlist.type === 'express'
+                                            ? `${pricingConfig.currency}${pricingConfig.tiers.express.price.toLocaleString()}`
+                                            : playlist.type === 'standard'
+                                                ? `${pricingConfig.currency}${pricingConfig.tiers.standard.price.toLocaleString()}`
+                                                : playlist.submission_fee > 0 ? `${pricingConfig.currency}${playlist.submission_fee.toLocaleString()}` : 'Free'
+                                    }
                                 </span>
                                 <span>Submission Fee</span>
                             </div>
