@@ -44,8 +44,18 @@ export default async function TrackPage({ params }: { params: { slug: string } }
         );
     }
 
-    // 2. Increment Clicks (Safe increment)
-    await supabase.rpc('increment_clicks', { submission_id: submission.id });
+    // 2. Increment Clicks (Safe increment with IP tracking)
+    const { headers } = await import('next/headers');
+    const headerList = await headers();
+    const forwardedFor = headerList.get('x-forwarded-for');
+    const realIp = headerList.get('x-real-ip');
+    // Basic IP extraction (first IP in list if comma-separated)
+    const ip = forwardedFor ? forwardedFor.split(',')[0].trim() : (realIp || 'unknown');
+
+    await supabase.rpc('increment_clicks', {
+        submission_id: submission.id,
+        ip_address: ip
+    });
 
     // 3. Resolve Target URL
     // @ts-ignore - Handle potential array or object return style safely
