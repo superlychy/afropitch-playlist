@@ -19,6 +19,37 @@ export default function PricingPage() {
             </div>
 
             <div className="flex flex-col md:flex-row gap-8 justify-center items-stretch w-full max-w-5xl">
+                {/* Free Tier */}
+                <Card className="flex-1 border-blue-500/30 bg-black/40 backdrop-blur-md relative overflow-hidden flex flex-col max-w-md">
+                    <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-blue-500 to-transparent" />
+                    <CardHeader>
+                        <CardTitle className="text-2xl mb-2">{tiers.free.title}</CardTitle>
+                        <CardDescription>{tiers.free.description}</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-6 flex-grow">
+                        <div className="flex justify-center items-baseline text-white">
+                            <span className="text-4xl font-extrabold tracking-tight">
+                                FREE
+                            </span>
+                        </div>
+                        <ul className="space-y-3 text-left">
+                            {tiers.free.features.map((feature, i) => (
+                                <li key={i} className="flex items-center gap-3">
+                                    <Check className="w-5 h-5 text-blue-500 flex-shrink-0" />
+                                    <span className="text-gray-300">{feature}</span>
+                                </li>
+                            ))}
+                        </ul>
+                    </CardContent>
+                    <CardFooter>
+                        <Link href={`/submit`} className="w-full">
+                            <Button variant="outline" className="w-full border-blue-500 text-blue-500 hover:bg-blue-500 hover:text-white py-6" size="lg">
+                                Submit Free
+                            </Button>
+                        </Link>
+                    </CardFooter>
+                </Card>
+
                 {/* Standard Tier */}
                 <Card className="flex-1 border-white/10 bg-black/40 backdrop-blur-md relative overflow-hidden flex flex-col max-w-md">
                     <CardHeader>
