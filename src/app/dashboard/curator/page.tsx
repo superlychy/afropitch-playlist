@@ -74,6 +74,14 @@ export default function CuratorDashboard() {
     const [profileWeb, setProfileWeb] = useState("");
     const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
 
+    // Application Modal State
+    const [showApplicationModal, setShowApplicationModal] = useState(false);
+    const [appPortfolio, setAppPortfolio] = useState("");
+    const [appExperience, setAppExperience] = useState("");
+    const [appGenres, setAppGenres] = useState("");
+    const [appReason, setAppReason] = useState("");
+    const [isApplying, setIsApplying] = useState(false);
+
     // Support Modal State
     const [showSupport, setShowSupport] = useState(false);
     const [supportView, setSupportView] = useState<'list' | 'create' | 'chat'>('list');
@@ -213,6 +221,39 @@ export default function CuratorDashboard() {
             setShowProfile(false);
         }
         setIsUpdatingProfile(false);
+    };
+
+    const handleApplyCurator = async () => {
+        if (!appPortfolio || !appExperience) {
+            alert("Please fill in required fields (Portfolio & Experience).");
+            return;
+        }
+        setIsApplying(true);
+
+        const docs = JSON.stringify({
+            portfolio: appPortfolio,
+            experience: appExperience,
+            genres: appGenres,
+            reason: appReason
+        });
+
+        const { error } = await supabase.from('profiles').update({
+            verification_status: 'pending',
+            verification_docs: docs
+        }).eq('id', user?.id);
+
+        if (error) {
+            alert("Error: " + error.message);
+        } else {
+            alert("Application submitted! We will review it shortly.");
+            setVerificationStatus('pending');
+            setShowApplicationModal(false);
+            setAppPortfolio("");
+            setAppExperience("");
+            setAppGenres("");
+            setAppReason("");
+        }
+        setIsApplying(false);
     };
 
     useEffect(() => {
@@ -956,18 +997,7 @@ export default function CuratorDashboard() {
                                         {verificationStatus}
                                     </span>
                                     {verificationStatus === 'none' && (
-                                        <Button size="sm" variant="outline" onClick={async () => {
-                                            const docs = prompt("Please enter a link to your portfolio or proof of work (Instagram, Website, etc):");
-                                            if (docs) {
-                                                const { error } = await supabase.from('profiles').update({ verification_status: 'pending', verification_docs: docs }).eq('id', user?.id);
-                                                if (error) {
-                                                    alert("Error: " + error.message);
-                                                } else {
-                                                    setVerificationStatus('pending');
-                                                    alert("Verification request sent!");
-                                                }
-                                            }
-                                        }}>
+                                        <Button size="sm" variant="outline" onClick={() => setShowApplicationModal(true)}>
                                             Request Verification
                                         </Button>
                                     )}
@@ -1142,6 +1172,75 @@ export default function CuratorDashboard() {
                         <div className="flex justify-end gap-2 pt-2">
                             <Button variant="ghost" onClick={() => setShowAcceptModal(false)}>Cancel</Button>
                             <Button className="bg-green-600 hover:bg-green-700" onClick={confirmAccept}>Confirm & Add to Playlist</Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* APPLICATION MODAL */}
+            {showApplicationModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in">
+                    <div className="bg-zinc-900 border border-white/10 p-6 rounded-lg w-full max-w-xl max-h-[90vh] overflow-y-auto space-y-6">
+                        <div className="flex justify-between items-center border-b border-white/10 pb-4">
+                            <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                                <Star className="w-5 h-5 text-yellow-500" /> Apply for Verification
+                            </h3>
+                            <Button variant="ghost" size="icon" onClick={() => setShowApplicationModal(false)}><XCircle className="w-6 h-6 text-gray-500" /></Button>
+                        </div>
+
+                        <div className="bg-yellow-500/10 p-4 rounded text-sm text-yellow-200 border border-yellow-500/20">
+                            <p><strong>Note:</strong> Verified curators get access to paid submission tiers and priority support. Please provide accurate details.</p>
+                        </div>
+
+                        <div className="space-y-4">
+                            <div className="space-y-2">
+                                <Label>Portfolio / Social Links <span className="text-red-500">*</span></Label>
+                                <Input
+                                    value={appPortfolio}
+                                    onChange={e => setAppPortfolio(e.target.value)}
+                                    placeholder="Spotify Profile, Instagram, Website..."
+                                    className="bg-black/40 border-white/10"
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label>Years of Experience <span className="text-red-500">*</span></Label>
+                                    <Input
+                                        type="number"
+                                        value={appExperience}
+                                        onChange={e => setAppExperience(e.target.value)}
+                                        placeholder="e.g. 2"
+                                        className="bg-black/40 border-white/10"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Primary Genres</Label>
+                                    <Input
+                                        value={appGenres}
+                                        onChange={e => setAppGenres(e.target.value)}
+                                        placeholder="Afrobeats, Hip Hop..."
+                                        className="bg-black/40 border-white/10"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label>Why do you want to join AfroPitch?</Label>
+                                <Textarea
+                                    value={appReason}
+                                    onChange={e => setAppReason(e.target.value)}
+                                    placeholder="Tell us about your curation philosophy..."
+                                    className="bg-black/40 border-white/10 min-h-[100px]"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="flex justify-end gap-2 pt-4 border-t border-white/10">
+                            <Button variant="ghost" onClick={() => setShowApplicationModal(false)}>Cancel</Button>
+                            <Button className="bg-green-600 hover:bg-green-700 font-bold" onClick={handleApplyCurator} disabled={isApplying}>
+                                {isApplying ? "Submitting..." : "Submit Application"}
+                            </Button>
                         </div>
                     </div>
                 </div>
