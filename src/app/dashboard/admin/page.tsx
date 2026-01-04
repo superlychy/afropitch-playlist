@@ -140,6 +140,7 @@ export default function AdminDashboard() {
     // Broadcast State
     const [broadcastSubject, setBroadcastSubject] = useState("");
     const [broadcastMessage, setBroadcastMessage] = useState("");
+    const [broadcastChannel, setBroadcastChannel] = useState<'email' | 'in_app' | 'both'>('email');
     const [isSendingBroadcast, setIsSendingBroadcast] = useState(false);
     useEffect(() => {
         if (!isLoading && (!user || user.role !== "admin")) {
@@ -609,7 +610,8 @@ export default function AdminDashboard() {
         const { error } = await supabase.from('broadcasts').insert({
             subject: broadcastSubject,
             message: broadcastMessage,
-            sender_id: user?.id
+            sender_id: user?.id,
+            channel: broadcastChannel
         });
 
         if (error) {
@@ -1102,40 +1104,6 @@ export default function AdminDashboard() {
                 </div>
             )}
 
-            {/* EDIT PLAYLIST MODAL */}
-            {showEditPlaylist && adminEditingPlaylist && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in">
-                    <div className="bg-zinc-900 border border-white/10 w-full max-w-md p-6 rounded-lg space-y-4">
-                        <h3 className="text-xl font-bold text-white">Edit Playlist</h3>
-                        <div className="space-y-3">
-                            <div>
-                                <label className="text-xs text-gray-400 mb-1 block">Playlist Name</label>
-                                <Input value={adminNewName} onChange={e => setAdminNewName(e.target.value)} className="bg-zinc-800 border-zinc-700" />
-                            </div>
-                            <div>
-                                <label className="text-xs text-gray-400 mb-1 block">Followers</label>
-                                <Input type="number" value={adminNewFollowers} onChange={e => setAdminNewFollowers(parseInt(e.target.value))} className="bg-zinc-800 border-zinc-700" />
-                            </div>
-                        </div>
-                        <div className="flex justify-end gap-2 pt-4">
-                            <Button variant="ghost" onClick={() => setShowEditPlaylist(false)}>Cancel</Button>
-                            <Button className="bg-green-600" onClick={async () => {
-                                setAdminIsSaving(true);
-                                await supabase.from('playlists').update({
-                                    name: adminNewName,
-                                    followers: adminNewFollowers
-                                }).eq('id', adminEditingPlaylist.id);
-                                setAdminIsSaving(false);
-                                setShowEditPlaylist(false);
-                                window.location.reload();
-                            }} disabled={adminIsSaving}>
-                                {adminIsSaving ? "Saving..." : "Save Changes"}
-                            </Button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
             {/* APPLICATIONS VIEW */}
             {activeTab === "applications" && (
                 <Card className="bg-black/40 border-white/10">
@@ -1183,7 +1151,114 @@ export default function AdminDashboard() {
                 </Card>
             )}
 
-            {/* ADD PLAYLIST MODAL (New) */}
+            {/* BROADCAST VIEW */}
+            {activeTab === "broadcast" && (
+                <div className="grid gap-6 md:grid-cols-2">
+                    <Card className="bg-black/40 border-white/10 md:col-span-2">
+                        <CardHeader>
+                            <CardTitle className="text-white flex items-center gap-2">
+                                <Bell className="w-5 h-5 text-yellow-500" /> Broadcast Message
+                            </CardTitle>
+                            <CardDescription>Send an announcement to platform users.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="bg-yellow-500/10 border border-yellow-500/20 p-4 rounded text-sm text-yellow-200 mb-4">
+                                <ShieldAlert className="w-4 h-4 inline mr-2 text-yellow-500" />
+                                <strong>Warning:</strong> sending to 'All Users' impacts the entire platform.
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-sm font-bold text-gray-300">Broadcast Channel</label>
+                                <div className="grid grid-cols-3 gap-3">
+                                    {(['email', 'in_app', 'both'] as const).map(c => (
+                                        <div
+                                            key={c}
+                                            onClick={() => setBroadcastChannel(c)}
+                                            className={`cursor-pointer p-3 rounded border text-center font-bold capitalize transition-all ${broadcastChannel === c ? 'bg-green-600 border-green-500 text-white' : 'bg-black/40 border-white/10 text-gray-400 hover:bg-white/5'}`}
+                                        >
+                                            {c.replace('_', '-')}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-sm font-bold text-gray-300">Subject Line</label>
+                                <Input
+                                    value={broadcastSubject}
+                                    onChange={e => setBroadcastSubject(e.target.value)}
+                                    placeholder="e.g. Best of 2025: Rising Stars!"
+                                    className="bg-black/50 border-white/10"
+                                />
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-sm font-bold text-gray-300">Message Body</label>
+                                <textarea
+                                    value={broadcastMessage}
+                                    onChange={e => setBroadcastMessage(e.target.value)}
+                                    placeholder="Write your announcement here..."
+                                    className="w-full h-64 bg-black/50 border-white/10 rounded-md p-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-green-500 resize-none"
+                                />
+                            </div>
+
+                            <div className="flex justify-end pt-4">
+                                <Button
+                                    className="bg-green-600 hover:bg-green-700 font-bold px-8"
+                                    onClick={handleSendBroadcast}
+                                    disabled={isSendingBroadcast}
+                                >
+                                    {isSendingBroadcast ? (
+                                        <>
+                                            <Loader2 className="w-4 h-4 animate-spin mr-2" /> Sending...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Send className="w-4 h-4 mr-2" /> Send Broadcast
+                                        </>
+                                    )}
+                                </Button>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+            )}
+
+            {/* EDIT PLAYLIST MODAL */}
+            {showEditPlaylist && adminEditingPlaylist && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in">
+                    <div className="bg-zinc-900 border border-white/10 w-full max-w-md p-6 rounded-lg space-y-4">
+                        <h3 className="text-xl font-bold text-white">Edit Playlist</h3>
+                        <div className="space-y-3">
+                            <div>
+                                <label className="text-xs text-gray-400 mb-1 block">Playlist Name</label>
+                                <Input value={adminNewName} onChange={e => setAdminNewName(e.target.value)} className="bg-zinc-800 border-zinc-700" />
+                            </div>
+                            <div>
+                                <label className="text-xs text-gray-400 mb-1 block">Followers</label>
+                                <Input type="number" value={adminNewFollowers} onChange={e => setAdminNewFollowers(parseInt(e.target.value))} className="bg-zinc-800 border-zinc-700" />
+                            </div>
+                        </div>
+                        <div className="flex justify-end gap-2 pt-4">
+                            <Button variant="ghost" onClick={() => setShowEditPlaylist(false)}>Cancel</Button>
+                            <Button className="bg-green-600" onClick={async () => {
+                                setAdminIsSaving(true);
+                                await supabase.from('playlists').update({
+                                    name: adminNewName,
+                                    followers: adminNewFollowers
+                                }).eq('id', adminEditingPlaylist.id);
+                                setAdminIsSaving(false);
+                                setShowEditPlaylist(false);
+                                window.location.reload();
+                            }} disabled={adminIsSaving}>
+                                {adminIsSaving ? "Saving..." : "Save Changes"}
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ADD PLAYLIST MODAL */}
             {showAddPlaylist && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in">
                     <div className="bg-zinc-900 border border-white/10 w-full max-w-md p-6 rounded-lg space-y-6">
@@ -1288,64 +1363,7 @@ export default function AdminDashboard() {
                 </div >
             )}
 
-            {/* BROADCAST VIEW */}
-            {activeTab === "broadcast" && (
-                <div className="grid gap-6 md:grid-cols-2">
-                    <Card className="bg-black/40 border-white/10 md:col-span-2">
-                        <CardHeader>
-                            <CardTitle className="text-white flex items-center gap-2">
-                                <Bell className="w-5 h-5 text-yellow-500" /> Broadcast Message
-                            </CardTitle>
-                            <CardDescription>Send an email announcement to all users on the platform.</CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="bg-yellow-500/10 border border-yellow-500/20 p-4 rounded text-sm text-yellow-200 mb-4">
-                                <ShieldAlert className="w-4 h-4 inline mr-2 text-yellow-500" />
-                                <strong>Warning:</strong> This will send an email to all registered users. Use responsibly.
-                            </div>
-
-                            <div className="space-y-2">
-                                <label className="text-sm font-bold text-gray-300">Subject Line</label>
-                                <Input
-                                    value={broadcastSubject}
-                                    onChange={e => setBroadcastSubject(e.target.value)}
-                                    placeholder="e.g. Best of 2025: Rising Stars!"
-                                    className="bg-black/50 border-white/10"
-                                />
-                            </div>
-
-                            <div className="space-y-2">
-                                <label className="text-sm font-bold text-gray-300">Message Body</label>
-                                <textarea
-                                    value={broadcastMessage}
-                                    onChange={e => setBroadcastMessage(e.target.value)}
-                                    placeholder="Write your announcement here..."
-                                    className="w-full h-64 bg-black/50 border-white/10 rounded-md p-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-green-500 resize-none"
-                                />
-                            </div>
-
-                            <div className="flex justify-end pt-4">
-                                <Button
-                                    className="bg-green-600 hover:bg-green-700 font-bold px-8"
-                                    onClick={handleSendBroadcast}
-                                    disabled={isSendingBroadcast}
-                                >
-                                    {isSendingBroadcast ? (
-                                        <>
-                                            <Loader2 className="w-4 h-4 animate-spin mr-2" /> Sending...
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Send className="w-4 h-4 mr-2" /> Send Broadcast
-                                        </>
-                                    )}
-                                </Button>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
-            )}
-
         </>
     );
 }
+

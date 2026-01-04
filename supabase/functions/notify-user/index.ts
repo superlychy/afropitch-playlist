@@ -195,6 +195,11 @@ async function handleSupportUpdate(record: any) {
 async function handleBroadcast(record: any) {
     console.log("📢 Starting Broadcast:", record.subject);
 
+    if (record.channel === 'in_app') {
+        console.log("Skipping email for in-app only broadcast.");
+        return;
+    }
+
     // 1. Fetch All Users (Page through if needed, but for now max 1000)
     const { data: { users }, error } = await supabase.auth.admin.listUsers({ per_page: 1000 });
 
