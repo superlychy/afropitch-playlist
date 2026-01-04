@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <style>
+        body {
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            background-color: #0d0d0d;
+            color: #ffffff;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #1a1a1a;
+            border-radius: 10px;
+            overflow: hidden;
+            border: 1px solid #333;
+        }
+
+        .header {
+            background-color: #000;
+            padding: 20px;
+            text-align: center;
+            border-bottom: 2px solid #22c55e;
+        }
+
+        .content {
+            padding: 30px;
+            line-height: 1.6;
+            color: #cccccc;
+        }
+
+        .amount-box {
+            text-align: center;
+            margin: 30px 0;
+        }
+
+        .amount-label {
+            font-size: 12px;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .amount-value {
+            font-size: 36px;
+            font-weight: bold;
+            color: #fff;
+            margin-top: 5px;
+        }
+
+        .details-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        .details-table td {
+            padding: 12px 0;
+            border-bottom: 1px solid #333;
+            color: #bbb;
+        }
+
+        .details-table td:last-child {
+            text-align: right;
+            color: #fff;
+            font-weight: bold;
+        }
+
+        .details-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .footer {
+            padding: 20px;
+            text-align: center;
+            font-size: 12px;
+            color: #666;
+            background-color: #111;
+            border-top: 1px solid #333;
+        }
+
+        .status-success {
+            color: #22c55e;
+        }
+
+        .type-badge {
+            background: #333;
+            color: #fff;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            text-transform: uppercase;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>AfroPitch</h1>
+        </div>
+        <div class="content">
+            <p>Hi {{ .Name }},</p>
+            <p>Here is the receipt for your recent transaction.</p>
+
+            <div class="amount-box">
+                <div class="amount-label">Total Amount</div>
+                <div class="amount-value">{{ .Currency }}{{ .Amount }}</div>
+                <div style="margin-top: 10px;">
+                    <span class="type-badge">{{ .TransactionType }}</span>
+                    <span style="font-size: 12px; margin-left: 5px; color: #22c55e;">● Success</span>
+                </div>
+            </div>
+
+            <table class="details-table">
+                <tr>
+                    <td>Date</td>
+                    <td>{{ .Date }}</td>
+                </tr>
+                <tr>
+                    <td>Reference ID</td>
+                    <td style="font-family: monospace; color: #888;">{{ .ReferenceId }}</td>
+                </tr>
+                <tr>
+                    <td>Description</td>
+                    <td>{{ .Description }}</td>
+                </tr>
+                <tr>
+                    <td>Payment Method</td>
+                    <td>{{ .PaymentMethod }}</td>
+                </tr>
+            </table>
+
+            <p style="margin-top: 30px; font-size: 13px; color: #888; text-align: center;">
+                If you have any questions about this transaction, please contact support with your reference ID.
+            </p>
+        </div>
+        <div class="footer">
+            &copy; 2026 AfroPitch.<br>
+            <a href="{{ .DashboardLink }}" style="color: #666;">View Wallet</a>
+        </div>
+    </div>
+</body>
+
+</html>
