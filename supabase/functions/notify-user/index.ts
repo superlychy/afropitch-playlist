@@ -51,6 +51,8 @@ Deno.serve(async (req) => {
             if (record.status !== payload.old_record?.status) {
                 await handleSupportUpdate(record);
             }
+        } else if (table === 'broadcasts' && type === 'INSERT') {
+            await handleBroadcast(record);
         }
 
         return new Response(JSON.stringify({ message: "Notification processed" }), { status: 200, headers: { 'Content-Type': 'application/json' } });
@@ -188,6 +190,50 @@ async function handleSupportUpdate(record: any) {
     });
 
     await sendEmail(user.email, subject, html);
+}
+
+async function handleBroadcast(record: any) {
+    console.log("📢 Starting Broadcast:", record.subject);
+
+    // 1. Fetch All Users (Page through if needed, but for now max 1000)
+    const { data: { users }, error } = await supabase.auth.admin.listUsers({ per_page: 1000 });
+
+    if (error || !users) {
+        console.error("Failed to list users for broadcast:", error);
+        return;
+    }
+
+    console.log(`Found ${users.length} users.`);
+
+    // 2. Iterate and Send
+    const targetRole = record.target_role || 'all';
+    let sentCount = 0;
+
+    for (const u of users) {
+        if (!u.email) continue;
+
+        // Optional: Filter by role if metadata present
+        // if (targetRole !== 'all' && u.user_metadata?.role !== targetRole) continue;
+
+        const subject = record.subject;
+        const html = `
+            <div style="font-family: sans-serif; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 8px;">
+                <h2 style="color: #16a34a;">${record.subject}</h2>
+                <div style="white-space: pre-wrap; font-size: 16px; line-height: 1.5;">${record.message}</div>
+                <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
+                <p style="font-size: 12px; color: #777; text-align: center;">
+                    You received this message from AfroPitch Admin.<br/>
+                    &copy; ${new Date().getFullYear()} AfroPitch Playlist.
+                </p>
+            </div>
+        `;
+
+        await sendEmail(u.email, subject, html);
+        sentCount++;
+        // Rate limit
+        await new Promise(r => setTimeout(r, 200));
+    }
+    console.log(`✅ Broadcast complete. Sent to ${sentCount} users.`);
 }
 
 async function sendEmail(to: string, subject: string, html: string) {

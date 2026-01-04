@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { BarChart3, TrendingUp, Music, Users, Trophy, DollarSign, ShieldAlert, CheckCircle, XCircle, MessageSquare, LogOut, Bell, Plus, Search, Loader2 } from "lucide-react";
+import { BarChart3, TrendingUp, Music, Users, Trophy, DollarSign, ShieldAlert, CheckCircle, XCircle, MessageSquare, LogOut, Bell, Plus, Search, Loader2, Send } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { TransactionsList } from "@/components/TransactionsList";
 import { pricingConfig } from "@/../config/pricing";
@@ -73,12 +73,22 @@ interface TopPlaylist {
 export default function AdminDashboard() {
     const { user, isLoading, logout } = useAuth();
     const router = useRouter();
-    const [activeTab, setActiveTab] = useState<"overview" | "users" | "withdrawals" | "transactions" | "support" | "playlists">("overview");
+    const [activeTab, setActiveTab] = useState<"overview" | "users" | "withdrawals" | "transactions" | "support" | "playlists" | "applications" | "broadcast">("overview");
 
     // DATA STATE
     const [usersList, setUsersList] = useState<AdminUser[]>([]);
+    const [pendingCurators, setPendingCurators] = useState<any[]>([]); // New state
     const [withdrawals, setWithdrawals] = useState<WithdrawalRequest[]>([]);
     const [tickets, setTickets] = useState<SupportTicket[]>([]);
+
+    // ... (rest of states remain same if not touched, but I must match replace context)
+
+    // ... 
+    // I can't easily replace just the state lines without context.
+    // I will replace lines 76-80 approximately.
+
+    // Actually, I can replace the whole block if I am careful.
+    // Let's target the exact lines.
 
     const [allPlaylists, setAllPlaylists] = useState<AdminPlaylist[]>([]);
     const [topCampaigns, setTopCampaigns] = useState<any[]>([]);
@@ -127,6 +137,10 @@ export default function AdminDashboard() {
     const [newPlaylistType, setNewPlaylistType] = useState<"standard" | "express" | "exclusive" | "free">("standard");
     const [isSavingPlaylist, setIsSavingPlaylist] = useState(false);
 
+    // Broadcast State
+    const [broadcastSubject, setBroadcastSubject] = useState("");
+    const [broadcastMessage, setBroadcastMessage] = useState("");
+    const [isSendingBroadcast, setIsSendingBroadcast] = useState(false);
     useEffect(() => {
         if (!isLoading && (!user || user.role !== "admin")) {
             router.push("/portal");
@@ -140,6 +154,16 @@ export default function AdminDashboard() {
                 .order('created_at', { ascending: false });
 
             if (users) setUsersList(users as AdminUser[]);
+
+            // New: Fetch Pending Curators
+            const { data: pending } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('role', 'curator')
+                .eq('verification_status', 'pending');
+
+            if (pending) setPendingCurators(pending);
+
 
             // 2. Fetch Withdrawals
             const { data: withdraws, error: withdrawError } = await supabase
@@ -561,6 +585,43 @@ export default function AdminDashboard() {
         }, 1000);
     };
 
+    const handleCuratorAction = async (id: string, action: 'verified' | 'rejected') => {
+        const { error } = await supabase.from('profiles').update({ verification_status: action }).eq('id', id);
+
+        if (error) {
+            alert("Error updating status: " + error.message);
+        } else {
+            // Optimistic update
+            setPendingCurators(prev => prev.filter(c => c.id !== id));
+            alert(`Curator application ${action}.`);
+
+            // If verified, maybe send email? (Requires Edge Function update, skipping for now as per MVP)
+        }
+    };
+
+    const handleSendBroadcast = async () => {
+        if (!broadcastSubject || !broadcastMessage) {
+            alert("Please fill in subject and message.");
+            return;
+        }
+        setIsSendingBroadcast(true);
+
+        const { error } = await supabase.from('broadcasts').insert({
+            subject: broadcastSubject,
+            message: broadcastMessage,
+            sender_id: user?.id
+        });
+
+        if (error) {
+            alert("Error sending broadcast: " + error.message);
+        } else {
+            alert("Broadcast queued! Emails will be sent shortly.");
+            setBroadcastSubject("");
+            setBroadcastMessage("");
+        }
+        setIsSendingBroadcast(false);
+    };
+
     if (isLoading) return <div className="p-10 text-center text-white">Loading Admin...</div>;
 
     return (
@@ -580,10 +641,11 @@ export default function AdminDashboard() {
                     </div>
                     <div className="flex items-center gap-4">
                         <div className="flex bg-white/5 p-1 rounded-lg border border-white/10">
-                            {["overview", "users", "withdrawals", "transactions", "support", "playlists"].map((tab) => {
+                            {["overview", "users", "withdrawals", "transactions", "support", "playlists", "applications", "broadcast"].map((tab) => {
                                 let count = 0;
                                 if (tab === 'withdrawals') count = pendingWithdrawalsCount;
                                 if (tab === 'support') count = openTicketsCount;
+                                if (tab === 'applications') count = pendingCurators.length;
 
                                 return (
                                     <button
@@ -1074,6 +1136,53 @@ export default function AdminDashboard() {
                 </div>
             )}
 
+            {/* APPLICATIONS VIEW */}
+            {activeTab === "applications" && (
+                <Card className="bg-black/40 border-white/10">
+                    <CardHeader>
+                        <CardTitle className="text-white">Curator Applications</CardTitle>
+                        <CardDescription>Review and approve new curators.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="space-y-4">
+                            {pendingCurators.length === 0 && <p className="text-gray-500 text-center py-4">No pending applications.</p>}
+                            {pendingCurators.map(c => (
+                                <div key={c.id} className="flex flex-col md:flex-row md:items-center justify-between p-4 bg-white/5 rounded-lg border border-white/5 gap-4">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-10 h-10 rounded-full bg-yellow-500/20 text-yellow-500 flex items-center justify-center font-bold">
+                                            {c.full_name[0]}
+                                        </div>
+                                        <div>
+                                            <p className="font-bold text-white flex items-center gap-2">
+                                                {c.full_name}
+                                                <span className="text-[10px] bg-yellow-500/20 text-yellow-500 px-2 rounded-full uppercase">Pending</span>
+                                            </p>
+                                            <p className="text-sm text-gray-500">{c.email}</p>
+                                            <div className="mt-1 text-xs text-gray-400">
+                                                Bank: {c.bank_name || 'Not set'} • Acc: {c.account_number || 'N/A'}
+                                            </div>
+                                            {c.verification_docs && (
+                                                <div className="mt-1 text-xs text-blue-400">
+                                                    Docs: {c.verification_docs}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={() => handleCuratorAction(c.id, 'verified')}>
+                                            <CheckCircle className="w-4 h-4 mr-2" /> Approve
+                                        </Button>
+                                        <Button size="sm" variant="destructive" onClick={() => handleCuratorAction(c.id, 'rejected')}>
+                                            <XCircle className="w-4 h-4 mr-2" /> Reject
+                                        </Button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
+
             {/* ADD PLAYLIST MODAL (New) */}
             {showAddPlaylist && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in">
@@ -1177,6 +1286,64 @@ export default function AdminDashboard() {
                         )}
                     </div>
                 </div >
+            )}
+
+            {/* BROADCAST VIEW */}
+            {activeTab === "broadcast" && (
+                <div className="grid gap-6 md:grid-cols-2">
+                    <Card className="bg-black/40 border-white/10 md:col-span-2">
+                        <CardHeader>
+                            <CardTitle className="text-white flex items-center gap-2">
+                                <Bell className="w-5 h-5 text-yellow-500" /> Broadcast Message
+                            </CardTitle>
+                            <CardDescription>Send an email announcement to all users on the platform.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="bg-yellow-500/10 border border-yellow-500/20 p-4 rounded text-sm text-yellow-200 mb-4">
+                                <ShieldAlert className="w-4 h-4 inline mr-2 text-yellow-500" />
+                                <strong>Warning:</strong> This will send an email to all registered users. Use responsibly.
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-sm font-bold text-gray-300">Subject Line</label>
+                                <Input
+                                    value={broadcastSubject}
+                                    onChange={e => setBroadcastSubject(e.target.value)}
+                                    placeholder="e.g. Best of 2025: Rising Stars!"
+                                    className="bg-black/50 border-white/10"
+                                />
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-sm font-bold text-gray-300">Message Body</label>
+                                <textarea
+                                    value={broadcastMessage}
+                                    onChange={e => setBroadcastMessage(e.target.value)}
+                                    placeholder="Write your announcement here..."
+                                    className="w-full h-64 bg-black/50 border-white/10 rounded-md p-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-green-500 resize-none"
+                                />
+                            </div>
+
+                            <div className="flex justify-end pt-4">
+                                <Button
+                                    className="bg-green-600 hover:bg-green-700 font-bold px-8"
+                                    onClick={handleSendBroadcast}
+                                    disabled={isSendingBroadcast}
+                                >
+                                    {isSendingBroadcast ? (
+                                        <>
+                                            <Loader2 className="w-4 h-4 animate-spin mr-2" /> Sending...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Send className="w-4 h-4 mr-2" /> Send Broadcast
+                                        </>
+                                    )}
+                                </Button>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
             )}
 
         </>

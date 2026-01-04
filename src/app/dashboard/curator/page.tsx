@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { DollarSign, CheckCircle, XCircle, Clock, Settings, User, Plus, ListMusic, MoreVertical, Star, Zap, HelpCircle, Send, LogOut, Trash2, Edit, MessageSquare, ChevronLeft } from "lucide-react";
+import { DollarSign, CheckCircle, XCircle, Clock, Settings, User, Plus, ListMusic, MoreVertical, Star, Zap, HelpCircle, Send, LogOut, Trash2, Edit, MessageSquare, ChevronLeft, AlertCircle } from "lucide-react";
 import { pricingConfig } from "@/../config/pricing";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -191,6 +191,8 @@ export default function CuratorDashboard() {
         setLoadingReviews(false);
     };
 
+    const [verificationStatus, setVerificationStatus] = useState<"none" | "pending" | "verified" | "rejected">("none");
+
     const handleUpdateProfile = async () => {
         if (!user) return;
         setIsUpdatingProfile(true);
@@ -198,7 +200,10 @@ export default function CuratorDashboard() {
             bio: profileBio,
             instagram: profileIg,
             twitter: profileTwitter,
-            website: profileWeb
+            website: profileWeb,
+            bank_name: bankName,
+            account_number: accountNumber,
+            account_name: accountName
         }).eq('id', user.id);
 
         if (error) {
@@ -216,6 +221,18 @@ export default function CuratorDashboard() {
             setProfileIg(user.instagram || "");
             setProfileTwitter(user.twitter || "");
             setProfileWeb(user.website || "");
+
+            // Fetch extended profile details (Bank & Verification)
+            const fetchExtendedProfile = async () => {
+                const { data } = await supabase.from('profiles').select('bank_name, account_number, account_name, verification_status').eq('id', user.id).single();
+                if (data) {
+                    setBankName(data.bank_name || "");
+                    setAccountNumber(data.account_number || "");
+                    setAccountName(data.account_name || "");
+                    setVerificationStatus(data.verification_status || "none");
+                }
+            };
+            fetchExtendedProfile();
 
             fetchCuratorData();
         }
@@ -921,43 +938,139 @@ export default function CuratorDashboard() {
                 </div>
             </div>
 
-            {/* Profile Modal (Reused) */}
+            {/* Profile Modal */}
             {
                 showProfile && (
                     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in">
-                        <div className=" bg-zinc-900 border border-white/10 p-6 rounded-lg w-full max-w-md space-y-4">
-                            <h3 className="font-bold text-white text-lg">Curator Profile</h3>
-                            <div className="space-y-2">
-                                <Label>Bio</Label>
-                                <Textarea value={profileBio} onChange={e => setProfileBio(e.target.value)} placeholder="About you..." />
+                        <div className="bg-zinc-900 border border-white/10 p-6 rounded-lg w-full max-w-md max-h-[90vh] overflow-y-auto space-y-6">
+                            <h3 className="font-bold text-white text-lg">Curator Settings</h3>
+
+                            {/* Verification Status */}
+                            <div className="bg-white/5 p-4 rounded border border-white/10">
+                                <h4 className="text-sm font-bold text-white mb-2">Verification Status</h4>
+                                <div className="flex items-center justify-between">
+                                    <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${verificationStatus === 'verified' ? 'bg-green-500/20 text-green-500' :
+                                        verificationStatus === 'pending' ? 'bg-yellow-500/20 text-yellow-500' :
+                                            'bg-red-500/20 text-gray-400'
+                                        }`}>
+                                        {verificationStatus}
+                                    </span>
+                                    {verificationStatus === 'none' && (
+                                        <Button size="sm" variant="outline" onClick={async () => {
+                                            const docs = prompt("Please enter a link to your portfolio or proof of work (Instagram, Website, etc):");
+                                            if (docs) {
+                                                const { error } = await supabase.from('profiles').update({ verification_status: 'pending', verification_docs: docs }).eq('id', user?.id);
+                                                if (error) {
+                                                    alert("Error: " + error.message);
+                                                } else {
+                                                    setVerificationStatus('pending');
+                                                    alert("Verification request sent!");
+                                                }
+                                            }
+                                        }}>
+                                            Request Verification
+                                        </Button>
+                                    )}
+                                </div>
                             </div>
-                            {/* ... Social fields ... */}
-                            <div className="flex justify-end gap-2 pt-2">
+
+                            <div className="space-y-4">
+                                <h4 className="text-sm font-bold text-gray-400 border-b border-white/10 pb-2">Public Profile</h4>
+                                <div className="space-y-2">
+                                    <Label>Bio</Label>
+                                    <Textarea value={profileBio} onChange={e => setProfileBio(e.target.value)} placeholder="About you..." />
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <Label>Instagram (Username)</Label>
+                                        <Input value={profileIg} onChange={e => setProfileIg(e.target.value)} placeholder="username" />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label>Twitter (Username)</Label>
+                                        <Input value={profileTwitter} onChange={e => setProfileTwitter(e.target.value)} placeholder="username" />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="space-y-4">
+                                <h4 className="text-sm font-bold text-gray-400 border-b border-white/10 pb-2">Bank Details</h4>
+                                <p className="text-xs text-gray-500">Used for withdrawals.</p>
+                                <div className="space-y-2">
+                                    <Label>Bank Name</Label>
+                                    <Input value={bankName} onChange={e => setBankName(e.target.value)} placeholder="e.g. GTBank" />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Account Number</Label>
+                                    <Input value={accountNumber} onChange={e => setAccountNumber(e.target.value)} placeholder="0123456789" />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Account Name</Label>
+                                    <Input value={accountName} onChange={e => setAccountName(e.target.value)} placeholder="Account Holder Name" />
+                                </div>
+                            </div>
+
+                            <div className="flex justify-end gap-2 pt-4 border-t border-white/10">
                                 <Button variant="ghost" onClick={() => setShowProfile(false)}>Cancel</Button>
-                                <Button className="bg-green-600" onClick={handleUpdateProfile} disabled={isUpdatingProfile}>Save Profile</Button>
+                                <Button className="bg-green-600" onClick={handleUpdateProfile} disabled={isUpdatingProfile}>
+                                    {isUpdatingProfile ? "Saving..." : "Save Settings"}
+                                </Button>
                             </div>
                         </div>
                     </div>
                 )
             }
-            {/* Withdraw Modal Reused ... */}
+            {/* Withdraw Modal */}
             {
                 showWithdraw && (
                     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in">
                         <div className="bg-zinc-900 border border-white/10 p-6 rounded-lg w-full max-w-md space-y-4">
                             <h3 className="font-bold text-white text-lg">Request Payout</h3>
-                            <div className="py-4">
-                                <Input type="number" placeholder="Amount" value={withdrawAmount} onChange={e => setWithdrawAmount(e.target.value)} className="mb-2" />
-                                <Input placeholder="Bank Name" value={bankName} onChange={e => setBankName(e.target.value)} className="mb-2" />
-                                <Input placeholder="Account Number" value={accountNumber} onChange={e => setAccountNumber(e.target.value)} className="mb-2" />
-                                <Input placeholder="Account Name" value={accountName} onChange={e => setAccountName(e.target.value)} className="mb-2" />
-                            </div>
-                            <div className="flex justify-end gap-2">
-                                <Button variant="ghost" onClick={() => setShowWithdraw(false)}>Cancel</Button>
-                                <Button className="bg-green-600" onClick={handleWithdraw} disabled={isWithdrawing}>
-                                    {isWithdrawing ? "Processing..." : "Submit Request"}
-                                </Button>
-                            </div>
+
+                            {(!bankName || !accountNumber) ? (
+                                <div className="py-8 text-center space-y-4">
+                                    <div className="p-4 bg-yellow-500/10 rounded-full inline-block">
+                                        <AlertCircle className="w-8 h-8 text-yellow-500" />
+                                    </div>
+                                    <p className="text-gray-300">Please add your bank details in settings before withdrawing.</p>
+                                    <Button className="w-full bg-white text-black" onClick={() => { setShowWithdraw(false); setShowProfile(true); }}>
+                                        Go to Settings
+                                    </Button>
+                                </div>
+                            ) : (
+                                <>
+                                    <div className="py-4 space-y-4">
+                                        <div className="p-4 bg-white/5 rounded border border-white/10 text-sm">
+                                            <p className="text-gray-400 text-xs mb-1">Transfer Destination</p>
+                                            <p className="font-bold text-white">{bankName}</p>
+                                            <p className="text-gray-300">{accountNumber} • {accountName}</p>
+                                            <Button variant="link" className="text-green-500 text-xs h-auto p-0 mt-2" onClick={() => { setShowWithdraw(false); setShowProfile(true); }}>
+                                                Change Account
+                                            </Button>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <Label>Amount to Withdraw</Label>
+                                            <div className="relative">
+                                                <span className="absolute left-3 top-3 text-gray-500">{pricingConfig.currency}</span>
+                                                <Input
+                                                    type="number"
+                                                    placeholder="0.00"
+                                                    value={withdrawAmount}
+                                                    onChange={e => setWithdrawAmount(e.target.value)}
+                                                    className="pl-8 bg-black/40 border-white/10"
+                                                />
+                                            </div>
+                                            <p className="text-xs text-gray-500">Available: {pricingConfig.currency}{user?.balance?.toLocaleString()}</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex justify-end gap-2">
+                                        <Button variant="ghost" onClick={() => setShowWithdraw(false)}>Cancel</Button>
+                                        <Button className="bg-green-600" onClick={handleWithdraw} disabled={isWithdrawing || !withdrawAmount}>
+                                            {isWithdrawing ? "Processing..." : "Submit Request"}
+                                        </Button>
+                                    </div>
+                                </>
+                            )}
                         </div>
                     </div>
                 )

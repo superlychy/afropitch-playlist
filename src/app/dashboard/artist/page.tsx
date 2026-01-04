@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Wallet, Plus, CreditCard, History, Settings, HelpCircle, Send, LogOut, XCircle, ChevronLeft, Bell } from "lucide-react";
 import { pricingConfig } from "@/../config/pricing";
-import { Copy, ExternalLink, BarChart3, TrendingUp, AlertCircle } from "lucide-react";
+import { Copy, ExternalLink, BarChart3, TrendingUp, AlertCircle, Star } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -44,10 +44,17 @@ export default function ArtistDashboard() {
 
     // Profile Modal State
     const [showProfile, setShowProfile] = useState(false);
+    const [profileName, setProfileName] = useState("");
+    const [profileEmail, setProfileEmail] = useState("");
     const [profileBio, setProfileBio] = useState("");
     const [profileIg, setProfileIg] = useState("");
     const [profileTwitter, setProfileTwitter] = useState("");
     const [profileWeb, setProfileWeb] = useState("");
+
+    // Security State
+    const [profilePassword, setProfilePassword] = useState("");
+    const [profileConfirmPassword, setProfileConfirmPassword] = useState("");
+
     const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
 
     // Support Modal State
@@ -68,6 +75,8 @@ export default function ArtistDashboard() {
 
     useEffect(() => {
         if (user) {
+            setProfileName(user.name || "");
+            setProfileEmail(user.email || "");
             setProfileBio(user.bio || "");
             setProfileIg(user.instagram || "");
             setProfileTwitter(user.twitter || "");
@@ -106,7 +115,32 @@ export default function ArtistDashboard() {
     const handleUpdateProfile = async () => {
         if (!user) return;
         setIsUpdatingProfile(true);
+
+        // 1. Validation
+        if (profilePassword && profilePassword !== profileConfirmPassword) {
+            alert("Passwords do not match!");
+            setIsUpdatingProfile(false);
+            return;
+        }
+
+        // 2. Auth Update (Email / Password)
+        const updates: any = {};
+        if (profileEmail && profileEmail !== user.email) updates.email = profileEmail;
+        if (profilePassword) updates.password = profilePassword;
+
+        if (Object.keys(updates).length > 0) {
+            const { error: authError } = await supabase.auth.updateUser(updates);
+            if (authError) {
+                alert("Auth Error: " + authError.message);
+                setIsUpdatingProfile(false);
+                return;
+            }
+            if (updates.email) alert("Confirmation email sent to new address. Please verify.");
+        }
+
+        // 3. Profile Update
         const { error } = await supabase.from('profiles').update({
+            full_name: profileName,
             bio: profileBio,
             instagram: profileIg,
             twitter: profileTwitter,
@@ -114,10 +148,12 @@ export default function ArtistDashboard() {
         }).eq('id', user.id);
 
         if (error) {
-            alert("Error: " + error.message);
+            alert("Error updating profile: " + error.message);
         } else {
-            alert("Profile updated!");
+            alert("Profile settings saved!");
             setShowProfile(false);
+            setProfilePassword("");
+            setProfileConfirmPassword("");
         }
         setIsUpdatingProfile(false);
     };
@@ -331,25 +367,87 @@ export default function ArtistDashboard() {
                                         <p className="text-sm font-bold text-white mb-2">{pricingConfig.currency}{sub.amount_paid}</p>
 
                                         {sub.status === 'accepted' && (
-                                            <div className="flex flex-col items-end gap-2 animate-in fade-in mt-2 w-full max-w-[280px] ml-auto">
-                                                <div className="bg-green-600/10 border border-green-500/30 rounded p-3 text-right space-y-2">
-                                                    <div>
-                                                        <p className="text-xs text-green-400 font-bold mb-1">Pass Check Passed! 🎉</p>
-                                                        <p className="text-[10px] text-white leading-tight">
-                                                            Congratulations! To rank higher and stay on the playlist:
+                                            <div className="flex flex-col items-end gap-2 animate-in fade-in mt-2 w-full max-w-[320px] ml-auto">
+                                                <div className="bg-gradient-to-br from-green-900/40 to-black border border-green-500/30 rounded p-4 text-left space-y-4 w-full shadow-lg shadow-green-900/10">
+                                                    <div className="flex items-center justify-between">
+                                                        <p className="text-xs font-bold text-green-400 uppercase tracking-widest flex items-center gap-1">
+                                                            <TrendingUp className="w-3 h-3" /> Viral Tracker
                                                         </p>
-                                                        <ul className="text-[10px] text-gray-300 mt-1 space-y-1 list-none">
-                                                            <li>1. Follow <span className="text-green-400 font-bold">AfroPitch Playlist</span> on Spotify.</li>
-                                                            <li>2. Save the playlist to your library.</li>
-                                                            <li>3. Share this tracker link with friends.</li>
-                                                            <li>4. Ask them to <span className="text-white font-bold">click & play</span> your song from the playlist!</li>
-                                                        </ul>
+                                                        <span className="text-xs font-bold text-white bg-green-500/20 px-2 py-0.5 rounded-full ring-1 ring-green-500/50">
+                                                            {sub.clicks || 0} Clicks
+                                                        </span>
                                                     </div>
 
-                                                    <div className="pt-2 border-t border-white/10">
-                                                        <a href={sub.tracking_slug ? `/track/${sub.tracking_slug}` : '#'} target="_blank" className="text-xs text-white hover:text-green-400 flex items-center justify-end gap-1 font-bold underline decoration-green-500/50">
-                                                            Get Share Link <ExternalLink className="w-3 h-3" />
-                                                        </a>
+                                                    {/* Progress Bar */}
+                                                    <div className="space-y-1.5">
+                                                        <div className="flex justify-between text-[10px] text-gray-400 font-medium">
+                                                            <span>Progress to Trending</span>
+                                                            <span>{Math.min(sub.clicks || 0, 100)}/100</span>
+                                                        </div>
+                                                        <div className="h-2 w-full bg-black/50 rounded-full overflow-hidden border border-white/5 relative">
+                                                            <div
+                                                                className="h-full bg-gradient-to-r from-green-600 to-green-400 transition-all duration-1000 relative"
+                                                                style={{ width: `${Math.min(((sub.clicks || 0) / 100) * 100, 100)}%` }}
+                                                            >
+                                                                <div className="absolute right-0 top-0 bottom-0 w-[1px] bg-white/50 shadow-[0_0_10px_white]"></div>
+                                                            </div>
+                                                        </div>
+                                                        <p className="text-[10px] text-gray-500 italic text-right">Update every 5 mins</p>
+                                                    </div>
+
+                                                    <div className="p-3 bg-black/40 rounded border border-white/5 space-y-2">
+                                                        <p className="text-[11px] text-gray-300 leading-tight flex gap-2">
+                                                            <Star className="w-4 h-4 flex-shrink-0 text-yellow-500 fill-yellow-500 animate-pulse" />
+                                                            <span>
+                                                                <span className="text-white font-bold">Challenge:</span> Share this unique link! Get 100 clicks to unlock "Local Trending" status.
+                                                            </span>
+                                                        </p>
+                                                    </div>
+
+                                                    <div className="pt-2 flex items-center gap-2">
+                                                        <div className="flex-1 bg-black/60 rounded px-3 py-2 text-[10px] text-gray-400 truncate select-all border border-white/5 font-mono">
+                                                            {typeof window !== 'undefined' ? `${window.location.origin}/track/${sub.tracking_slug}` : `/track/${sub.tracking_slug}`}
+                                                        </div>
+                                                        <div className="flex gap-1">
+                                                            <Button
+                                                                size="icon"
+                                                                variant="outline"
+                                                                className="h-8 w-8 border-green-500/30 text-green-400 hover:bg-green-500 hover:text-white transition-all"
+                                                                onClick={async () => {
+                                                                    const url = `${window.location.origin}/track/${sub.tracking_slug}`;
+                                                                    await navigator.clipboard.writeText(url);
+                                                                    alert("Tracker Link copied! Share it now.");
+                                                                }}
+                                                                title="Copy Link"
+                                                            >
+                                                                <Copy className="w-3 h-3" />
+                                                            </Button>
+                                                            <Button
+                                                                size="icon"
+                                                                variant="outline"
+                                                                className="h-8 w-8 border-green-500/30 text-green-400 hover:bg-green-500 hover:text-white transition-all"
+                                                                onClick={async () => {
+                                                                    const url = `${window.location.origin}/track/${sub.tracking_slug}`;
+                                                                    if (navigator.share) {
+                                                                        try {
+                                                                            await navigator.share({
+                                                                                title: 'Listen to my song on AfroPitch!',
+                                                                                text: 'Help me trend! Click to play my new track on the playlist.',
+                                                                                url: url
+                                                                            });
+                                                                        } catch (err) {
+                                                                            console.error("Share failed", err);
+                                                                        }
+                                                                    } else {
+                                                                        await navigator.clipboard.writeText(url);
+                                                                        alert("Link copied!");
+                                                                    }
+                                                                }}
+                                                                title="Share"
+                                                            >
+                                                                <ExternalLink className="w-3 h-3" />
+                                                            </Button>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
