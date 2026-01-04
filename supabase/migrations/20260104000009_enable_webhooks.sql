@@ -7,7 +7,7 @@ returns trigger as $$
 declare
   payload jsonb;
   url text := 'https://gildytqinnntmtvbagxm.supabase.co/functions/v1/notify-user';
-  api_key text := 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdpbGR5dHFpbm5udG10dmJhZ3htIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NjcwMjM5MSwiZXhwIjoyMDgyMjc4MzkxfQ.L37HsKmzmvxUh1r8r5dYrRuy8i50akMfd5hpWOcv5ms';
+  api_key text := 'SERVICE_ROLE_KEY'; -- REPLACE WITH YOUR KEY OR USE VAULT
 begin
   payload = jsonb_build_object(
     'table', TG_TABLE_NAME,
