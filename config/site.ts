@@ -1,7 +1,7 @@
 export const siteConfig = {
   name: "AfroPitch Playlist",
   description: "Get Your Afro Music Reviewed & Pitched to Playlists in 48 Hours. The trusted platform for Afro-based artists.",
-  url: "https://afropitchplaylist.com", // Placeholder
+  url: "https://afropitchplay.best",
   ogImage: "https://afropitchplaylist.com/og.jpg", // Placeholder
   links: {
     twitter: "https://twitter.com/afropitch",
