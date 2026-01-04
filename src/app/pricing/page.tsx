@@ -42,7 +42,7 @@ export default function PricingPage() {
                         </ul>
                     </CardContent>
                     <CardFooter>
-                        <Link href={`/submit`} className="w-full">
+                        <Link href={`/submit?tier=free`} className="w-full">
                             <Button variant="outline" className="w-full border-blue-500 text-blue-500 hover:bg-blue-500 hover:text-white py-6" size="lg">
                                 Submit Free
                             </Button>

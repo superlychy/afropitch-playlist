@@ -602,7 +602,7 @@ function SubmitForm() {
                                                 <Label>Review Speed</Label>
                                                 <div className="flex gap-4">
                                                     {Object.keys(pricingConfig.tiers)
-                                                        .filter(key => key !== 'exclusive')
+                                                        .filter(key => key !== 'exclusive' && (key !== 'free' || tier === 'free'))
                                                         .map((key) => {
                                                             const t = pricingConfig.tiers[key as keyof typeof pricingConfig.tiers];
                                                             return (
