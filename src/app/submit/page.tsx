@@ -271,6 +271,14 @@ function SubmitForm() {
                     .eq('id', user.id);
 
                 if (balanceError) throw new Error("Database balance update failed: " + balanceError.message);
+
+                // Insert Transaction Record
+                await supabase.from('transactions').insert({
+                    user_id: user.id,
+                    amount: -total, // Negative for spending
+                    type: 'payment',
+                    description: `Submission Fee: ${selectedPlaylistIds.length} Playlists`
+                });
             }
 
             // 2. Save Submission

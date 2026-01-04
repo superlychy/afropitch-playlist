@@ -340,46 +340,34 @@ export default function AdminDashboard() {
         const withdrawal = withdrawals.find(w => w.id === id);
         if (!withdrawal) return;
 
-        const status = action === 'approve' ? 'approved' : 'rejected';
-
-        // Optimistic UI update
-        setWithdrawals(prev => prev.map(w => w.id === id ? { ...w, status: status } : w));
-
-        const { error } = await supabase.from('withdrawals').update({ status }).eq('id', id);
-
-        if (error) {
-            alert("Error updating withdrawal: " + error.message);
-            // Revert state if error
-            setWithdrawals(prev => prev.map(w => w.id === id ? { ...w, status: withdrawal.status } : w));
-            return;
-        }
-
         if (action === 'reject') {
-            // Refund the user with atomic transaction ideally, but here sequential is better than nothing until we migrate admin triggers.
-            const { data: profile } = await supabase.from('profiles').select('balance').eq('id', withdrawal.user_id).single();
-            if (profile) {
-                const newBalance = (profile.balance || 0) + withdrawal.amount;
+            const { error } = await supabase.rpc('reject_withdrawal', {
+                p_withdrawal_id: id,
+                p_reason: 'Rejected by Admin'
+            });
 
-                // 1. Refund Balance
-                const { error: refundError } = await supabase.from('profiles').update({ balance: newBalance }).eq('id', withdrawal.user_id);
-
-                if (refundError) {
-                    alert("Error refunding user: " + refundError.message);
-                } else {
-                    // 2. Create Refund Transaction
-                    await supabase.from('transactions').insert({
-                        user_id: withdrawal.user_id,
-                        amount: withdrawal.amount,
-                        type: 'refund',
-                        description: `Refund: Withdrawal Rejected`
-                    });
-
-                    alert("Withdrawal rejected and funds refunded.");
-                }
+            if (error) {
+                console.error(error);
+                alert("Error rejecting withdrawal: " + error.message);
+                return;
             }
+
+            // Update Local State
+            setWithdrawals(prev => prev.map(w => w.id === id ? { ...w, status: 'rejected' } : w));
+            alert("Withdrawal rejected and funds refunded.");
+
         } else {
-            // Approved - The withdrawal status update is enough, as the money was already deducted when requested.
-            alert(`Withdrawal approved.`);
+            // Approve Logic
+            const { error } = await supabase.from('withdrawals').update({ status: 'approved' }).eq('id', id);
+
+            if (error) {
+                console.error(error);
+                alert("Error approving withdrawal: " + error.message);
+                return;
+            }
+
+            setWithdrawals(prev => prev.map(w => w.id === id ? { ...w, status: 'approved' } : w));
+            alert("Withdrawal approved.");
         }
     };
 

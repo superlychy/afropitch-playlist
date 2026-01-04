@@ -282,6 +282,15 @@ export default function ArtistDashboard() {
             return;
         }
 
+        // 2. Insert Transaction Record
+        await supabase.from('transactions').insert({
+            user_id: user.id,
+            amount: val,
+            type: 'deposit',
+            // Use reference if available for clearer tracking
+            description: `Wallet Deposit: ${reference?.reference || 'Manual'}`
+        });
+
         // 2. Update Local State
         loadFunds(val);
         setAmount("");
