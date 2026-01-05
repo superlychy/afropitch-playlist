@@ -452,31 +452,81 @@ export default function AdminDashboard() {
         if (!fetchedPlaylistInfo || !user) return;
         setIsSavingPlaylist(true);
 
-        const { error } = await supabase.from('playlists').insert({
-            name: fetchedPlaylistInfo.name,
-            description: fetchedPlaylistInfo.description,
-            cover_image: fetchedPlaylistInfo.coverImage,
-            followers: fetchedPlaylistInfo.followers,
-            playlist_link: newPlaylistLink,
-            curator_id: user.id,
+        try {
+            const { error } = await supabase.from('playlists').insert({
+                name: fetchedPlaylistInfo.name,
+                description: fetchedPlaylistInfo.description,
+                cover_image: fetchedPlaylistInfo.coverImage,
+                followers: fetchedPlaylistInfo.followers,
+                playlist_link: newPlaylistLink,
+                curator_id: user.id,
 
-            genre: "Multi-Genre", // Default or add selector
-            type: newPlaylistType,
-            submission_fee: pricingConfig.tiers[newPlaylistType].price,
-            is_active: true
-        }).select().single();
+                genre: "Multi-Genre", // Default or add selector
+                type: newPlaylistType,
+                submission_fee: pricingConfig.tiers[newPlaylistType].price,
+                is_active: true
+            }).select().single();
 
-        if (error) {
-            alert("Error adding playlist: " + error.message);
-        } else {
-            alert("Playlist added successfully! It will appear under 'AfroPitch Team Playlists'.");
-            setShowAddPlaylist(false);
-            setNewPlaylistLink("");
-            setFetchedPlaylistInfo(null);
-            // Reload page or re-fetch (simplest is reload for admin or optimistic add)
-            window.location.reload();
+            if (error) {
+                throw error;
+            } else {
+                alert("Playlist added successfully! It will appear under 'AfroPitch Team Playlists'.");
+                setShowAddPlaylist(false);
+                setNewPlaylistLink("");
+                setFetchedPlaylistInfo(null);
+                window.location.reload();
+            }
+        } catch (err: any) {
+            console.error("Add Playlist Error:", err);
+            alert("Error adding playlist: " + err.message);
+        } finally {
+            setIsSavingPlaylist(false);
         }
-        setIsSavingPlaylist(false);
+    };
+
+    const handleRefreshPlaylist = async (playlist: any) => {
+        if (!playlist.playlist_link) {
+            alert("Cannot refresh: No Spotify link found.");
+            return;
+        }
+        setIsRefreshing(playlist.id);
+        try {
+            const res = await fetch('/api/playlist-info', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url: playlist.playlist_link })
+            });
+
+            // Check if response is JSON
+            const contentType = res.headers.get("content-type");
+            if (!contentType || !contentType.includes("application/json")) {
+                const text = await res.text();
+                throw new Error("Invalid server response: " + text.slice(0, 100));
+            }
+
+            const data = await res.json();
+            if (data.name) { // api returns { name, ... } or { error }
+                // Update Supabase
+                const { error } = await supabase.from('playlists').update({
+                    name: data.name,
+                    cover_image: data.coverImage, // Note camelCase from API return in Step 451? No wait.
+                    // Step 451: return NextResponse.json({ name, followers, songsCount, coverImage, description })
+                    // Supabase: cover_image
+                    followers: data.followers
+                }).eq('id', playlist.id);
+
+                if (error) throw error;
+                alert(`Playlist "${data.name}" updated successfully!`);
+                window.location.reload();
+            } else {
+                throw new Error(data.error || "Unknown validation error");
+            }
+        } catch (err: any) {
+            console.error("Refresh Error:", err);
+            alert("Error refreshing playlist: " + err.message);
+        } finally {
+            setIsRefreshing(null);
+        }
     };
 
     // CHAT FUNCTIONS
@@ -940,6 +990,13 @@ export default function AdminDashboard() {
                                         </div>
 
                                         <div className="flex gap-2">
+                                            <Button size="sm" variant="outline" className="border-white/10 hover:bg-white/10 text-blue-400 hover:text-blue-300"
+                                                onClick={() => handleRefreshPlaylist(playlist)}
+                                                disabled={isRefreshing === playlist.id || !playlist.playlist_link}
+                                                title={!playlist.playlist_link ? "No Spotify Link" : "Refresh Metadata"}
+                                            >
+                                                {isRefreshing === playlist.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                                            </Button>
                                             <Button size="sm" variant="outline" className="flex-1 border-white/10 hover:bg-white/10" onClick={() => {
                                                 setAdminEditingPlaylist(playlist);
                                                 setAdminNewName(playlist.name);
