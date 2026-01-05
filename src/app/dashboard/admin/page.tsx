@@ -575,10 +575,15 @@ export default function AdminDashboard() {
     };
 
     const handleCuratorAction = async (id: string, action: 'verified' | 'rejected') => {
-        const { error } = await supabase.from('profiles').update({ verification_status: action }).eq('id', id);
+        const { data, error } = await supabase.from('profiles').update({ verification_status: action }).eq('id', id).select();
 
         if (error) {
             alert("Error updating status: " + error.message);
+        } else if (!data || data.length === 0) {
+            alert("Update failed: Permission denied or user not found. Please refresh.");
+            // Revert state by triggering a refresh or manual revert?
+            // Since we already filtered it out optimistically (wait, we didn't filter it yet in the previous code? Ah, we did below).
+            // I'll move optimistic update to AFTER check.
         } else {
             // Optimistic update
             setPendingCurators(prev => prev.filter(c => c.id !== id));
