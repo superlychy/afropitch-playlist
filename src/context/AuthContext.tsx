@@ -42,99 +42,142 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Load session from Supabase on mount
     useEffect(() => {
+        let mounted = true;
+
+        // Safety timeout to prevent infinite loading
+        const loadingTimeout = setTimeout(() => {
+            if (mounted && isLoading) {
+                console.warn("Auth check timed out, forcing load completion.");
+                setIsLoading(false);
+            }
+        }, 8000); // 8 seconds backup
+
         const syncProfile = async (session: any) => {
-            if (session?.user) {
-                try {
-                    // 1. Try to fetch existing profile
-                    const { data: profile, error } = await supabase
-                        .from('profiles')
-                        .select('*')
-                        .eq('id', session.user.id)
-                        .single();
+            if (!session?.user) {
+                if (mounted) setUser(null);
+                return;
+            }
 
-                    if (profile) {
-                        setUser({
-                            id: profile.id,
-                            name: profile.full_name || session.user.email?.split("@")[0] || "User",
-                            email: profile.email || session.user.email || "",
-                            role: (profile.role as UserRole) || "artist",
-                            balance: profile.balance || 0,
-                            earnings: 0, // In real app, this might be separate table or field
-                            bio: profile.bio,
-                            instagram: profile.instagram,
-                            twitter: profile.twitter,
-                            website: profile.website
-                        });
-                        return;
+            try {
+                // 1. Try to fetch existing profile
+                const { data: profile, error } = await supabase
+                    .from('profiles')
+                    .select('*')
+                    .eq('id', session.user.id)
+                    .single();
+
+                if (error) {
+                    // If error is "Row not found" (PGRST116), it's fine, we create one.
+                    // But if it's connection error, we might want to be careful.
+                    // For now, proceed to create if missing.
+                    if (error.code !== 'PGRST116') {
+                        console.error("Profile fetch error:", error);
                     }
-
-                    // 2. If no profile, create one (First time login)
-                    const role = session.user.user_metadata?.role || (session.user.email?.includes("curator") ? "curator" : "artist");
-                    const name = session.user.user_metadata?.full_name || session.user.email?.split("@")[0] || "User";
-
-                    const newProfile = {
-                        id: session.user.id,
-                        email: session.user.email,
-                        full_name: name,
-                        role: role,
-                        balance: 0,
-                        verified: false
-                    };
-
-                    const { error: insertError } = await supabase
-                        .from('profiles')
-                        .insert([newProfile]);
-
-                    if (!insertError) {
-                        setUser({
-                            id: newProfile.id,
-                            name: newProfile.full_name,
-                            email: newProfile.email || "",
-                            role: newProfile.role as UserRole,
-                            balance: newProfile.balance,
-                            earnings: 0
-                        });
-                    } else {
-                        console.error("Error creating profile:", insertError);
-                        // Fallback to session data
-                        setUser({
-                            id: session.user.id,
-                            name: name,
-                            email: session.user.email || "",
-                            role: role as UserRole,
-                            balance: 0,
-                            earnings: 0
-                        });
-                    }
-
-                } catch (e) {
-                    console.error("Profile sync error", e);
                 }
-            } else {
-                setUser(null);
+
+                if (profile && mounted) {
+                    setUser({
+                        id: profile.id,
+                        name: profile.full_name || session.user.email?.split("@")[0] || "User",
+                        email: profile.email || session.user.email || "",
+                        role: (profile.role as UserRole) || "artist",
+                        balance: profile.balance || 0,
+                        earnings: 0,
+                        bio: profile.bio,
+                        instagram: profile.instagram,
+                        twitter: profile.twitter,
+                        website: profile.website
+                    });
+                    return;
+                }
+
+                // 2. If no profile, create one (First time login or data wiped)
+                const role = session.user.user_metadata?.role || (session.user.email?.includes("curator") ? "curator" : "artist");
+                const name = session.user.user_metadata?.full_name || session.user.email?.split("@")[0] || "User";
+
+                const newProfile = {
+                    id: session.user.id,
+                    email: session.user.email,
+                    full_name: name,
+                    role: role,
+                    balance: 0,
+                    verified: false
+                };
+
+                const { error: insertError } = await supabase
+                    .from('profiles')
+                    .insert([newProfile]);
+
+                if (!insertError && mounted) {
+                    setUser({
+                        id: newProfile.id,
+                        name: newProfile.full_name,
+                        email: newProfile.email || "",
+                        role: newProfile.role as UserRole,
+                        balance: newProfile.balance,
+                        earnings: 0
+                    });
+                } else if (mounted) {
+                    // Critical fallback if DB is partial but Auth is valid
+                    console.error("Error creating profile during sync:", insertError);
+                    setUser({
+                        id: session.user.id,
+                        name: name,
+                        email: session.user.email || "",
+                        role: role as UserRole,
+                        balance: 0,
+                        earnings: 0
+                    });
+                }
+
+            } catch (e) {
+                console.error("Profile sync unexpected error", e);
+                // If profile sync fails catastrophically, we might want to nullify user to prevent broken UI
+                // But let's keep them logged in with basic info if possible logic above handles it.
             }
         };
 
         const getSession = async () => {
             try {
                 const { data: { session }, error } = await supabase.auth.getSession();
-                if (error) console.error("getSession error:", error);
-                await syncProfile(session);
+                if (error) {
+                    console.error("getSession error:", error);
+                    // If session is invalid, clear it
+                    if (error.message.includes("invalid")) {
+                        await supabase.auth.signOut();
+                    }
+                }
+                if (mounted) await syncProfile(session);
             } catch (error) {
                 console.error("Auth initialization error:", error);
             } finally {
-                setIsLoading(false);
+                if (mounted) {
+                    clearTimeout(loadingTimeout);
+                    setIsLoading(false);
+                }
             }
         };
 
         getSession();
 
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-            await syncProfile(session);
-            setIsLoading(false); // Ensure loading is cleared on auth change
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+            console.log("Auth State Change:", event);
+            if (event === 'SIGNED_OUT') {
+                if (mounted) {
+                    setUser(null);
+                    setIsLoading(false);
+                }
+            } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+                await syncProfile(session);
+                if (mounted) setIsLoading(false);
+            }
         });
 
-        return () => subscription.unsubscribe();
+        return () => {
+            mounted = false;
+            clearTimeout(loadingTimeout);
+            subscription.unsubscribe();
+        };
     }, []);
 
     const login = async (email: string, password: string) => {
@@ -150,7 +193,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 throw error; // Re-throw to let component handle UI feedback
             }
         } catch (error) {
-            // Error is handled by caller or logged
+            throw error;
         } finally {
             setIsLoading(false);
         }
