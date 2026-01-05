@@ -134,6 +134,7 @@ export default function CuratorDashboard() {
             .from('playlists')
             .select(`
     *,
+    playlist_link,
     submissions: submissions(count)
         `)
             .eq('curator_id', user.id);
@@ -530,6 +531,7 @@ export default function CuratorDashboard() {
     const openEditModal = (playlist: Playlist) => {
         setEditingPlaylist(playlist);
         setNewName(playlist.name);
+        setNewPlaylistLink(playlist.playlist_link || "");
         setNewGenre(""); // We don't fetch genre in list currently, might need update 'fetchCuratorData' or assume empty
         // Actually interface Playlist doesn't show genre. We should update Playlist interface soon but for now let's hope it's not essential or user re-enters it.
         // Or better, let's fetch it or update interface.
