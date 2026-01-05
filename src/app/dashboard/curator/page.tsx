@@ -611,7 +611,7 @@ export default function CuratorDashboard() {
             const res = await fetch('/api/playlist-info', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ link: playlist.playlist_link })
+                body: JSON.stringify({ url: playlist.playlist_link })
             });
             const data = await res.json();
             if (data.success) {
