@@ -95,16 +95,6 @@ export default function ArtistDashboard() {
         const { data } = await supabase
             .from('broadcasts')
             .select('*')
-            .in('channel', ['email', 'in_app', 'both', 'null']) // Include 'email' as well for generic updates
-            // Actually, if we just want to show everything targeted to 'all', 'artist' etc.
-            // But let's respect channel if we want strictness. 
-            // The request says "in app broadcast is not working yet... all users should get a notification... let the broadcast message allow html formats too."
-            // So we need to select everything for now to be safe, or just filter by role + target.
-            // The previous code had `.in('channel', ...`.
-            // Let's broaden it to ensure we catch the 'email' ones too if they double as in-app, or just all.
-            // Simplified:
-            .from('broadcasts')
-            .select('*')
             .or('target_role.eq.all,target_role.is.null,target_role.eq.artist')
             .order('created_at', { ascending: false })
             .limit(20);
