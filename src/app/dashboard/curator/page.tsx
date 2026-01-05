@@ -410,35 +410,43 @@ export default function CuratorDashboard() {
         if (!user || !supportSubject || !supportMessage) return;
         setIsSubmittingTicket(true);
 
-        // 1. Create Ticket
-        const { data: ticket, error } = await supabase.from('support_tickets').insert({
-            user_id: user.id,
-            subject: supportSubject,
-            message: supportMessage,
-            status: 'open'
-        }).select().single();
+        try {
+            // 1. Create Ticket
+            const { data: ticket, error } = await supabase.from('support_tickets').insert({
+                user_id: user.id,
+                subject: supportSubject,
+                message: supportMessage,
+                status: 'open'
+            }).select().single();
 
-        if (error) {
-            alert("Error: " + error.message);
+            if (error) {
+                console.error("Ticket Create Error:", error);
+                alert("Error creating ticket: " + error.message);
+                return;
+            }
+
+            // 2. Create Initial Message
+            if (ticket) {
+                const { error: msgError } = await supabase.from('support_messages').insert({
+                    ticket_id: ticket.id,
+                    sender_id: user.id,
+                    message: supportMessage
+                });
+
+                if (msgError) console.error("Initial message error:", msgError);
+
+                alert("Support ticket created successfully!");
+                setSupportSubject("");
+                setSupportMessage("");
+                setSupportView('list');
+                fetchTickets();
+            }
+        } catch (err: any) {
+            console.error("Unexpected error submitting ticket:", err);
+            alert("An unexpected error occurred. Please check your connection and try again.");
+        } finally {
             setIsSubmittingTicket(false);
-            return;
         }
-
-        // 2. Create Initial Message
-        if (ticket) {
-            await supabase.from('support_messages').insert({
-                ticket_id: ticket.id,
-                sender_id: user.id,
-                message: supportMessage
-            });
-
-            alert("Support ticket created!");
-            setSupportSubject("");
-            setSupportMessage("");
-            setSupportView('list');
-            fetchTickets();
-        }
-        setIsSubmittingTicket(false);
     };
 
     const openTicketChat = async (ticket: any) => {
