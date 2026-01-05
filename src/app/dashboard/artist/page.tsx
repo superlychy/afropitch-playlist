@@ -95,13 +95,17 @@ export default function ArtistDashboard() {
         const { data } = await supabase
             .from('broadcasts')
             .select('*')
-            .in('channel', ['in_app', 'both', 'null']) // Handle null for legacy if any, though default is email?
-            // Actually, safe to just select all if I don't care, but better filtering:
-            // My default in DB was 'email'. So legacy rows (if default applied) are 'email'.
-            // I should explicitly select 'in_app' and 'both'.
-            .or('channel.eq.in_app,channel.eq.both')
+            .in('channel', ['email', 'in_app', 'both', 'null']) // Include 'email' as well for generic updates
+            // Actually, if we just want to show everything targeted to 'all', 'artist' etc.
+            // But let's respect channel if we want strictness. 
+            // The request says "in app broadcast is not working yet... all users should get a notification... let the broadcast message allow html formats too."
+            // So we need to select everything for now to be safe, or just filter by role + target.
+            // The previous code had `.in('channel', ...`.
+            // Let's broaden it to ensure we catch the 'email' ones too if they double as in-app, or just all.
+            // Simplified:
+            .or('channel.eq.in_app,channel.eq.both,channel.eq.email')
             .order('created_at', { ascending: false })
-            .limit(10);
+            .limit(20);
 
         if (data) setNotifications(data);
     };
@@ -694,10 +698,10 @@ export default function ArtistDashboard() {
                             <Button variant="ghost" size="icon" onClick={() => setShowNotifications(false)}><XCircle className="w-6 h-6" /></Button>
                         </div>
                         <div className="space-y-4">
-                            {notifications.map(n => (
-                                <div key={n.id} className="bg-white/5 p-4 rounded border border-white/5">
+                            {notifications.map((n, i) => (
+                                <div key={n.id || i} className="bg-white/5 p-4 rounded border border-white/5">
                                     <h4 className="font-bold text-white mb-1">{n.subject}</h4>
-                                    <p className="text-sm text-gray-400 whitespace-pre-wrap">{n.message}</p>
+                                    <div className="text-sm text-gray-400 whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: n.message }} />
                                     <p className="text-[10px] text-gray-600 mt-2">{new Date(n.created_at).toLocaleDateString()}</p>
                                 </div>
                             ))}

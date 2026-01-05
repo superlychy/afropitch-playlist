@@ -98,7 +98,7 @@ export default function Home() {
             ))}
           </ul>
           <div className="pt-4">
-            <Link href="/about" className="text-green-500 font-medium hover:text-green-400 inline-flex items-center gap-1 group">
+            <Link href="/how-it-works" className="text-green-500 font-medium hover:text-green-400 inline-flex items-center gap-1 group">
               Learn more about our review process
               <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
             </Link>

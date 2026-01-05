@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { DollarSign, CheckCircle, XCircle, Clock, Settings, User, Plus, ListMusic, MoreVertical, Star, Zap, HelpCircle, Send, LogOut, Trash2, Edit, MessageSquare, ChevronLeft, AlertCircle } from "lucide-react";
+import { DollarSign, CheckCircle, XCircle, Clock, Settings, User, Plus, ListMusic, MoreVertical, Star, Zap, HelpCircle, Send, LogOut, Trash2, Edit, MessageSquare, ChevronLeft, AlertCircle, Bell } from "lucide-react";
 import { pricingConfig } from "@/../config/pricing";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -256,8 +256,24 @@ export default function CuratorDashboard() {
         setIsApplying(false);
     };
 
+    // Notifications
+    const [showNotifications, setShowNotifications] = useState(false);
+    const [notifications, setNotifications] = useState<any[]>([]);
+
+    const fetchNotifications = async () => {
+        const { data } = await supabase
+            .from('broadcasts')
+            .select('*')
+            .or('channel.eq.in_app,channel.eq.both,channel.eq.email')
+            .order('created_at', { ascending: false })
+            .limit(20);
+
+        if (data) setNotifications(data);
+    };
+
     useEffect(() => {
         if (user) {
+            // ... existing profile setters
             setProfileBio(user.bio || "");
             setProfileIg(user.instagram || "");
             setProfileTwitter(user.twitter || "");
@@ -276,6 +292,7 @@ export default function CuratorDashboard() {
             fetchExtendedProfile();
 
             fetchCuratorData();
+            fetchNotifications(); // Add this
         }
     }, [user]);
 
@@ -666,6 +683,16 @@ export default function CuratorDashboard() {
                     <p className="text-gray-400">Welcome back, <span className="text-green-500">{user?.name || 'Curator'}</span>. Manage your playlists and review incoming tracks.</p>
                 </div>
                 <div className="flex items-center gap-4">
+                    <Button
+                        variant="outline"
+                        size="icon"
+                        className="border-white/10 hover:bg-white/10 h-12 w-12 relative"
+                        title="Notifications"
+                        onClick={() => setShowNotifications(true)}
+                    >
+                        <Bell className="w-6 h-6 text-gray-400" />
+                        {notifications.length > 0 && <span className="absolute top-3 right-3 w-2 h-2 bg-red-500 rounded-full animate-pulse" />}
+                    </Button>
 
                     {/* Support Button */}
                     <Button variant="outline" size="icon" className="border-white/10 hover:bg-white/10 h-12 w-12" title="Contact Support" onClick={() => setShowSupport(true)}>
@@ -679,6 +706,28 @@ export default function CuratorDashboard() {
                     </Button>
                 </div>
             </div>
+
+            {/* Notifications Modal */}
+            {showNotifications && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in">
+                    <div className="bg-zinc-900 border border-white/10 w-full max-w-md p-6 rounded-lg space-y-6 max-h-[80vh] overflow-y-auto">
+                        <div className="flex justify-between items-center pb-4 border-b border-white/10">
+                            <h3 className="text-xl font-bold text-white flex items-center gap-2"><Bell className="w-5 h-5 text-yellow-500" /> Updates</h3>
+                            <Button variant="ghost" size="icon" onClick={() => setShowNotifications(false)}><XCircle className="w-6 h-6" /></Button>
+                        </div>
+                        <div className="space-y-4">
+                            {notifications.map((n, i) => (
+                                <div key={n.id || i} className="bg-white/5 p-4 rounded border border-white/5">
+                                    <h4 className="font-bold text-white mb-1">{n.subject}</h4>
+                                    <div className="text-sm text-gray-400 whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: n.message }} />
+                                    <p className="text-[10px] text-gray-600 mt-2">{new Date(n.created_at).toLocaleDateString()}</p>
+                                </div>
+                            ))}
+                            {notifications.length === 0 && <p className="text-gray-500 text-center">No new updates.</p>}
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Support Modal */}
             {showSupport && (

@@ -18,7 +18,7 @@ export default function PlaylistsPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
     const [selectedGenre, setSelectedGenre] = useState("All");
-    const [usingMockData, setUsingMockData] = useState(false);
+    const [error, setError] = useState(false);
 
     const genres = ["All", "Afrobeats", "Amapiano", "Hip Hop", "RnB", "Pop", "Alternative"]; // Add more as needed
 
@@ -60,12 +60,7 @@ export default function PlaylistsPage() {
                     setPlaylists(mapped);
                 } else {
                     console.error("Playlists fetch failed or timed out", plResult);
-                    setUsingMockData(true);
-                    // Fallback Mock Data for testing if backend fails
-                    setPlaylists([
-                        { id: '1', name: 'Afro Hits', description: 'Top Afrobeat hits. 50 songs', followers: 1200, cover_image: null, genre: 'Afrobeats', submission_fee: 3000, songCount: '50' },
-                        { id: '2', name: 'Chill Vibes', description: 'Relaxing tunes. 30 songs', followers: 800, cover_image: null, genre: 'RnB', submission_fee: 0, songCount: '30' }
-                    ]);
+                    setError(true);
                 }
 
                 // Handle Curators Result
@@ -107,172 +102,176 @@ export default function PlaylistsPage() {
 
     return (
         <div className="w-full mx-auto max-w-7xl px-4 py-16 md:py-24 min-h-screen">
-            {usingMockData && (
-                <div className="mb-8 p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-lg flex items-center justify-center gap-2 text-yellow-500">
-                    <span className="font-bold">⚠️ Demo Mode:</span>
-                    <span>Connection to database failed. Showing example data.</span>
+            {error && (
+                <div className="flex flex-col items-center justify-center py-20 text-center space-y-4 min-h-[50vh]">
+                    <div className="w-12 h-12 border-4 border-green-500 border-t-transparent rounded-full animate-spin"></div>
+                    <h2 className="text-xl font-bold text-white">Connection Error</h2>
+                    <p className="text-gray-400">Unable to load data. Please refresh the page.</p>
+                    <Button onClick={() => window.location.reload()} variant="outline" className="mt-4 border-white/10 hover:bg-white/10">
+                        Refresh Page
+                    </Button>
                 </div>
             )}
-            <div className="text-center mb-12 space-y-4">
-                <h1 className="text-4xl font-bold tracking-tight text-white sm:text-5xl">
-                    Discover <span className="text-green-500">Music</span>
-                </h1>
-                <p className="text-xl text-gray-400 max-w-2xl mx-auto">
-                    Browse top-tier playlists or find your favorite curators to pitch your music to.
-                </p>
-            </div>
 
-            {/* Search & Filter Bar */}
-            <div className="max-w-2xl mx-auto mb-10 flex flex-col md:flex-row gap-4 items-center">
-                <div className="relative flex-1 w-full">
-                    <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-500" />
-                    <Input
-                        placeholder="Search playlists or curators..."
-                        className="pl-10 bg-white/5 border-white/10 text-white placeholder:text-gray-500"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                    />
-                </div>
-                {activeTab === "playlists" && (
-                    <div className="w-full md:w-48">
-                        <Select
-                            className="bg-white/5 border-white/10 text-white"
-                            value={selectedGenre}
-                            onChange={(e) => setSelectedGenre(e.target.value)}
-                        >
-                            {genres.map(g => (
-                                <option key={g} value={g} className="bg-zinc-900 text-white">{g}</option>
-                            ))}
-                        </Select>
+            {!error && (
+                <>
+                    <div className="text-center mb-12 space-y-4">
+                        <h1 className="text-4xl font-bold tracking-tight text-white sm:text-5xl">
+                            Discover <span className="text-green-500">Music</span>
+                        </h1>
+                        <p className="text-xl text-gray-400 max-w-2xl mx-auto">
+                            Browse top-tier playlists or find your favorite curators to pitch your music to.
+                        </p>
                     </div>
-                )}
-            </div>
 
-            {/* Tabs */}
-            <div className="flex justify-center mb-12">
-                <div className="bg-white/5 p-1 rounded-full flex gap-1 border border-white/10">
-                    <button
-                        onClick={() => setActiveTab("playlists")}
-                        className={`px-6 py-2 rounded-full text-sm font-bold transition-all ${activeTab === "playlists" ? "bg-green-600 text-white shadow-lg" : "text-gray-400 hover:text-white"}`}
-                    >
-                        Playlists
-                    </button>
-                    <button
-                        onClick={() => setActiveTab("curators")}
-                        className={`px-6 py-2 rounded-full text-sm font-bold transition-all ${activeTab === "curators" ? "bg-green-600 text-white shadow-lg" : "text-gray-400 hover:text-white"}`}
-                    >
-                        Curators
-                    </button>
-                </div>
-            </div>
+                    {/* Search & Filter Bar */}
+                    <div className="max-w-2xl mx-auto mb-10 flex flex-col md:flex-row gap-4 items-center">
+                        <div className="relative flex-1 w-full">
+                            <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-500" />
+                            <Input
+                                placeholder="Search playlists or curators..."
+                                className="pl-10 bg-white/5 border-white/10 text-white placeholder:text-gray-500"
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                            />
+                        </div>
+                        {activeTab === "playlists" && (
+                            <div className="w-full md:w-48">
+                                <Select
+                                    className="bg-white/5 border-white/10 text-white"
+                                    value={selectedGenre}
+                                    onChange={(e) => setSelectedGenre(e.target.value)}
+                                >
+                                    {genres.map(g => (
+                                        <option key={g} value={g} className="bg-zinc-900 text-white">{g}</option>
+                                    ))}
+                                </Select>
+                            </div>
+                        )}
+                    </div>
 
-            {isLoading && (
-                <div className="text-center py-20 text-gray-500">Loading {activeTab}...</div>
-            )}
+                    {/* Tabs */}
+                    <div className="flex justify-center mb-12">
+                        <div className="bg-white/5 p-1 rounded-full flex gap-1 border border-white/10">
+                            <button
+                                onClick={() => setActiveTab("playlists")}
+                                className={`px-6 py-2 rounded-full text-sm font-bold transition-all ${activeTab === "playlists" ? "bg-green-600 text-white shadow-lg" : "text-gray-400 hover:text-white"}`}
+                            >
+                                Playlists
+                            </button>
+                            <button
+                                onClick={() => setActiveTab("curators")}
+                                className={`px-6 py-2 rounded-full text-sm font-bold transition-all ${activeTab === "curators" ? "bg-green-600 text-white shadow-lg" : "text-gray-400 hover:text-white"}`}
+                            >
+                                Curators
+                            </button>
+                        </div>
+                    </div>
 
-            {!isLoading && activeTab === "playlists" && (
-                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                    {filteredPlaylists.length === 0 && <div className="text-center w-full col-span-full text-gray-500">No playlists found.</div>}
-                    {filteredPlaylists.map((playlist) => (
-                        <Card key={playlist.id} className="group bg-white/5 border-white/5 hover:bg-white/[0.07] transition-all overflow-hidden h-full flex flex-col">
-                            <CardContent className="p-0 flex flex-col h-full">
-                                {/* Playlist Cover Strip */}
-                                <div className="w-full h-48 relative overflow-hidden bg-zinc-800">
-                                    {playlist.cover_image?.startsWith('http') ? (
-                                        <img src={playlist.cover_image} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
-                                    ) : (
-                                        <div className="w-full h-full flex items-center justify-center text-white/20"><Music2 className="w-12 h-12" /></div>
-                                    )}
-                                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
-                                    <div className="absolute bottom-4 left-4 text-white p-2">
-                                        <p className="font-bold text-lg leading-tight">{playlist.name}</p>
-                                        <p className="text-xs text-green-400 font-medium mt-1 uppercase">{playlist.genre}</p>
-                                    </div>
-                                </div>
+                    {isLoading && (
+                        <div className="text-center py-20 text-gray-500">Loading {activeTab}...</div>
+                    )}
 
-                                <div className="p-5 space-y-4 flex-1 flex flex-col">
-                                    <p className="text-sm text-gray-400 line-clamp-2">{playlist.description}</p>
-                                    <div className="flex items-center justify-between text-sm text-gray-400">
-                                        <span className="flex items-center gap-1.5"><Users className="w-4 h-4" /> {playlist.followers.toLocaleString()}</span>
-                                        {playlist.songCount && <span className="text-xs bg-white/10 px-2 py-1 rounded-full">{playlist.songCount} Songs</span>}
-                                    </div>
-
-                                    <div className="mt-auto pt-4 border-t border-white/5 flex items-center justify-between gap-3">
-                                        <div className="text-sm">
-                                            <span className="block text-[10px] text-gray-500 uppercase tracking-wider">Fee</span>
-                                            <span className="font-bold text-white">
-                                                {playlist.submission_fee === 0
-                                                    ? <span className="text-green-400">FREE</span>
-                                                    : `${pricingConfig.currency}${playlist.submission_fee.toLocaleString()}`
-                                                }
-                                            </span>
+                    {!isLoading && activeTab === "playlists" && (
+                        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                            {filteredPlaylists.length === 0 && <div className="text-center w-full col-span-full text-gray-500">No playlists found.</div>}
+                            {filteredPlaylists.map((playlist) => (
+                                <Card key={playlist.id} className="group bg-white/5 border-white/5 hover:bg-white/[0.07] transition-all overflow-hidden h-full flex flex-col">
+                                    <CardContent className="p-0 flex flex-col h-full">
+                                        {/* Playlist Cover Strip */}
+                                        <div className="w-full h-48 relative overflow-hidden bg-zinc-800">
+                                            {playlist.cover_image?.startsWith('http') ? (
+                                                <img src={playlist.cover_image} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
+                                            ) : (
+                                                <div className="w-full h-full flex items-center justify-center text-white/20"><Music2 className="w-12 h-12" /></div>
+                                            )}
+                                            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
+                                            <div className="absolute bottom-4 left-4 text-white p-2">
+                                                <p className="font-bold text-lg leading-tight">{playlist.name}</p>
+                                                <p className="text-xs text-green-400 font-medium mt-1 uppercase">{playlist.genre}</p>
+                                            </div>
                                         </div>
-                                        <div className="flex items-center gap-2">
-                                            <Link href={`/playlist/${playlist.id}`}>
-                                                <Button size="sm" variant="outline" className="border-white/10 hover:bg-white/10 text-white">
-                                                    View
+
+                                        <div className="p-5 space-y-4 flex-1 flex flex-col">
+                                            <p className="text-sm text-gray-400 line-clamp-2">{playlist.description}</p>
+                                            <div className="flex items-center justify-between text-sm text-gray-400">
+                                                <span className="flex items-center gap-1.5"><Users className="w-4 h-4" /> {playlist.followers.toLocaleString()}</span>
+                                                {playlist.songCount && <span className="text-xs bg-white/10 px-2 py-1 rounded-full">{playlist.songCount} Songs</span>}
+                                            </div>
+
+                                            <div className="mt-auto pt-4 border-t border-white/5 flex items-center justify-between gap-3">
+                                                <div className="text-sm">
+                                                    <span className="block text-[10px] text-gray-500 uppercase tracking-wider">Fee</span>
+                                                    <span className="font-bold text-white">
+                                                        {playlist.submission_fee === 0
+                                                            ? <span className="text-green-400">FREE</span>
+                                                            : `${pricingConfig.currency}${playlist.submission_fee.toLocaleString()}`
+                                                        }
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <Link href={`/playlist/${playlist.id}`}>
+                                                        <Button size="sm" variant="outline" className="border-white/10 hover:bg-white/10 text-white">
+                                                            View
+                                                        </Button>
+                                                    </Link>
+                                                    <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white shadow-lg shadow-green-900/20 group-hover:scale-105 transition-transform" onClick={(e) => {
+                                                        e.preventDefault();
+                                                        window.location.href = `/submit?playlist=${playlist.id}`;
+                                                    }}>
+                                                        Submit
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            ))}
+                        </div>
+                    )}
+
+                    {!isLoading && activeTab === "curators" && (
+                        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                            {filteredCurators.length === 0 && <div className="text-center w-full col-span-full text-gray-500">No curators found.</div>}
+                            {filteredCurators.map((curator) => (
+                                <div key={curator.id} className="space-y-4">
+                                    <Card
+                                        className="cursor-pointer transition-all border-white/10 bg-black/40 hover:border-green-500/50 hover:shadow-lg hover:shadow-green-900/10 h-full"
+                                    >
+                                        <CardHeader className="pb-2">
+                                            <div className="flex items-center justify-between">
+                                                <div className="w-16 h-16 rounded-full bg-zinc-800 flex items-center justify-center text-2xl font-bold text-white overflow-hidden border-2 border-white/10">
+                                                    {curator.avatar_url ? (
+                                                        <img src={curator.avatar_url} className="w-full h-full object-cover" />
+                                                    ) : (
+                                                        curator.full_name?.[0] || <User className="w-8 h-8 text-gray-500" />
+                                                    )}
+                                                </div>
+                                                <div className="flex items-center gap-1 text-green-500 text-xs font-medium bg-green-500/10 px-2 py-1 rounded-full">
+                                                    <BadgeCheck className="w-3 h-3" /> Curator
+                                                </div>
+                                            </div>
+                                            <CardTitle className="mt-4 text-xl text-white">{curator.full_name || "Curator"}</CardTitle>
+                                            <div className="flex items-center gap-2 text-xs text-green-400 font-bold mb-1">
+                                                <ListMusic className="w-3 h-3" />
+                                                {curator.playlistCount !== undefined ? curator.playlistCount : 0} Playlists
+                                            </div>
+                                            <CardDescription className="line-clamp-2 text-gray-400 min-h-[2.5rem]">{curator.bio || "No bio available."}</CardDescription>
+                                        </CardHeader>
+                                        <CardFooter className="pt-4">
+                                            <Link href={`/curators/${curator.id}`} className="w-full">
+                                                <Button variant="ghost" className="w-full text-green-400 hover:text-green-300 hover:bg-green-400/10 group">
+                                                    View Profile <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
                                                 </Button>
                                             </Link>
-                                            <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white shadow-lg shadow-green-900/20 group-hover:scale-105 transition-transform" onClick={(e) => {
-                                                e.preventDefault();
-                                                window.location.href = `/submit?playlist=${playlist.id}`;
-                                            }}>
-                                                Submit
-                                            </Button>
-                                        </div>
-                                    </div>
+                                        </CardFooter>
+                                    </Card>
                                 </div>
-                            </CardContent>
-                        </Card>
-                    ))}
-                </div>
+                            ))}
+                        </div>
+                    )}
+                </>
             )}
-
-            {
-                !isLoading && activeTab === "curators" && (
-                    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                        {filteredCurators.length === 0 && <div className="text-center w-full col-span-full text-gray-500">No curators found.</div>}
-                        {filteredCurators.map((curator) => (
-                            <div key={curator.id} className="space-y-4">
-                                <Card
-                                    className="cursor-pointer transition-all border-white/10 bg-black/40 hover:border-green-500/50 hover:shadow-lg hover:shadow-green-900/10 h-full"
-                                >
-                                    <CardHeader className="pb-2">
-                                        <div className="flex items-center justify-between">
-                                            <div className="w-16 h-16 rounded-full bg-zinc-800 flex items-center justify-center text-2xl font-bold text-white overflow-hidden border-2 border-white/10">
-                                                {curator.avatar_url ? (
-                                                    <img src={curator.avatar_url} className="w-full h-full object-cover" />
-                                                ) : (
-                                                    curator.full_name?.[0] || <User className="w-8 h-8 text-gray-500" />
-                                                )}
-                                            </div>
-                                            {/* Mocking Verified status for now, or check real DB column if exists */}
-                                            {/* {curator.verified && ( */}
-                                            <div className="flex items-center gap-1 text-green-500 text-xs font-medium bg-green-500/10 px-2 py-1 rounded-full">
-                                                <BadgeCheck className="w-3 h-3" /> Curator
-                                            </div>
-                                            {/* )} */}
-                                        </div>
-                                        <CardTitle className="mt-4 text-xl text-white">{curator.full_name || "Curator"}</CardTitle>
-                                        <div className="flex items-center gap-2 text-xs text-green-400 font-bold mb-1">
-                                            <ListMusic className="w-3 h-3" />
-                                            {curator.playlistCount !== undefined ? curator.playlistCount : 0} Playlists
-                                        </div>
-                                        <CardDescription className="line-clamp-2 text-gray-400 min-h-[2.5rem]">{curator.bio || "No bio available."}</CardDescription>
-                                    </CardHeader>
-                                    <CardFooter className="pt-4">
-                                        <Link href={`/curators/${curator.id}`} className="w-full">
-                                            <Button variant="ghost" className="w-full text-green-400 hover:text-green-300 hover:bg-green-400/10 group">
-                                                View Profile <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
-                                            </Button>
-                                        </Link>
-                                    </CardFooter>
-                                </Card>
-                            </div>
-                        ))}
-                    </div>
-                )
-            }
         </div >
     );
 }

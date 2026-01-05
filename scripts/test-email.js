@@ -14,7 +14,7 @@ async function run() {
         }
 
         const envContent = fs.readFileSync(envPath, 'utf8');
-        const match = envContent.match(/RESEND_API_KEY=(.+)/);
+        const match = envContent.match(/RESEND_API_KEY\s*=\s*(.+)/);
 
         if (!match) {
             console.error("RESEND_API_KEY not found in .env.local");
@@ -23,7 +23,12 @@ async function run() {
 
         const apiKey = match[1].trim().replace(/['"]/g, ''); // Remove quotes if present
 
-        console.log("Found API Key. Sending test email...");
+        if (apiKey.length < 5) {
+            console.error("API Key seems too short.");
+            return;
+        }
+
+        console.log(`Found API Key: ${apiKey.substring(0, 5)}...${apiKey.slice(-3)}. Sending test email...`);
 
         const response = await fetch('https://api.resend.com/emails', {
             method: 'POST',
