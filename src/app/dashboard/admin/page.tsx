@@ -584,18 +584,45 @@ export default function AdminDashboard() {
     };
 
     const handleSubmissionAction = async (submissionId: string, action: 'accepted' | 'declined') => {
+        const sub = playlistSongs.find(s => s.id === submissionId);
+        if (!sub) return;
+
+        let feedback = "Reviewed by Admin";
+        if (action === 'declined') {
+            const reason = prompt("Enter reason for rejection (optional):", "Does not fit playlist vibe");
+            if (reason) feedback = reason;
+        }
+
         if (!confirm(`Are you sure you want to ${action} this song?`)) return;
 
-        const { error } = await supabase
-            .from('submissions')
-            .update({ status: action })
-            .eq('id', submissionId);
+        // Create tracking slug if accepted
+        let trackingSlug = null;
+        if (action === 'accepted') {
+            const cleanTitle = (sub.song_title || 'track').replace(/[^a-z0-9]/gi, '-').toLowerCase();
+            trackingSlug = `${cleanTitle}-${Math.random().toString(36).substring(2, 7)}`;
+        }
 
-        if (error) {
-            alert("Error: " + error.message);
-        } else {
-            alert(`Song ${action}!`);
+        try {
+            const { data, error } = await supabase.rpc('process_submission_review', {
+                p_submission_id: submissionId,
+                p_action: action,
+                p_feedback: feedback,
+                p_curator_id: user?.id,
+                p_tracking_slug: trackingSlug
+            });
+
+            if (error) throw error;
+
+            const successMsg = action === 'accepted'
+                ? "Song accepted! Artist notified and link tracking generated."
+                : "Song rejected. Refund processed to artist wallet.";
+            alert(successMsg);
+
+            // Update local state
             setPlaylistSongs(prev => prev.map(s => s.id === submissionId ? { ...s, status: action } : s));
+        } catch (err: any) {
+            console.error("Submission Action Error:", err);
+            alert(`Error processing submission: ${err.message}`);
         }
     };
 
