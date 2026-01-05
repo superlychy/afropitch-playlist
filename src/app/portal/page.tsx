@@ -164,7 +164,7 @@ export default function PortalPage() {
                         <p className="text-sm text-gray-400">
                             {isSignup ? "Already have an account?" : "New to AfroPitch?"}{" "}
                             <span
-                                onClick={() => setIsSignup(!isSignup)}
+                                onClick={() => { setIsSignup(!isSignup); setError(""); }}
                                 className={`cursor-pointer hover:underline ${activeTab === 'artist' ? 'text-green-500' : 'text-white'}`}
                             >
                                 {isSignup ? "Log In" : "Create Account"}
