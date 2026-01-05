@@ -273,6 +273,9 @@ export default function AdminDashboard() {
                 let curatorShareTotal = 0;
 
                 financeSubs.forEach((s: any) => {
+                    // Skip refunded/rejected transactions from Volume and Profit
+                    if (s.status === 'declined' || s.status === 'rejected') return;
+
                     const amount = s.amount_paid || 0;
                     totalRev += amount;
 
