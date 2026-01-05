@@ -294,7 +294,9 @@ export default function AdminDashboard() {
                     .filter((w: any) => w.status === 'pending')
                     .reduce((acc: number, curr: any) => acc + curr.amount, 0);
 
-                const holdings = curatorShareTotal - withdrawn;
+                // Curator Holdings: Sum of wallet balances of all curators (Source of Truth)
+                const holdings = users?.filter((u: any) => u.role === 'curator')
+                    .reduce((acc: number, curr: any) => acc + (curr.balance || 0), 0) || 0;
 
                 // Calculate Artist Holdings (Sum of balances of all artists)
                 // We reuse 'users' from Step 1 if available, otherwise 0.
