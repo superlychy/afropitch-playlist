@@ -108,7 +108,8 @@ export default function AdminDashboard() {
         curatorHoldings: 0,
         totalWithdrawn: 0,
         totalPending: 0,
-        artistHoldings: 0
+        artistHoldings: 0,
+        totalHoldings: 0
     });
 
     const pendingWithdrawalsCount = withdrawals.filter(w => w.status === 'pending').length;
