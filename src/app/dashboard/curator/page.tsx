@@ -72,6 +72,7 @@ export default function CuratorDashboard() {
     const [profileIg, setProfileIg] = useState("");
     const [profileTwitter, setProfileTwitter] = useState("");
     const [profileWeb, setProfileWeb] = useState("");
+    const [profileAvatar, setProfileAvatar] = useState(""); // New Avatar State
     const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
 
     // Application Modal State
@@ -213,7 +214,8 @@ export default function CuratorDashboard() {
             website: profileWeb,
             bank_name: bankName,
             account_number: accountNumber,
-            account_name: accountName
+            account_name: accountName,
+            avatar_url: profileAvatar
         }).eq('id', user.id);
 
         if (error) {
@@ -293,14 +295,15 @@ export default function CuratorDashboard() {
             setProfileTwitter(user.twitter || "");
             setProfileWeb(user.website || "");
 
-            // Fetch extended profile details (Bank & Verification)
+            // Fetch extended profile details (Bank & Verification & Avatar)
             const fetchExtendedProfile = async () => {
-                const { data } = await supabase.from('profiles').select('bank_name, account_number, account_name, verification_status').eq('id', user.id).single();
+                const { data } = await supabase.from('profiles').select('bank_name, account_number, account_name, verification_status, avatar_url').eq('id', user.id).single();
                 if (data) {
                     setBankName(data.bank_name || "");
                     setAccountNumber(data.account_number || "");
                     setAccountName(data.account_name || "");
                     setVerificationStatus(data.verification_status || "none");
+                    setProfileAvatar(data.avatar_url || "");
                 }
             };
             fetchExtendedProfile();
@@ -820,7 +823,12 @@ export default function CuratorDashboard() {
                                         {chatMessages.map((msg, idx) => {
                                             const isMe = msg.sender_id === user?.id; // Assuming user.id available
                                             return (
-                                                <div key={idx} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
+                                                <div key={idx} className={`flex items-end gap-2 ${isMe ? 'justify-end' : 'justify-start'}`}>
+                                                    {!isMe && (
+                                                        <div className="w-6 h-6 rounded-full overflow-hidden bg-white shrink-0 mb-1">
+                                                            <img src="/logo.png" alt="Admin" className="w-full h-full object-contain" />
+                                                        </div>
+                                                    )}
                                                     <div className={`max-w-[75%] p-3 rounded-xl text-sm ${isMe ? 'bg-green-600 text-white rounded-br-none' : 'bg-zinc-700 text-gray-200 rounded-bl-none'}`}>
                                                         <p>{msg.message}</p>
                                                         <p className="text-[10px] opacity-50 mt-1 text-right">{new Date(msg.created_at).toLocaleTimeString()}</p>
@@ -829,6 +837,7 @@ export default function CuratorDashboard() {
                                             );
                                         })}
                                     </div>
+                                    <div ref={(el) => { if (el) el.scrollIntoView({ behavior: "smooth" }); }}></div>
 
                                     <div className="p-3 bg-zinc-900 border-t border-white/10 flex gap-2">
                                         <Input
@@ -1069,6 +1078,21 @@ export default function CuratorDashboard() {
                             </div>
 
                             <div className="space-y-4">
+                                <h4 className="text-sm font-bold text-gray-400 border-b border-white/10 pb-2">Profile Avatar</h4>
+                                <div className="grid grid-cols-4 gap-4">
+                                    {[1, 2, 3, 4].map((num) => (
+                                        <div
+                                            key={num}
+                                            onClick={() => setProfileAvatar(`/avatars/curator_avatar_${num}.png`)}
+                                            className={`aspect-square rounded-full overflow-hidden cursor-pointer border-2 transition-all ${profileAvatar === `/avatars/curator_avatar_${num}.png` ? 'border-green-500 scale-110' : 'border-transparent hover:border-white/50'}`}
+                                        >
+                                            <img src={`/avatars/curator_avatar_${num}.png`} alt={`Avatar ${num}`} className="w-full h-full object-cover" />
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="space-y-4">
                                 <h4 className="text-sm font-bold text-gray-400 border-b border-white/10 pb-2">Public Profile</h4>
                                 <div className="space-y-2">
                                     <Label>Bio</Label>
@@ -1278,11 +1302,11 @@ export default function CuratorDashboard() {
                             </div>
 
                             <div className="space-y-2">
-                                <Label>Link to ID Card / NIN Document <span className="text-red-500">*</span></Label>
+                                <Label>NIN Number <span className="text-red-500">*</span></Label>
                                 <Input
                                     value={appIdLink}
                                     onChange={e => setAppIdLink(e.target.value)}
-                                    placeholder="Google Drive / Dropbox Link to ID..."
+                                    placeholder="Enter your 11-digit NIN"
                                     className="bg-black/40 border-white/10"
                                 />
                             </div>
