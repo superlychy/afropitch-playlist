@@ -246,7 +246,7 @@ async function sendEmail(to: string, subject: string, html: string) {
     console.log(`📧 Sending email to ${to}: ${subject}`);
     try {
         const { data, error } = await resend.emails.send({
-            from: 'AfroPitch <notifications@afropitch.com>', // User needs to verify domain or use onboard
+            from: 'AfroPitch <notifications@afropitchplay.best>', // Using the new domain
             to: [to],
             subject: subject,
             html: html,

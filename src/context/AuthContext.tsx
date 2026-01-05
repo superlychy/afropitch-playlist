@@ -163,6 +163,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 email,
                 password,
                 options: {
+                    emailRedirectTo: `${window.location.origin}/portal`,
                     data: {
                         full_name: name,
                         role: role
@@ -177,7 +178,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 console.log("Signup successful, check email for confirmation if enabled.");
             }
         } catch (error) {
-            // Error handled by caller
+            throw error;
         } finally {
             setIsLoading(false);
         }

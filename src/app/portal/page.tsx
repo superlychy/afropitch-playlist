@@ -30,14 +30,11 @@ export default function PortalPage() {
         try {
             if (isSignup) {
                 await signup(email, password, activeTab, name);
+                alert("Account created! Please check your email to confirm specific access, or login if auto-confirmed.");
+                // Optionally switch to login tab or clear form
+                setIsSignup(false);
             } else {
                 await login(email, password);
-            }
-            // Start client-side redirect immediately on success if login doesn't throw
-            if (isSignup) {
-                // Signup success doesn't auto login usually in supabase unless email confirm off, 
-                // but assuming it does or we just show success. 
-                // Context handles success alert for signup currently in console.
             }
         } catch (err: any) {
             console.error(err);

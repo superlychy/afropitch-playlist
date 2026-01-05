@@ -37,7 +37,7 @@ async function run() {
                 'Authorization': `Bearer ${apiKey}`
             },
             body: JSON.stringify({
-                from: 'AfroPitch <notifications@afropitch.com>', // Assuming domain is verified or testing default
+                from: 'AfroPitch <notifications@afropitchplay.best>',
                 // If domain not verified, Resend only allows sending to the email registered (the account email). 
                 // The user said "send me a test email to my email everlastinglifey@gmail.com".
                 // If notifications@afropitch.com is not verified, this might fail unless using 'onboarding@resend.dev'
