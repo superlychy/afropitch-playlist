@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { BarChart3, TrendingUp, Music, Users, Trophy, DollarSign, ShieldAlert, CheckCircle, XCircle, MessageSquare, LogOut, Bell, Plus, Search, Loader2, Send } from "lucide-react";
+import { BarChart3, TrendingUp, Music, Users, Trophy, DollarSign, ShieldAlert, CheckCircle, XCircle, MessageSquare, LogOut, Bell, Plus, Search, Loader2, Send, RefreshCw } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { TransactionsList } from "@/components/TransactionsList";
 import { pricingConfig } from "@/../config/pricing";
@@ -60,6 +60,7 @@ interface AdminPlaylist {
     name: string;
     followers: number;
     type: string;
+    playlist_link?: string;
     created_at: string;
 }
 
@@ -91,6 +92,7 @@ export default function AdminDashboard() {
     // Let's target the exact lines.
 
     const [allPlaylists, setAllPlaylists] = useState<AdminPlaylist[]>([]);
+    const [isRefreshing, setIsRefreshing] = useState<string | null>(null);
     const [topCampaigns, setTopCampaigns] = useState<any[]>([]);
     const [topPlaylists, setTopPlaylists] = useState<TopPlaylist[]>([]);
 
