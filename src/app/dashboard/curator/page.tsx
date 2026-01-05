@@ -323,9 +323,10 @@ export default function CuratorDashboard() {
         });
 
         if (error) {
-            alert("System Error: " + error.message);
+            console.error("Payout RPC Error:", error);
+            alert("Unable to process payout request. Please try again later or contact support.");
         } else if (data && !data.success) {
-            alert("Error: " + data.message);
+            alert("Payout Request Failed: " + data.message);
         } else {
             // Success
             alert("Withdrawal requested successfully! It will be processed within 1-24 hours.");

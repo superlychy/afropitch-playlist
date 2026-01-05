@@ -253,7 +253,7 @@ function SubmitForm() {
             // 1. Wallet Deduction (if not free)
             if (total > 0) {
                 if (user.balance < total) {
-                    alert("Insufficient funds. Please load your wallet.");
+                    alert("Insufficient funds. Please load your wallet via your dashboard.");
                     setIsSubmitting(false);
                     return;
                 }
@@ -261,7 +261,7 @@ function SubmitForm() {
                 // Check deductFunds result - local optimistic update
                 const success = deductFunds(total);
                 if (!success) {
-                    throw new Error("Local wallet deduction failed");
+                    throw new Error("Unable to process wallet deduction. Please refresh and try again or contact support.");
                 }
 
                 // DB Update for Balance
@@ -270,7 +270,13 @@ function SubmitForm() {
                     .update({ balance: user.balance - total })
                     .eq('id', user.id);
 
-                if (balanceError) throw new Error("Database balance update failed: " + balanceError.message);
+                if (balanceError) {
+                    // Critical Error: Money deducted locally but not remote.
+                    // Ideally we should rollback local state, but strict reload will fix.
+                    console.error("Balance update failed:", balanceError);
+                    alert("Network error updating balance. Submissions may not be saved. Please contact support immediately.");
+                    throw new Error("Database balance update failed: " + balanceError.message);
+                }
 
                 // Insert Transaction Record
                 await supabase.from('transactions').insert({

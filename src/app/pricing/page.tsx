@@ -74,7 +74,7 @@ export default function PricingPage() {
                     <CardFooter>
                         <Link href={`/submit?tier=${tiers.standard.id}`} className="w-full">
                             <Button variant="outline" className="w-full border-green-500 text-green-500 hover:bg-green-500 hover:text-white py-6" size="lg">
-                                Choose {tiers.standard.duration}
+                                Choose {tiers.standard.duration.replace("Hours", "hr")}
                             </Button>
                         </Link>
                     </CardFooter>
@@ -109,7 +109,7 @@ export default function PricingPage() {
                     <CardFooter>
                         <Link href={`/submit?tier=${tiers.express.id}`} className="w-full">
                             <Button className="w-full bg-green-600 hover:bg-green-700 text-lg py-6" size="lg">
-                                Choose {tiers.express.duration}
+                                Choose {tiers.express.duration.replace("Hours", "hr")}
                             </Button>
                         </Link>
                     </CardFooter>
@@ -142,7 +142,7 @@ export default function PricingPage() {
                     <CardFooter>
                         <Link href={`/submit?tier=exclusive`} className="w-full">
                             <Button className="w-full bg-yellow-600 hover:bg-yellow-700 text-lg py-6" size="lg">
-                                Get {tiers.exclusive.title}
+                                Get Exclusive
                             </Button>
                         </Link>
                     </CardFooter>
@@ -150,7 +150,7 @@ export default function PricingPage() {
             </div>
 
             <p className="mt-12 text-sm text-gray-400 text-center">
-                Secure payment via Paystack/Flutterwave (Coming soon). <br />
+                Secure payment via Paystack. <br />
                 Accepted: Debit Card, Bank Transfer, USSD.
             </p>
         </div >
