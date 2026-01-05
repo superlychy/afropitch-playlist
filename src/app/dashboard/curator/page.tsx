@@ -80,6 +80,8 @@ export default function CuratorDashboard() {
     const [appExperience, setAppExperience] = useState("");
     const [appGenres, setAppGenres] = useState("");
     const [appReason, setAppReason] = useState("");
+    const [appPhone, setAppPhone] = useState("");
+    const [appIdLink, setAppIdLink] = useState("");
     const [isApplying, setIsApplying] = useState(false);
 
     // Support Modal State
@@ -224,8 +226,8 @@ export default function CuratorDashboard() {
     };
 
     const handleApplyCurator = async () => {
-        if (!appPortfolio || !appExperience) {
-            alert("Please fill in required fields (Portfolio & Experience).");
+        if (!appPortfolio || !appExperience || !appPhone || !appIdLink) {
+            alert("Please fill in all required fields (Portfolio, Experience, Phone, and ID/NIN Link).");
             return;
         }
         setIsApplying(true);
@@ -234,26 +236,38 @@ export default function CuratorDashboard() {
             portfolio: appPortfolio,
             experience: appExperience,
             genres: appGenres,
-            reason: appReason
+            reason: appReason,
+            phone: appPhone,
+            id_document: appIdLink
         });
 
-        const { error } = await supabase.from('profiles').update({
-            verification_status: 'pending',
-            verification_docs: docs
-        }).eq('id', user?.id);
+        try {
+            const { error } = await supabase.from('profiles').update({
+                verification_status: 'pending',
+                verification_docs: docs
+            }).eq('id', user?.id);
 
-        if (error) {
-            alert("Error: " + error.message);
-        } else {
-            alert("Application submitted! We will review it shortly.");
-            setVerificationStatus('pending');
-            setShowApplicationModal(false);
-            setAppPortfolio("");
-            setAppExperience("");
-            setAppGenres("");
-            setAppReason("");
+            if (error) {
+                console.error("Application error:", error);
+                alert("Error submitting application: " + error.message);
+            } else {
+                alert("Application submitted successfully! We will review your ID and details shortly.");
+                setVerificationStatus('pending');
+                setShowApplicationModal(false);
+                // Clear form
+                setAppPortfolio("");
+                setAppExperience("");
+                setAppGenres("");
+                setAppReason("");
+                setAppPhone("");
+                setAppIdLink("");
+            }
+        } catch (err) {
+            console.error("Unexpected error applying:", err);
+            alert("Unexpected error. Please try again.");
+        } finally {
+            setIsApplying(false);
         }
-        setIsApplying(false);
     };
 
     // Notifications
@@ -1249,6 +1263,26 @@ export default function CuratorDashboard() {
                                     value={appPortfolio}
                                     onChange={e => setAppPortfolio(e.target.value)}
                                     placeholder="Spotify Profile, Instagram, Website..."
+                                    className="bg-black/40 border-white/10"
+                                />
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label>Phone Number <span className="text-red-500">*</span></Label>
+                                <Input
+                                    value={appPhone}
+                                    onChange={e => setAppPhone(e.target.value)}
+                                    placeholder="+234..."
+                                    className="bg-black/40 border-white/10"
+                                />
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label>Link to ID Card / NIN Document <span className="text-red-500">*</span></Label>
+                                <Input
+                                    value={appIdLink}
+                                    onChange={e => setAppIdLink(e.target.value)}
+                                    placeholder="Google Drive / Dropbox Link to ID..."
                                     className="bg-black/40 border-white/10"
                                 />
                             </div>
