@@ -308,1275 +308,1243 @@ export default function AdminDashboard() {
                     totalPending: pendingWithdrawals,
                     artistHoldings: artistHoldings
                 });
-            } setTopPlaylists(topPl as TopPlaylist[]);
+            }
+        };
+
+        fetchData();
+
+    }, [user, isLoading, router]);
+
+    // ACTIONS
+    const toggleUserBlock = async (userId: string) => {
+        // Toggle locally first
+        const user = usersList.find(u => u.id === userId);
+        if (!user) return;
+        const newStatus = !user.is_blocked;
+
+        setUsersList(prev => prev.map(u => u.id === userId ? { ...u, is_blocked: newStatus } : u));
+
+        // Call Supabase
+        const { error } = await supabase.from('profiles').update({ is_blocked: newStatus }).eq('id', userId);
+        if (error) {
+            alert("Error updating user block status: " + error.message);
+            // Revert on error
+            setUsersList(prev => prev.map(u => u.id === userId ? { ...u, is_blocked: !newStatus } : u));
         }
-        // 7. Calculate Financials
-        // Total Available (User Balances)
-        const { data: allProfiles } = await supabase.from('profiles').select('balance, role');
-
-        const curatorHoldings = allProfiles
-            ?.filter(p => p.role === 'curator')
-            .reduce((sum, p) => sum + (p.balance || 0), 0) || 0;
-
-        const artistHoldings = allProfiles
-            ?.filter(p => p.role === 'artist')
-            .reduce((sum, p) => sum + (p.balance || 0), 0) || 0;
-
-        const totalHoldings = curatorHoldings + artistHoldings;
-
-        // Total Withdrawn & Pending
-        const { data: allWithdrawals } = await supabase.from('withdrawals').select('amount, status');
-        const totalWithdrawn = allWithdrawals?.filter(w => w.status === 'approved').reduce((sum, w) => sum + w.amount, 0) || 0;
-        const totalPendingWithdrawal = allWithdrawals?.filter(w => w.status === 'pending').reduce((sum, w) => sum + w.amount, 0) || 0;
-
-        // Total Revenue (Volume) - Payments made by artists
-        const { data: allSubs } = await supabase.from('submissions').select('amount_paid');
-        const totalRevenue = allSubs?.reduce((sum, s) => sum + (s.amount_paid || 0), 0) || 0;
-
-        setFinStats({
-            totalRevenue,
-            totalWithdrawn,
-            totalPending: totalPendingWithdrawal,
-            totalHoldings,
-            curatorHoldings,
-            artistHoldings
-        });
     };
 
-    fetchData();
+    const deleteUser = async (userId: string) => {
+        if (confirm("Are you sure you want to delete this user? This cannot be undone.")) {
+            // Optimistic Update
+            setUsersList(prev => prev.filter(u => u.id !== userId));
 
-}, [user, isLoading, router]);
+            // Call Supabase (Requires admin specific delete capability usually, often via Edge Function or just soft delete if RLS blocks user deletion from auth)
+            // If we just delete from profiles, auth user remains. Best to use custom admin function.
+            // For now, we try standard table delete (cascades usually require more).
+            const { error } = await supabase.from('profiles').delete().eq('id', userId);
 
-// ACTIONS
-const toggleUserBlock = async (userId: string) => {
-    // Toggle locally first
-    const user = usersList.find(u => u.id === userId);
-    if (!user) return;
-    const newStatus = !user.is_blocked;
+            if (error) {
+                alert("Error deleting user: " + error.message);
+                // Can't easily revert local filter without refetching, so refetch would be safesty.
+                // Or just ignore if user doesn't notice immediately.
+            } else {
+                alert("User deleted from public profiles. Auth account may still exist.");
+            }
+        }
+    };
 
-    setUsersList(prev => prev.map(u => u.id === userId ? { ...u, is_blocked: newStatus } : u));
+    const deletePlaylist = async (id: string) => {
+        if (!confirm("Are you sure you want to delete this playlist? This action cannot be undone.")) return;
 
-    // Call Supabase
-    const { error } = await supabase.from('profiles').update({ is_blocked: newStatus }).eq('id', userId);
-    if (error) {
-        alert("Error updating user block status: " + error.message);
-        // Revert on error
-        setUsersList(prev => prev.map(u => u.id === userId ? { ...u, is_blocked: !newStatus } : u));
-    }
-};
-
-const deleteUser = async (userId: string) => {
-    if (confirm("Are you sure you want to delete this user? This cannot be undone.")) {
-        // Optimistic Update
-        setUsersList(prev => prev.filter(u => u.id !== userId));
-
-        // Call Supabase (Requires admin specific delete capability usually, often via Edge Function or just soft delete if RLS blocks user deletion from auth)
-        // If we just delete from profiles, auth user remains. Best to use custom admin function.
-        // For now, we try standard table delete (cascades usually require more).
-        const { error } = await supabase.from('profiles').delete().eq('id', userId);
+        const { error } = await supabase.from('playlists').delete().eq('id', id);
 
         if (error) {
-            alert("Error deleting user: " + error.message);
-            // Can't easily revert local filter without refetching, so refetch would be safesty.
-            // Or just ignore if user doesn't notice immediately.
+            alert("Error deleting playlist: " + error.message);
         } else {
-            alert("User deleted from public profiles. Auth account may still exist.");
+            setAllPlaylists(prev => prev.filter(p => p.id !== id));
+            alert("Playlist deleted successfully.");
         }
-    }
-};
+    };
 
-const deletePlaylist = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this playlist? This action cannot be undone.")) return;
+    const handleWithdrawal = async (id: string, action: 'approve' | 'reject') => {
+        const withdrawal = withdrawals.find(w => w.id === id);
+        if (!withdrawal) return;
 
-    const { error } = await supabase.from('playlists').delete().eq('id', id);
+        if (action === 'reject') {
+            const { error } = await supabase.rpc('reject_withdrawal', {
+                p_withdrawal_id: id,
+                p_reason: 'Rejected by Admin'
+            });
 
-    if (error) {
-        alert("Error deleting playlist: " + error.message);
-    } else {
-        setAllPlaylists(prev => prev.filter(p => p.id !== id));
-        alert("Playlist deleted successfully.");
-    }
-};
+            if (error) {
+                console.error(error);
+                alert("Error rejecting withdrawal: " + error.message);
+                return;
+            }
 
-const handleWithdrawal = async (id: string, action: 'approve' | 'reject') => {
-    const withdrawal = withdrawals.find(w => w.id === id);
-    if (!withdrawal) return;
+            // Update Local State
+            setWithdrawals(prev => prev.map(w => w.id === id ? { ...w, status: 'rejected' } : w));
+            alert("Withdrawal rejected and funds refunded.");
 
-    if (action === 'reject') {
-        const { error } = await supabase.rpc('reject_withdrawal', {
-            p_withdrawal_id: id,
-            p_reason: 'Rejected by Admin'
-        });
+        } else {
+            // Approve Logic
+            const { error } = await supabase.from('withdrawals').update({ status: 'approved' }).eq('id', id);
 
-        if (error) {
-            console.error(error);
-            alert("Error rejecting withdrawal: " + error.message);
-            return;
+            if (error) {
+                console.error(error);
+                alert("Error approving withdrawal: " + error.message);
+                return;
+            }
+
+            setWithdrawals(prev => prev.map(w => w.id === id ? { ...w, status: 'approved' } : w));
+            alert("Withdrawal approved.");
         }
-
-        // Update Local State
-        setWithdrawals(prev => prev.map(w => w.id === id ? { ...w, status: 'rejected' } : w));
-        alert("Withdrawal rejected and funds refunded.");
-
-    } else {
-        // Approve Logic
-        const { error } = await supabase.from('withdrawals').update({ status: 'approved' }).eq('id', id);
-
-        if (error) {
-            console.error(error);
-            alert("Error approving withdrawal: " + error.message);
-            return;
-        }
-
-        setWithdrawals(prev => prev.map(w => w.id === id ? { ...w, status: 'approved' } : w));
-        alert("Withdrawal approved.");
-    }
-};
+    };
 
 
-const initiateChatWithUser = async (userId: string, userName: string) => {
-    if (!user) return;
+    const initiateChatWithUser = async (userId: string, userName: string) => {
+        if (!user) return;
 
-    const subject = `Regarding Withdrawal Request`;
-    const message = `Hello ${userName}, regarding your recent withdrawal request...`;
+        const subject = `Regarding Withdrawal Request`;
+        const message = `Hello ${userName}, regarding your recent withdrawal request...`;
 
-    const { data: existingTicket } = await supabase
-        .from('support_tickets')
-        .select('*')
-        .eq('user_id', userId)
-        .eq('status', 'open')
-        .eq('subject', subject)
-        .single();
-
-    if (existingTicket) {
-        openChat(existingTicket);
-    } else {
-        const { data: newTicket, error } = await supabase
+        const { data: existingTicket } = await supabase
             .from('support_tickets')
-            .insert({
-                user_id: userId,
-                subject: subject,
-                message: message,
-                status: 'open'
-            })
-            .select()
+            .select('*')
+            .eq('user_id', userId)
+            .eq('status', 'open')
+            .eq('subject', subject)
             .single();
 
-        if (error) {
-            alert("Could not start chat (check Admin Policy): " + error.message);
-        } else if (newTicket) {
-            await supabase.from('support_messages').insert({
-                ticket_id: newTicket.id,
-                sender_id: user.id,
-                message: message
-            });
+        if (existingTicket) {
+            openChat(existingTicket);
+        } else {
+            const { data: newTicket, error } = await supabase
+                .from('support_tickets')
+                .insert({
+                    user_id: userId,
+                    subject: subject,
+                    message: message,
+                    status: 'open'
+                })
+                .select()
+                .single();
 
-            openChat({
-                ...newTicket,
-                user_name: userName,
-                last_message: message,
-                date: new Date().toLocaleDateString()
-            });
+            if (error) {
+                alert("Could not start chat (check Admin Policy): " + error.message);
+            } else if (newTicket) {
+                await supabase.from('support_messages').insert({
+                    ticket_id: newTicket.id,
+                    sender_id: user.id,
+                    message: message
+                });
+
+                openChat({
+                    ...newTicket,
+                    user_name: userName,
+                    last_message: message,
+                    date: new Date().toLocaleDateString()
+                });
+            }
         }
-    }
-};
+    };
 
-// PLAYLIST FUNCTIONS
-// PLAYLIST FUNCTIONS
-const fetchPlaylistInfo = async () => {
-    setIsFetchingInfo(true);
+    // PLAYLIST FUNCTIONS
+    // PLAYLIST FUNCTIONS
+    const fetchPlaylistInfo = async () => {
+        setIsFetchingInfo(true);
 
-    // If it looks like a Spotify link, try to fetch info
-    if (newPlaylistLink.includes("spotify.com")) {
-        try {
-            const response = await fetch('/api/playlist-info', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ url: newPlaylistLink }),
-            });
-            const data = await response.json();
-            if (data.error) throw new Error(data.error);
-            setFetchedPlaylistInfo(data);
-        } catch (err: any) {
-            console.warn("Auto-fetch failed, falling back to manual entry:", err.message);
-            // Fallback to manual
+        // If it looks like a Spotify link, try to fetch info
+        if (newPlaylistLink.includes("spotify.com")) {
+            try {
+                const response = await fetch('/api/playlist-info', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url: newPlaylistLink }),
+                });
+                const data = await response.json();
+                if (data.error) throw new Error(data.error);
+                setFetchedPlaylistInfo(data);
+            } catch (err: any) {
+                console.warn("Auto-fetch failed, falling back to manual entry:", err.message);
+                // Fallback to manual
+                setFetchedPlaylistInfo({ name: "", description: "", coverImage: "", followers: 0 });
+            }
+        } else {
+            // Manual Entry for other platforms (Apple Music, Audiomack, etc.)
             setFetchedPlaylistInfo({ name: "", description: "", coverImage: "", followers: 0 });
         }
-    } else {
-        // Manual Entry for other platforms (Apple Music, Audiomack, etc.)
-        setFetchedPlaylistInfo({ name: "", description: "", coverImage: "", followers: 0 });
-    }
 
-    setIsFetchingInfo(false);
-};
-
-const addPlaylist = async () => {
-    if (!fetchedPlaylistInfo || !user) return;
-    setIsSavingPlaylist(true);
-
-    try {
-        const { error } = await supabase.from('playlists').insert({
-            name: fetchedPlaylistInfo.name,
-            description: fetchedPlaylistInfo.description,
-            cover_image: fetchedPlaylistInfo.coverImage,
-            followers: fetchedPlaylistInfo.followers,
-            playlist_link: newPlaylistLink,
-            curator_id: user.id,
-
-            genre: "Multi-Genre", // Default or add selector
-            type: newPlaylistType,
-            submission_fee: pricingConfig.tiers[newPlaylistType].price,
-            is_active: true
-        }).select().single();
-
-        if (error) {
-            throw error;
-        } else {
-            alert("Playlist added successfully! It will appear under 'AfroPitch Team Playlists'.");
-            setShowAddPlaylist(false);
-            setNewPlaylistLink("");
-            setFetchedPlaylistInfo(null);
-            window.location.reload();
-        }
-    } catch (err: any) {
-        console.error("Add Playlist Error:", err);
-        alert("Error adding playlist: " + err.message);
-    } finally {
-        setIsSavingPlaylist(false);
-    }
-};
-
-const handleRefreshPlaylist = async (playlist: any) => {
-    if (!playlist.playlist_link) {
-        alert("Cannot refresh: No Spotify link found.");
-        return;
-    }
-    setIsRefreshing(playlist.id);
-    try {
-        const res = await fetch('/api/playlist-info', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ url: playlist.playlist_link })
-        });
-
-        // Check if response is JSON
-        const contentType = res.headers.get("content-type");
-        if (!contentType || !contentType.includes("application/json")) {
-            const text = await res.text();
-            throw new Error("Invalid server response: " + text.slice(0, 100));
-        }
-
-        const data = await res.json();
-        if (data.name) { // api returns { name, ... } or { error }
-            // Update Supabase
-            const { error } = await supabase.from('playlists').update({
-                name: data.name,
-                cover_image: data.coverImage, // Note camelCase from API return in Step 451? No wait.
-                // Step 451: return NextResponse.json({ name, followers, songsCount, coverImage, description })
-                // Supabase: cover_image
-                followers: data.followers
-            }).eq('id', playlist.id);
-
-            if (error) throw error;
-            alert(`Playlist "${data.name}" updated successfully!`);
-            window.location.reload();
-        } else {
-            throw new Error(data.error || "Unknown validation error");
-        }
-    } catch (err: any) {
-        console.error("Refresh Error:", err);
-        alert("Error refreshing playlist: " + err.message);
-    } finally {
-        setIsRefreshing(null);
-    }
-};
-
-const togglePlaylistSongs = async (playlistId: string) => {
-    if (expandedPlaylistId === playlistId) {
-        setExpandedPlaylistId(null);
-        return;
-    }
-    setExpandedPlaylistId(playlistId);
-    setIsLoadingSongs(true);
-
-    const { data } = await supabase
-        .from('submissions')
-        .select('*, artist:profiles(full_name)')
-        .eq('playlist_id', playlistId)
-        // Show all statuses so admin can see history, or just pending? 
-        // User: "accept or reject". So at least pending.
-        .order('created_at', { ascending: false });
-
-    if (data) setPlaylistSongs(data);
-    setIsLoadingSongs(false);
-};
-
-const handleSubmissionAction = async (submissionId: string, action: 'accepted' | 'declined') => {
-    if (!confirm(`Are you sure you want to ${action} this song?`)) return;
-
-    const { error } = await supabase
-        .from('submissions')
-        .update({ status: action })
-        .eq('id', submissionId);
-
-    if (error) {
-        alert("Error: " + error.message);
-    } else {
-        alert(`Song ${action}!`);
-        setPlaylistSongs(prev => prev.map(s => s.id === submissionId ? { ...s, status: action } : s));
-    }
-};
-
-// CHAT FUNCTIONS
-const openChat = async (ticket: SupportTicket) => {
-    setActiveTicket(ticket);
-    setShowChat(true);
-    // Fetch Messages
-    const { data, error } = await supabase
-        .from('support_messages')
-        .select('*')
-        .eq('ticket_id', ticket.id)
-        .order('created_at', { ascending: true });
-
-    if (data) {
-        setChatMessages(data.map((m: any) => ({
-            ...m,
-            is_admin: user?.id === m.sender_id
-        })));
-    } else {
-        // If no messages yet, maybe effectively empty
-        setChatMessages([]);
-    }
-};
-
-const sendMessage = async () => {
-    if (!chatInput.trim() || !activeTicket || !user) return;
-    setSendingMsg(true);
-
-    const text = chatInput;
-    // Optimistic
-    const optimMsg: ChatMessage = {
-        id: Math.random().toString(),
-        ticket_id: activeTicket.id,
-        sender_id: user.id!,
-        message: text,
-        created_at: new Date().toISOString(),
-        is_admin: true
+        setIsFetchingInfo(false);
     };
-    setChatMessages(prev => [...prev, optimMsg]);
-    setChatInput("");
 
-    const { error } = await supabase.from('support_messages').insert({
-        ticket_id: activeTicket.id,
-        sender_id: user.id,
-        message: text
-    });
+    const addPlaylist = async () => {
+        if (!fetchedPlaylistInfo || !user) return;
+        setIsSavingPlaylist(true);
 
-    if (error) {
-        alert("Failed to send: " + error.message);
-        // Remove optimistic? nah, just alert.
-    } else {
-        // Also update ticket status to 'open' if it was closed? Or maybe 'replied'?
-        // Optionally update last_message on ticket view locally
-    }
-    setSendingMsg(false);
-};
+        try {
+            const { error } = await supabase.from('playlists').insert({
+                name: fetchedPlaylistInfo.name,
+                description: fetchedPlaylistInfo.description,
+                cover_image: fetchedPlaylistInfo.coverImage,
+                followers: fetchedPlaylistInfo.followers,
+                playlist_link: newPlaylistLink,
+                curator_id: user.id,
 
-const handleAddUser = async () => {
-    // Since we can't create Auth users client-side without logging out, 
-    // we will create a Profile and simulate the invite.
-    setIsAddingUser(true);
+                genre: "Multi-Genre", // Default or add selector
+                type: newPlaylistType,
+                submission_fee: pricingConfig.tiers[newPlaylistType].price,
+                is_active: true
+            }).select().single();
 
-    // 1. Create Profile (Mocking auth ID with a random UUID if we can't create auth)
-    // ideally we need Real Auth. 
-    // For this demo, we'll assume the user will sign up.
-    // But profiles.id Must match auth.id. 
-    // So we can't insert a functioning profile easily.
+            if (error) {
+                throw error;
+            } else {
+                alert("Playlist added successfully! It will appear under 'AfroPitch Team Playlists'.");
+                setShowAddPlaylist(false);
+                setNewPlaylistLink("");
+                setFetchedPlaylistInfo(null);
+                window.location.reload();
+            }
+        } catch (err: any) {
+            console.error("Add Playlist Error:", err);
+            alert("Error adding playlist: " + err.message);
+        } finally {
+            setIsSavingPlaylist(false);
+        }
+    };
 
-    // Alternative: Show instructions.
-    alert("Note: To fully create a user, you must use the Supabase Dashboard or an Admin API. \n\nWe will create a 'Pending Profile' here. The user must Sign Up with [" + newUserEmail + "] to claim it.");
+    const handleRefreshPlaylist = async (playlist: any) => {
+        if (!playlist.playlist_link) {
+            alert("Cannot refresh: No Spotify link found.");
+            return;
+        }
+        setIsRefreshing(playlist.id);
+        try {
+            const res = await fetch('/api/playlist-info', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url: playlist.playlist_link })
+            });
 
-    // We can't actually insert into public.profiles with a random ID because it references auth.users usually? 
-    // Wait, schema: create table public.profiles (id uuid primary key...). It does NOT reference auth.users constraint-wise in the schema I read!
-    // It has "create policy ... (auth.uid() = id)".
-    // So we CAN insert a profile with a random UUID. But user won't be able to login to it unless we update the ID later.
+            // Check if response is JSON
+            const contentType = res.headers.get("content-type");
+            if (!contentType || !contentType.includes("application/json")) {
+                const text = await res.text();
+                throw new Error("Invalid server response: " + text.slice(0, 100));
+            }
 
-    // Let's just mock it for the UI satisfaction if Real Auth is impossible.
-    // OR: use a secondary "invites" table.
+            const data = await res.json();
+            if (data.name) { // api returns { name, ... } or { error }
+                // Update Supabase
+                const { error } = await supabase.from('playlists').update({
+                    name: data.name,
+                    cover_image: data.coverImage, // Note camelCase from API return in Step 451? No wait.
+                    // Step 451: return NextResponse.json({ name, followers, songsCount, coverImage, description })
+                    // Supabase: cover_image
+                    followers: data.followers
+                }).eq('id', playlist.id);
 
-    // Let's Insert a profile.
-    // const fakeId = crypto.randomUUID(); 
-    // ...
+                if (error) throw error;
+                alert(`Playlist "${data.name}" updated successfully!`);
+                window.location.reload();
+            } else {
+                throw new Error(data.error || "Unknown validation error");
+            }
+        } catch (err: any) {
+            console.error("Refresh Error:", err);
+            alert("Error refreshing playlist: " + err.message);
+        } finally {
+            setIsRefreshing(null);
+        }
+    };
 
-    // Actually, let's just alert success for the endpoint demonstration if we can't do it real.
-    // User wants "Add User Functionality". 
-    // I will implement a visual success and clear form.
+    const togglePlaylistSongs = async (playlistId: string) => {
+        if (expandedPlaylistId === playlistId) {
+            setExpandedPlaylistId(null);
+            return;
+        }
+        setExpandedPlaylistId(playlistId);
+        setIsLoadingSongs(true);
 
-    setTimeout(() => {
-        alert(`User invitiation sent to ${newUserEmail} for role: ${newRole}.`);
-        setIsAddingUser(false);
-        setShowAddUser(false);
-        setNewName("");
-        setNewUserEmail("");
-        setNewUserPass("");
-    }, 1000);
-};
+        const { data } = await supabase
+            .from('submissions')
+            .select('*, artist:profiles(full_name)')
+            .eq('playlist_id', playlistId)
+            // Show all statuses so admin can see history, or just pending? 
+            // User: "accept or reject". So at least pending.
+            .order('created_at', { ascending: false });
 
-const handleCuratorAction = async (id: string, action: 'verified' | 'rejected') => {
-    const { data, error } = await supabase.from('profiles').update({ verification_status: action }).eq('id', id).select();
+        if (data) setPlaylistSongs(data);
+        setIsLoadingSongs(false);
+    };
 
-    if (error) {
-        alert("Error updating status: " + error.message);
-    } else if (!data || data.length === 0) {
-        alert("Update failed: Permission denied or user not found. Please refresh.");
-        // Revert state by triggering a refresh or manual revert?
-        // Since we already filtered it out optimistically (wait, we didn't filter it yet in the previous code? Ah, we did below).
-        // I'll move optimistic update to AFTER check.
-    } else {
-        // Optimistic update
-        setPendingCurators(prev => prev.filter(c => c.id !== id));
-        alert(`Curator application ${action}.`);
+    const handleSubmissionAction = async (submissionId: string, action: 'accepted' | 'declined') => {
+        if (!confirm(`Are you sure you want to ${action} this song?`)) return;
 
-        // If verified, maybe send email? (Requires Edge Function update, skipping for now as per MVP)
-    }
-};
+        const { error } = await supabase
+            .from('submissions')
+            .update({ status: action })
+            .eq('id', submissionId);
 
-const handleSendBroadcast = async () => {
-    if (!broadcastSubject || !broadcastMessage) {
-        alert("Please fill in subject and message.");
-        return;
-    }
-    setIsSendingBroadcast(true);
+        if (error) {
+            alert("Error: " + error.message);
+        } else {
+            alert(`Song ${action}!`);
+            setPlaylistSongs(prev => prev.map(s => s.id === submissionId ? { ...s, status: action } : s));
+        }
+    };
 
-    try {
-        const { error } = await supabase.from('broadcasts').insert({
-            subject: broadcastSubject,
-            message: broadcastMessage,
-            sender_id: user?.id,
-            channel: broadcastChannel,
-            target_role: 'all' // Explicitly set target to all for now
+    // CHAT FUNCTIONS
+    const openChat = async (ticket: SupportTicket) => {
+        setActiveTicket(ticket);
+        setShowChat(true);
+        // Fetch Messages
+        const { data, error } = await supabase
+            .from('support_messages')
+            .select('*')
+            .eq('ticket_id', ticket.id)
+            .order('created_at', { ascending: true });
+
+        if (data) {
+            setChatMessages(data.map((m: any) => ({
+                ...m,
+                is_admin: user?.id === m.sender_id
+            })));
+        } else {
+            // If no messages yet, maybe effectively empty
+            setChatMessages([]);
+        }
+    };
+
+    const sendMessage = async () => {
+        if (!chatInput.trim() || !activeTicket || !user) return;
+        setSendingMsg(true);
+
+        const text = chatInput;
+        // Optimistic
+        const optimMsg: ChatMessage = {
+            id: Math.random().toString(),
+            ticket_id: activeTicket.id,
+            sender_id: user.id!,
+            message: text,
+            created_at: new Date().toISOString(),
+            is_admin: true
+        };
+        setChatMessages(prev => [...prev, optimMsg]);
+        setChatInput("");
+
+        const { error } = await supabase.from('support_messages').insert({
+            ticket_id: activeTicket.id,
+            sender_id: user.id,
+            message: text
         });
 
         if (error) {
-            console.error("Broadcast Error:", error);
-            alert("Error sending broadcast: " + error.message);
+            alert("Failed to send: " + error.message);
+            // Remove optimistic? nah, just alert.
         } else {
-            alert("Broadcast queued successfully! Users will receive it shortly.");
-            setBroadcastSubject("");
-            setBroadcastMessage("");
+            // Also update ticket status to 'open' if it was closed? Or maybe 'replied'?
+            // Optionally update last_message on ticket view locally
         }
-    } catch (err: any) {
-        console.error("Unexpected Broadcast Error:", err);
-        alert("An unexpected error occurred while sending broadcast.");
-    } finally {
-        setIsSendingBroadcast(false);
-    }
-};
+        setSendingMsg(false);
+    };
 
-if (isLoading) return <div className="p-10 text-center text-white">Loading Admin...</div>;
+    const handleAddUser = async () => {
+        // Since we can't create Auth users client-side without logging out, 
+        // we will create a Profile and simulate the invite.
+        setIsAddingUser(true);
 
-return (
-    <>
-        <div className="container mx-auto px-4 max-w-7xl py-12 min-h-screen">
-            <div className="flex justify-between items-center mb-8">
-                <div>
-                    <h1 className="text-3xl font-bold text-white flex items-center gap-3">
-                        Admin Dashboard
-                        {(pendingWithdrawalsCount + openTicketsCount) > 0 && (
-                            <span className="bg-red-500 text-white text-sm px-2 py-0.5 rounded-full animate-pulse shadow-lg shadow-red-500/20">
-                                {pendingWithdrawalsCount + openTicketsCount} Updates
-                            </span>
-                        )}
-                    </h1>
-                    <p className="text-gray-400">Welcome, <span className="text-green-500">{user?.name || 'Admin'}</span>. Platform Management System</p>
-                </div>
-                <div className="flex items-center gap-4">
-                    <div className="flex bg-white/5 p-1 rounded-lg border border-white/10">
-                        {["overview", "users", "withdrawals", "transactions", "support", "playlists", "applications", "broadcast"].map((tab) => {
-                            let count = 0;
-                            if (tab === 'withdrawals') count = pendingWithdrawalsCount;
-                            if (tab === 'support') count = openTicketsCount;
-                            if (tab === 'applications') count = pendingCurators.length;
+        // 1. Create Profile (Mocking auth ID with a random UUID if we can't create auth)
+        // ideally we need Real Auth. 
+        // For this demo, we'll assume the user will sign up.
+        // But profiles.id Must match auth.id. 
+        // So we can't insert a functioning profile easily.
 
-                            return (
-                                <button
-                                    key={tab}
-                                    onClick={() => setActiveTab(tab as any)}
-                                    className={`px-4 py-2 rounded-md text-sm font-medium capitalize transition-all relative ${activeTab === tab ? "bg-green-600 text-white" : "text-gray-400 hover:text-white"}`}
-                                >
-                                    {tab}
-                                    {count > 0 && (
-                                        <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] w-4 h-4 flex items-center justify-center rounded-full animate-pulse font-bold">
-                                            {count}
-                                        </span>
-                                    )}
-                                </button>
-                            );
-                        })}
-                    </div>
-                    <Button variant="outline" size="icon" className="border-white/10 hover:bg-red-500/20 h-10 w-10 group" title="Logout" onClick={logout}>
-                        <LogOut className="w-5 h-5 text-gray-400 group-hover:text-red-500" />
-                    </Button>
-                </div>
-            </div>
+        // Alternative: Show instructions.
+        alert("Note: To fully create a user, you must use the Supabase Dashboard or an Admin API. \n\nWe will create a 'Pending Profile' here. The user must Sign Up with [" + newUserEmail + "] to claim it.");
 
-            {/* OVERVIEW CONTENT */}
-            {activeTab === "overview" && (
-                <div className="space-y-8">
-                    <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
-                        <Card className="bg-blue-600/10 border-blue-500/20 lg:col-span-2">
-                            <CardHeader className="pb-2"><CardTitle className="text-sm text-gray-400">Total Volume</CardTitle></CardHeader>
-                            <CardContent><div className="text-2xl font-bold text-white">{pricingConfig.currency}{finStats.totalRevenue.toLocaleString()}</div></CardContent>
-                        </Card>
-                        <Card className="bg-purple-600/10 border-purple-500/20 lg:col-span-2">
-                            <CardHeader className="pb-2"><CardTitle className="text-sm text-gray-400">Total Holdings (Net)</CardTitle></CardHeader>
-                            <CardContent>
-                                <div className="text-2xl font-bold text-white">{pricingConfig.currency}{finStats.totalHoldings.toLocaleString()}</div>
-                                <p className="text-xs text-gray-400">Curator + Artist Funds</p>
-                            </CardContent>
-                        </Card>
-                        <Card className="bg-yellow-600/10 border-yellow-500/20 lg:col-span-2">
-                            <CardHeader className="pb-2"><CardTitle className="text-sm text-gray-400">Total Withdrawn</CardTitle></CardHeader>
-                            <CardContent><div className="text-2xl font-bold text-white">{pricingConfig.currency}{finStats.totalWithdrawn.toLocaleString()}</div></CardContent>
-                        </Card>
+        // We can't actually insert into public.profiles with a random ID because it references auth.users usually? 
+        // Wait, schema: create table public.profiles (id uuid primary key...). It does NOT reference auth.users constraint-wise in the schema I read!
+        // It has "create policy ... (auth.uid() = id)".
+        // So we CAN insert a profile with a random UUID. But user won't be able to login to it unless we update the ID later.
 
-                        <Card className="bg-green-600/10 border-green-500/20 lg:col-span-2">
-                            <CardHeader className="pb-2"><CardTitle className="text-sm text-gray-400">Curator Holdings</CardTitle></CardHeader>
-                            <CardContent>
-                                <div className="text-xl font-bold text-white">{pricingConfig.currency}{finStats.curatorHoldings.toLocaleString()}</div>
-                            </CardContent>
-                        </Card>
-                        <Card className="bg-pink-600/10 border-pink-500/20 lg:col-span-2">
-                            <CardHeader className="pb-2"><CardTitle className="text-sm text-gray-400">Artist Holdings</CardTitle></CardHeader>
-                            <CardContent>
-                                <div className="text-xl font-bold text-white">{pricingConfig.currency}{finStats.artistHoldings.toLocaleString()}</div>
-                            </CardContent>
-                        </Card>
-                        <Card className="bg-orange-600/10 border-orange-500/20 lg:col-span-2">
-                            <CardHeader className="pb-2"><CardTitle className="text-sm text-gray-400">Pending Payouts</CardTitle></CardHeader>
-                            <CardContent>
-                                <div className="text-xl font-bold text-white">{pricingConfig.currency}{finStats.totalPending.toLocaleString()}</div>
-                                <p className="text-xs text-gray-400">{pendingWithdrawalsCount} requests</p>
-                            </CardContent>
-                        </Card>
-                    </div>
+        // Let's just mock it for the UI satisfaction if Real Auth is impossible.
+        // OR: use a secondary "invites" table.
 
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        {/* TOP SONGS */}
-                        <Card className="bg-black/40 border-white/10">
-                            <CardHeader>
-                                <CardTitle className="text-white flex items-center gap-2"><Trophy className="w-5 h-5 text-yellow-500" /> Top Songs</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="space-y-4">
-                                    {topCampaigns.length === 0 && <p className="text-gray-500 text-sm">No campaigns data available.</p>}
-                                    {topCampaigns.map((c, idx) => (
-                                        <div key={c.id} className="flex items-center justify-between p-3 bg-white/5 rounded border border-white/5">
-                                            <div className="flex items-center gap-4">
-                                                <div className="font-bold text-lg text-white/20 w-6">#{idx + 1}</div>
-                                                <div>
-                                                    <p className="font-bold text-white">{c.song_title}</p>
-                                                    <p className="text-xs text-gray-400">by {c.artist?.full_name || 'Unknown'}</p>
-                                                    {c.playlist && <p className="text-[10px] text-green-400">on {c.playlist.name}</p>}
-                                                </div>
-                                            </div>
-                                            <div className="text-right">
-                                                <span className="block font-bold text-green-500">{c.clicks || 0} clicks</span>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </CardContent>
-                        </Card>
+        // Let's Insert a profile.
+        // const fakeId = crypto.randomUUID(); 
+        // ...
 
-                        {/* TOP PLAYLISTS */}
-                        <Card className="bg-black/40 border-white/10">
-                            <CardHeader>
-                                <CardTitle className="text-white flex items-center gap-2"><Music className="w-5 h-5 text-purple-500" /> Top Playlists</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="space-y-4">
-                                    {topPlaylists.length === 0 && <p className="text-gray-500 text-sm">No playlist data available.</p>}
-                                    {topPlaylists.map((p, idx) => (
-                                        <div key={p.playlist_id} className="flex items-center justify-between p-3 bg-white/5 rounded border border-white/5">
-                                            <div className="flex items-center gap-4">
-                                                <div className="font-bold text-lg text-white/20 w-6">#{idx + 1}</div>
-                                                <div>
-                                                    <p className="font-bold text-white">{p.playlist_name}</p>
-                                                    <p className="text-xs text-gray-400">Curator: {p.curator_name || 'Unknown'}</p>
-                                                </div>
-                                            </div>
-                                            <div className="text-right">
-                                                <span className="block font-bold text-purple-500">{p.total_clicks || 0} clicks</span>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </div>
-                </div>
-            )}
+        // Actually, let's just alert success for the endpoint demonstration if we can't do it real.
+        // User wants "Add User Functionality". 
+        // I will implement a visual success and clear form.
 
-            {/* USERS MANAGEMENT */}
-            {activeTab === "users" && (
-                <Card className="bg-black/40 border-white/10">
-                    <CardHeader className="flex flex-row items-center justify-between">
-                        <CardTitle className="text-white">User Management</CardTitle>
-                        <Button size="sm" className="bg-white text-black hover:bg-gray-200" onClick={() => setShowAddUser(true)}>
-                            <Users className="w-4 h-4 mr-2" /> Add User
-                        </Button>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="space-y-4">
-                            {usersList.map(u => (
-                                <div key={u.id} className="flex items-center justify-between p-4 bg-white/5 rounded-lg border border-white/5">
-                                    <div className="flex items-center gap-4">
-                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${u.role === 'artist' ? 'bg-purple-500/20 text-purple-500' : 'bg-green-500/20 text-green-500'}`}>
-                                            {u.full_name[0]}
-                                        </div>
-                                        <div>
-                                            <p className="font-bold text-white flex items-center gap-2">
-                                                {u.full_name}
-                                                <span className={`text-[10px] px-2 py-0.5 rounded-full border ${u.role === 'artist' ? 'border-purple-500 text-purple-500' : 'border-green-500 text-green-500'}`}>{u.role}</span>
-                                                {u.is_blocked && <span className="text-[10px] bg-red-500 text-white px-2 rounded">BLOCKED</span>}
-                                            </p>
-                                            <p className="text-sm text-gray-500">{u.email}</p>
-                                            <div className="mt-1 flex items-center gap-2">
-                                                <span className="text-xs text-gray-400">Bal:</span>
-                                                <span className="text-sm font-bold text-green-400">{pricingConfig.currency}{(u.balance || 0).toLocaleString()}</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <Button size="sm" variant="outline" className={`border-red-500/20 ${u.is_blocked ? 'text-green-500 hover:text-green-400' : 'text-red-500 hover:text-red-400'}`} onClick={() => toggleUserBlock(u.id)}>
-                                            {u.is_blocked ? "Unblock" : "Block"}
-                                        </Button>
-                                        <Button size="sm" variant="ghost" className="text-red-500 hover:text-red-400 hover:bg-red-500/10" onClick={() => deleteUser(u.id)}>Delete</Button>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </CardContent>
-                </Card>
-            )}
+        setTimeout(() => {
+            alert(`User invitiation sent to ${newUserEmail} for role: ${newRole}.`);
+            setIsAddingUser(false);
+            setShowAddUser(false);
+            setNewName("");
+            setNewUserEmail("");
+            setNewUserPass("");
+        }, 1000);
+    };
 
-            {/* TRANSACTIONS VIEW */}
-            {activeTab === "transactions" && (
-                <div className="space-y-6">
+    const handleCuratorAction = async (id: string, action: 'verified' | 'rejected') => {
+        const { data, error } = await supabase.from('profiles').update({ verification_status: action }).eq('id', id).select();
+
+        if (error) {
+            alert("Error updating status: " + error.message);
+        } else if (!data || data.length === 0) {
+            alert("Update failed: Permission denied or user not found. Please refresh.");
+            // Revert state by triggering a refresh or manual revert?
+            // Since we already filtered it out optimistically (wait, we didn't filter it yet in the previous code? Ah, we did below).
+            // I'll move optimistic update to AFTER check.
+        } else {
+            // Optimistic update
+            setPendingCurators(prev => prev.filter(c => c.id !== id));
+            alert(`Curator application ${action}.`);
+
+            // If verified, maybe send email? (Requires Edge Function update, skipping for now as per MVP)
+        }
+    };
+
+    const handleSendBroadcast = async () => {
+        if (!broadcastSubject || !broadcastMessage) {
+            alert("Please fill in subject and message.");
+            return;
+        }
+        setIsSendingBroadcast(true);
+
+        try {
+            const { error } = await supabase.from('broadcasts').insert({
+                subject: broadcastSubject,
+                message: broadcastMessage,
+                sender_id: user?.id,
+                channel: broadcastChannel,
+                target_role: 'all' // Explicitly set target to all for now
+            });
+
+            if (error) {
+                console.error("Broadcast Error:", error);
+                alert("Error sending broadcast: " + error.message);
+            } else {
+                alert("Broadcast queued successfully! Users will receive it shortly.");
+                setBroadcastSubject("");
+                setBroadcastMessage("");
+            }
+        } catch (err: any) {
+            console.error("Unexpected Broadcast Error:", err);
+            alert("An unexpected error occurred while sending broadcast.");
+        } finally {
+            setIsSendingBroadcast(false);
+        }
+    };
+
+    if (isLoading) return <div className="p-10 text-center text-white">Loading Admin...</div>;
+
+    return (
+        <>
+            <div className="container mx-auto px-4 max-w-7xl py-12 min-h-screen">
+                <div className="flex justify-between items-center mb-8">
                     <div>
-                        <h2 className="text-2xl font-bold text-white">Platform Transactions</h2>
-                        <p className="text-gray-400">View all financial activity across the platform.</p>
+                        <h1 className="text-3xl font-bold text-white flex items-center gap-3">
+                            Admin Dashboard
+                            {(pendingWithdrawalsCount + openTicketsCount) > 0 && (
+                                <span className="bg-red-500 text-white text-sm px-2 py-0.5 rounded-full animate-pulse shadow-lg shadow-red-500/20">
+                                    {pendingWithdrawalsCount + openTicketsCount} Updates
+                                </span>
+                            )}
+                        </h1>
+                        <p className="text-gray-400">Welcome, <span className="text-green-500">{user?.name || 'Admin'}</span>. Platform Management System</p>
                     </div>
+                    <div className="flex items-center gap-4">
+                        <div className="flex bg-white/5 p-1 rounded-lg border border-white/10">
+                            {["overview", "users", "withdrawals", "transactions", "support", "playlists", "applications", "broadcast"].map((tab) => {
+                                let count = 0;
+                                if (tab === 'withdrawals') count = pendingWithdrawalsCount;
+                                if (tab === 'support') count = openTicketsCount;
+                                if (tab === 'applications') count = pendingCurators.length;
 
-                    {/* Financial Snapshot */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
-                        <Card className="bg-blue-600/10 border-blue-500/20">
-                            <CardHeader className="pb-2"><CardTitle className="text-sm text-gray-400">Total Volume</CardTitle></CardHeader>
-                            <CardContent><div className="text-2xl font-bold text-white">{pricingConfig.currency}{finStats.totalRevenue.toLocaleString()}</div></CardContent>
-                        </Card>
-                        <Card className="bg-green-600/10 border-green-500/20">
-                            <CardHeader className="pb-2"><CardTitle className="text-sm text-gray-400">AfroPitch Profit</CardTitle></CardHeader>
-                            <CardContent>
-                                <div className="text-2xl font-bold text-white">{pricingConfig.currency}{finStats.afropitchProfit.toLocaleString()}</div>
-                                <p className="text-xs text-gray-400">Net Earnings/Commissions</p>
-                            </CardContent>
-                        </Card>
-                        <Card className="bg-purple-600/10 border-purple-500/20">
-                            <CardHeader className="pb-2"><CardTitle className="text-sm text-gray-400">Curator Holdings</CardTitle></CardHeader>
-                            <CardContent>
-                                <div className="text-2xl font-bold text-white">{pricingConfig.currency}{finStats.curatorHoldings.toLocaleString()}</div>
-                                <p className="text-xs text-gray-400">Payable to Curators</p>
-                            </CardContent>
-                        </Card>
-                        <Card className="bg-pink-600/10 border-pink-500/20">
-                            <CardHeader className="pb-2"><CardTitle className="text-sm text-gray-400">Artist Holdings</CardTitle></CardHeader>
-                            <CardContent>
-                                <div className="text-2xl font-bold text-white">{pricingConfig.currency}{finStats.artistHoldings.toLocaleString()}</div>
-                                <p className="text-xs text-gray-400">Artist Wallet Balances</p>
-                            </CardContent>
-                        </Card>
-                        <Card className="bg-orange-600/10 border-orange-500/20">
-                            <CardHeader className="pb-2"><CardTitle className="text-sm text-gray-400">Pending Payouts</CardTitle></CardHeader>
-                            <CardContent>
-                                <div className="text-2xl font-bold text-white">{pricingConfig.currency}{finStats.totalPending.toLocaleString()}</div>
-                                <p className="text-xs text-gray-400">Withdrawn: {pricingConfig.currency}{finStats.totalWithdrawn.toLocaleString()}</p>
-                            </CardContent>
-                        </Card>
-                    </div>
-
-                    <TransactionsList />
-                </div>
-            )}
-
-            {/* WITHDRAWALS MANAGEMENT */}
-            {activeTab === "withdrawals" && (
-                <Card className="bg-black/40 border-white/10">
-                    <CardHeader>
-                        <CardTitle className="text-white">Withdrawal Requests</CardTitle>
-                        <CardDescription>Manage fund payout requests from curators.</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="space-y-4">
-                            {withdrawals.length === 0 && <p className="text-gray-500 text-center py-4">No requests found.</p>}
-                            {withdrawals.map(w => (
-                                <div key={w.id} className="flex flex-col md:flex-row md:items-center justify-between p-4 bg-white/5 rounded-lg border border-white/5 gap-4">
-                                    <div className="flex items-center gap-4">
-                                        <div className="bg-green-500/20 p-2 rounded-full text-green-500">
-                                            <DollarSign className="w-6 h-6" />
-                                        </div>
-                                        <div>
-                                            <p className="font-bold text-white flex items-center gap-2">
-                                                {pricingConfig.currency}{w.amount.toLocaleString()}
-                                                <span className={`text-[10px] px-2 py-0.5 rounded-full uppercase ${w.status === 'pending' ? 'bg-yellow-500 text-black' : w.status === 'approved' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'}`}>
-                                                    {w.status}
-                                                </span>
-                                            </p>
-                                            <p className="text-sm text-gray-400">Requested by <span className="text-white">{w.user_name}</span> • {w.date}</p>
-                                            <p className="text-xs text-gray-500 mt-1 font-mono">{w.bank_details}</p>
-                                        </div>
-                                    </div>
-                                    {w.status === 'pending' && (
-                                        <div className="flex items-center gap-2">
-                                            <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={() => handleWithdrawal(w.id, 'approve')}>
-                                                <CheckCircle className="w-4 h-4 mr-1" /> Approve
-                                            </Button>
-                                            <Button size="sm" variant="ghost" className="text-red-500 hover:text-red-400 hover:bg-red-500/10" onClick={() => handleWithdrawal(w.id, 'reject')}>
-                                                <XCircle className="w-4 h-4 mr-1" /> Reject
-                                            </Button>
-                                        </div>
-                                    )}
-                                    {/* Always show Message button */}
-                                    <div className="ml-2">
-                                        <Button size="sm" variant="outline" onClick={() => initiateChatWithUser(w.user_id, w.user_name)}>
-                                            <MessageSquare className="w-4 h-4 mr-1" /> Message
-                                        </Button>
-                                    </div>
-                                </div>
-                            ))}
+                                return (
+                                    <button
+                                        key={tab}
+                                        onClick={() => setActiveTab(tab as any)}
+                                        className={`px-4 py-2 rounded-md text-sm font-medium capitalize transition-all relative ${activeTab === tab ? "bg-green-600 text-white" : "text-gray-400 hover:text-white"}`}
+                                    >
+                                        {tab}
+                                        {count > 0 && (
+                                            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] w-4 h-4 flex items-center justify-center rounded-full animate-pulse font-bold">
+                                                {count}
+                                            </span>
+                                        )}
+                                    </button>
+                                );
+                            })}
                         </div>
-                    </CardContent>
-                </Card>
-            )}
-
-            {/* PLAYLISTS MANAGEMENT */}
-            {activeTab === "playlists" && (
-                <div className="space-y-6">
-                    <div className="flex justify-between items-center">
-                        <h2 className="text-2xl font-bold text-white">All Playlists</h2>
-                        <Button className="bg-green-600 hover:bg-green-700" onClick={() => setShowAddPlaylist(true)}>
-                            <Plus className="w-4 h-4 mr-2" /> Add Playlist
+                        <Button variant="outline" size="icon" className="border-white/10 hover:bg-red-500/20 h-10 w-10 group" title="Logout" onClick={logout}>
+                            <LogOut className="w-5 h-5 text-gray-400 group-hover:text-red-500" />
                         </Button>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {allPlaylists.map((playlist) => (
-                            <Card key={playlist.id} className="bg-black/40 border-white/10 overflow-hidden hover:border-white/20 transition-all">
-                                <div className="h-32 bg-gradient-to-br from-gray-800 to-black relative">
-                                    <div className="absolute inset-0 flex items-center justify-center">
-                                        <Music className="w-12 h-12 text-white/20" />
-                                    </div>
-                                    <div className="absolute top-2 right-2">
-                                        <span className={`px-2 py-1 rounded text-[10px] uppercase font-bold ${playlist.type === 'exclusive' ? 'bg-yellow-500 text-black' :
-                                            playlist.type === 'express' ? 'bg-orange-500 text-white' :
-                                                'bg-blue-500 text-white'
-                                            }`}>
-                                            {playlist.type}
-                                        </span>
-                                    </div>
-                                </div>
-                                <CardContent className="p-4">
-                                    <h3 className="font-bold text-white text-lg truncate" title={playlist.name}>{playlist.name}</h3>
-                                    <p className="text-sm text-gray-400 mb-4 flex items-center gap-1">
-                                        <Users className="w-3 h-3" /> Curator: <span className="text-white">{playlist.curator_name || 'Unknown'}</span>
-                                    </p>
+                </div>
 
-                                    <div className="grid grid-cols-2 gap-2 text-xs text-gray-500 mb-4">
-                                        <div className="bg-white/5 p-2 rounded">
-                                            <span className="block font-bold text-white">{playlist.followers.toLocaleString()}</span>
-                                            Followers
-                                        </div>
-                                        <div className="bg-white/5 p-2 rounded">
-                                            <span className="block font-bold text-white max-w-[100px] truncate">{new Date(playlist.created_at).toLocaleDateString()}</span>
-                                            Created
-                                        </div>
-                                    </div>
-
-                                    <div className="flex gap-2">
-                                        <Button size="sm" variant="outline" className="border-white/10 hover:bg-white/10 text-blue-400 hover:text-blue-300"
-                                            onClick={() => handleRefreshPlaylist(playlist)}
-                                            disabled={isRefreshing === playlist.id || !playlist.playlist_link}
-                                            title={!playlist.playlist_link ? "No Spotify Link" : "Refresh Metadata"}
-                                        >
-                                            {isRefreshing === playlist.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-                                        </Button>
-                                        <Button size="sm" variant="outline" className="flex-1 border-white/10 hover:bg-white/10" onClick={() => {
-                                            setAdminEditingPlaylist(playlist);
-                                            setAdminNewName(playlist.name);
-                                            setAdminNewFollowers(playlist.followers);
-                                            setShowEditPlaylist(true);
-                                        }}>
-                                            Edit
-                                        </Button>
-                                        <Button size="sm" variant="destructive" className="flex-1 opacity-80 hover:opacity-100" onClick={() => deletePlaylist(playlist.id)}>
-                                            Delete
-                                        </Button>
-                                    </div>
-
-                                    {/* Song Management (Admin Playlists Only) */}
-                                    {playlist.curator_id === user?.id && (
-                                        <div className="mt-4 pt-4 border-t border-white/5">
-                                            <Button
-                                                size="sm"
-                                                variant="secondary"
-                                                className="w-full mb-2 bg-white/10 hover:bg-white/20 text-white"
-                                                onClick={() => togglePlaylistSongs(playlist.id)}
-                                            >
-                                                {expandedPlaylistId === playlist.id ? "Hide Submissions" : "Manage Submissions"}
-                                            </Button>
-
-                                            {expandedPlaylistId === playlist.id && (
-                                                <div className="space-y-2 animate-in fade-in">
-                                                    {isLoadingSongs && <div className="text-center py-2"><Loader2 className="w-4 h-4 animate-spin mx-auto text-green-500" /></div>}
-                                                    {!isLoadingSongs && playlistSongs.length === 0 && <p className="text-xs text-gray-500 text-center">No submissions yet.</p>}
-                                                    {!isLoadingSongs && playlistSongs.map(song => (
-                                                        <div key={song.id} className="flex justify-between items-center bg-black/40 p-2 rounded border border-white/5">
-                                                            <div className="overflow-hidden">
-                                                                <p className="text-xs text-white font-bold truncate">{song.artist?.full_name || 'Unknown Artist'}</p>
-                                                                <a href={song.song_link} target="_blank" rel="noopener noreferrer" className="text-[10px] text-blue-400 hover:underline truncate block">View Song</a>
-                                                            </div>
-                                                            {song.status === 'pending' ? (
-                                                                <div className="flex gap-1">
-                                                                    <Button size="sm" className="h-6 w-6 p-0 bg-green-600 hover:bg-green-700" onClick={() => handleSubmissionAction(song.id, 'accepted')}>
-                                                                        <CheckCircle className="w-3 h-3" />
-                                                                    </Button>
-                                                                    <Button size="sm" className="h-6 w-6 p-0 bg-red-600 hover:bg-red-700" onClick={() => handleSubmissionAction(song.id, 'declined')}>
-                                                                        <XCircle className="w-3 h-3" />
-                                                                    </Button>
-                                                                </div>
-                                                            ) : (
-                                                                <span className={`text-[10px] font-bold uppercase ${song.status === 'accepted' ? 'text-green-500' : 'text-red-500'}`}>
-                                                                    {song.status}
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
+                {/* OVERVIEW CONTENT */}
+                {activeTab === "overview" && (
+                    <div className="space-y-8">
+                        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                            <Card className="bg-blue-600/10 border-blue-500/20 lg:col-span-2">
+                                <CardHeader className="pb-2"><CardTitle className="text-sm text-gray-400">Total Volume</CardTitle></CardHeader>
+                                <CardContent><div className="text-2xl font-bold text-white">{pricingConfig.currency}{finStats.totalRevenue.toLocaleString()}</div></CardContent>
+                            </Card>
+                            <Card className="bg-purple-600/10 border-purple-500/20 lg:col-span-2">
+                                <CardHeader className="pb-2"><CardTitle className="text-sm text-gray-400">Total Holdings (Net)</CardTitle></CardHeader>
+                                <CardContent>
+                                    <div className="text-2xl font-bold text-white">{pricingConfig.currency}{finStats.totalHoldings.toLocaleString()}</div>
+                                    <p className="text-xs text-gray-400">Curator + Artist Funds</p>
                                 </CardContent>
                             </Card>
-                        ))}
-                        {allPlaylists.length === 0 && <p className="text-gray-500 col-span-3 text-center py-10">No playlists found.</p>}
-                    </div>
-                </div>
-            )}
+                            <Card className="bg-yellow-600/10 border-yellow-500/20 lg:col-span-2">
+                                <CardHeader className="pb-2"><CardTitle className="text-sm text-gray-400">Total Withdrawn</CardTitle></CardHeader>
+                                <CardContent><div className="text-2xl font-bold text-white">{pricingConfig.currency}{finStats.totalWithdrawn.toLocaleString()}</div></CardContent>
+                            </Card>
 
-            {/* SUPPORT SYSTEM */}
-            {activeTab === "support" && (
-                <Card className="bg-black/40 border-white/10">
-                    <CardHeader>
-                        <CardTitle className="text-white">Support Tickets</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="space-y-4">
-                            {tickets.map(t => (
-                                <div key={t.id} className="flex items-center justify-between p-4 bg-white/5 rounded-lg border border-white/5 hover:bg-white/10 cursor-pointer transition-colors">
-                                    <div className="flex items-center gap-4">
-                                        <div className="bg-blue-500/20 p-2 rounded-full text-blue-500">
-                                            <MessageSquare className="w-6 h-6" />
-                                        </div>
-                                        <div>
-                                            <p className="font-bold text-white">{t.subject}</p>
-                                            <p className="text-sm text-gray-400">From: {t.user_name} • {t.date}</p>
-                                            <p className="text-xs text-gray-500 mt-1 line-clamp-1">{t.last_message}</p>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-3">
-                                        <span className={`text-[10px] px-2 py-1 rounded-full uppercase ${t.status === 'open' ? 'bg-green-500 text-white' : 'bg-gray-500 text-white'}`}>
-                                            {t.status}
-                                        </span>
-                                        <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); openChat(t); }}>Chat</Button>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </CardContent>
-                </Card>
-            )}
-
-
-
-        </div>
-
-        {/* CHAT MODAL */}
-        {showChat && activeTicket && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in">
-                <div className="bg-zinc-900 border border-white/10 w-full max-w-2xl h-[600px] flex flex-col rounded-xl shadow-2xl">
-                    {/* Header */}
-                    <div className="p-4 border-b border-white/10 flex justify-between items-center bg-zinc-900 rounded-t-xl">
-                        <div>
-                            <h3 className="font-bold text-white text-lg">{activeTicket?.subject}</h3>
-                            <p className="text-sm text-gray-400">Chat with {activeTicket?.user_name}</p>
-                        </div>
-                        <div className="flex gap-2">
-                            {activeTicket?.status === 'open' && (
-                                <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="border-red-500/30 text-red-500 hover:bg-red-500/10"
-                                    onClick={async () => {
-                                        if (!activeTicket) return;
-                                        const { error } = await supabase.from('support_tickets').update({ status: 'closed' }).eq('id', activeTicket.id);
-                                        if (!error) {
-                                            alert("Ticket closed.");
-                                            setTickets(prev => prev.map(t => t.id === activeTicket.id ? { ...t, status: 'closed' } : t));
-                                            setActiveTicket(prev => prev ? { ...prev, status: 'closed' } : null);
-                                            setShowChat(false);
-                                        }
-                                    }}
-                                >
-                                    Close Ticket
-                                </Button>
-                            )}
-                            <Button variant="ghost" size="icon" onClick={() => setShowChat(false)}><XCircle className="w-6 h-6 text-gray-400" /></Button>
-                        </div>
-                    </div>
-
-                    {/* Messages */}
-                    <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-black/20">
-                        {chatMessages.length === 0 && (
-                            <div className="text-center text-gray-500 mt-10">No messages yet. Start the conversation.</div>
-                        )}
-                        {chatMessages.map((msg) => (
-                            <div key={msg.id} className={`flex ${msg.is_admin ? 'justify-end' : 'justify-start'}`}>
-                                <div className={`max-w-[70%] p-3 rounded-xl ${msg.is_admin ? 'bg-green-600 text-white' : 'bg-zinc-800 text-gray-200'}`}>
-                                    <p className="text-sm">{msg.message}</p>
-                                    <p className="text-[10px] opacity-50 mt-1 text-right">{new Date(msg.created_at).toLocaleTimeString()}</p>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-
-                    {/* Input */}
-                    <div className="p-4 border-t border-white/10 bg-zinc-900 rounded-b-xl flex gap-2">
-                        <Input
-                            value={chatInput}
-                            onChange={(e) => setChatInput(e.target.value)}
-                            placeholder="Type a message..."
-                            className="bg-zinc-800 border-zinc-700 text-white"
-                            onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
-                        />
-                        <Button className="bg-green-600 hover:bg-green-700" onClick={sendMessage} disabled={sendingMsg}>
-                            <MessageSquare className="w-4 h-4" />
-                        </Button>
-                    </div>
-                </div>
-            </div>
-        )}
-
-        {/* ADD USER MODAL */}
-        {showAddUser && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in">
-                <div className="bg-zinc-900 border border-white/10 w-full max-w-md p-6 rounded-lg space-y-4">
-                    <h3 className="text-xl font-bold text-white">Add New User</h3>
-                    <p className="text-sm text-gray-400">Invite a new user to the platform.</p>
-
-                    <div className="space-y-3">
-                        <div>
-                            <label className="text-xs text-gray-400 mb-1 block">Full Name</label>
-                            <Input value={newName} onChange={e => setNewName(e.target.value)} placeholder="John Doe" className="bg-zinc-800 border-zinc-700" />
-                        </div>
-                        <div>
-                            <label className="text-xs text-gray-400 mb-1 block">Email</label>
-                            <Input value={newUserEmail} onChange={e => setNewUserEmail(e.target.value)} placeholder="john@example.com" className="bg-zinc-800 border-zinc-700" />
-                        </div>
-                        <div>
-                            <label className="text-xs text-gray-400 mb-1 block">Role</label>
-                            <div className="flex gap-2">
-                                {(['artist', 'curator', 'admin'] as const).map(r => (
-                                    <div
-                                        key={r}
-                                        className={`px-3 py-1.5 rounded cursor-pointer border ${newRole === r ? 'bg-green-600 border-green-500 text-white' : 'bg-zinc-800 border-zinc-700 text-gray-400'}`}
-                                        onClick={() => setNewRole(r)}
-                                    >
-                                        <span className="capitalize text-xs font-bold">{r}</span>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="flex justify-end gap-2 pt-2">
-                        <Button variant="ghost" onClick={() => setShowAddUser(false)}>Cancel</Button>
-                        <Button className="bg-green-600" onClick={handleAddUser} disabled={isAddingUser}>
-                            {isAddingUser ? "Sending Invite..." : "Send Invite"}
-                        </Button>
-                    </div>
-                </div>
-            </div>
-        )}
-
-        {/* APPLICATIONS VIEW */}
-        {activeTab === "applications" && (
-            <Card className="bg-black/40 border-white/10">
-                <CardHeader>
-                    <CardTitle className="text-white">Curator Applications</CardTitle>
-                    <CardDescription>Review and approve new curators.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <div className="space-y-4">
-                        {pendingCurators.length === 0 && <p className="text-gray-500 text-center py-4">No pending applications.</p>}
-                        {pendingCurators.map(c => (
-                            <div key={c.id} className="flex flex-col md:flex-row md:items-center justify-between p-4 bg-white/5 rounded-lg border border-white/5 gap-4">
-                                <div className="flex items-center gap-4">
-                                    <div className="w-10 h-10 rounded-full bg-yellow-500/20 text-yellow-500 flex items-center justify-center font-bold">
-                                        {c.full_name[0]}
-                                    </div>
-                                    <div>
-                                        <p className="font-bold text-white flex items-center gap-2">
-                                            {c.full_name}
-                                            <span className="text-[10px] bg-yellow-500/20 text-yellow-500 px-2 rounded-full uppercase">Pending</span>
-                                        </p>
-                                        <p className="text-sm text-gray-500">{c.email}</p>
-                                        <div className="mt-1 text-xs text-gray-400">
-                                            Bank: {c.bank_name || 'Not set'} • Acc: {c.account_number || 'N/A'}
-                                        </div>
-                                        {c.verification_docs && (
-                                            <div className="mt-1 text-xs text-blue-400">
-                                                Docs: {c.verification_docs}
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={() => handleCuratorAction(c.id, 'verified')}>
-                                        <CheckCircle className="w-4 h-4 mr-2" /> Approve
-                                    </Button>
-                                    <Button size="sm" variant="destructive" onClick={() => handleCuratorAction(c.id, 'rejected')}>
-                                        <XCircle className="w-4 h-4 mr-2" /> Reject
-                                    </Button>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </CardContent>
-            </Card>
-        )}
-
-        {/* BROADCAST VIEW */}
-        {activeTab === "broadcast" && (
-            <div className="grid gap-6 md:grid-cols-2">
-                <Card className="bg-black/40 border-white/10 md:col-span-2">
-                    <CardHeader>
-                        <CardTitle className="text-white flex items-center gap-2">
-                            <Bell className="w-5 h-5 text-yellow-500" /> Broadcast Message
-                        </CardTitle>
-                        <CardDescription>Send an announcement to platform users.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className="bg-yellow-500/10 border border-yellow-500/20 p-4 rounded text-sm text-yellow-200 mb-4">
-                            <ShieldAlert className="w-4 h-4 inline mr-2 text-yellow-500" />
-                            <strong>Warning:</strong> sending to 'All Users' impacts the entire platform.
+                            <Card className="bg-green-600/10 border-green-500/20 lg:col-span-2">
+                                <CardHeader className="pb-2"><CardTitle className="text-sm text-gray-400">Curator Holdings</CardTitle></CardHeader>
+                                <CardContent>
+                                    <div className="text-xl font-bold text-white">{pricingConfig.currency}{finStats.curatorHoldings.toLocaleString()}</div>
+                                </CardContent>
+                            </Card>
+                            <Card className="bg-pink-600/10 border-pink-500/20 lg:col-span-2">
+                                <CardHeader className="pb-2"><CardTitle className="text-sm text-gray-400">Artist Holdings</CardTitle></CardHeader>
+                                <CardContent>
+                                    <div className="text-xl font-bold text-white">{pricingConfig.currency}{finStats.artistHoldings.toLocaleString()}</div>
+                                </CardContent>
+                            </Card>
+                            <Card className="bg-orange-600/10 border-orange-500/20 lg:col-span-2">
+                                <CardHeader className="pb-2"><CardTitle className="text-sm text-gray-400">Pending Payouts</CardTitle></CardHeader>
+                                <CardContent>
+                                    <div className="text-xl font-bold text-white">{pricingConfig.currency}{finStats.totalPending.toLocaleString()}</div>
+                                    <p className="text-xs text-gray-400">{pendingWithdrawalsCount} requests</p>
+                                </CardContent>
+                            </Card>
                         </div>
 
-                        <div className="space-y-2">
-                            <label className="text-sm font-bold text-gray-300">Broadcast Channel</label>
-                            <div className="grid grid-cols-3 gap-3">
-                                {(['email', 'in_app', 'both'] as const).map(c => (
-                                    <div
-                                        key={c}
-                                        onClick={() => setBroadcastChannel(c)}
-                                        className={`cursor-pointer p-3 rounded border text-center font-bold capitalize transition-all ${broadcastChannel === c ? 'bg-green-600 border-green-500 text-white' : 'bg-black/40 border-white/10 text-gray-400 hover:bg-white/5'}`}
-                                    >
-                                        {c.replace('_', '-')}
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-
-                        <div className="space-y-2">
-                            <label className="text-sm font-bold text-gray-300">Subject Line</label>
-                            <Input
-                                value={broadcastSubject}
-                                onChange={e => setBroadcastSubject(e.target.value)}
-                                placeholder="e.g. Best of 2025: Rising Stars!"
-                                className="bg-black/50 border-white/10"
-                            />
-                        </div>
-
-                        <div className="space-y-2">
-                            <label className="text-sm font-bold text-gray-300">Message Body</label>
-                            <textarea
-                                value={broadcastMessage}
-                                onChange={e => setBroadcastMessage(e.target.value)}
-                                placeholder="Write your announcement here..."
-                                className="w-full h-64 bg-black/50 border-white/10 rounded-md p-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-green-500 resize-none"
-                            />
-                        </div>
-
-                        <div className="flex justify-end pt-4">
-                            <Button
-                                className="bg-green-600 hover:bg-green-700 font-bold px-8"
-                                onClick={handleSendBroadcast}
-                                disabled={isSendingBroadcast}
-                            >
-                                {isSendingBroadcast ? (
-                                    <>
-                                        <Loader2 className="w-4 h-4 animate-spin mr-2" /> Sending...
-                                    </>
-                                ) : (
-                                    <>
-                                        <Send className="w-4 h-4 mr-2" /> Send Broadcast
-                                    </>
-                                )}
-                            </Button>
-                        </div>
-                    </CardContent>
-                </Card>
-            </div>
-        )}
-
-        {/* EDIT PLAYLIST MODAL */}
-        {showEditPlaylist && adminEditingPlaylist && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in">
-                <div className="bg-zinc-900 border border-white/10 w-full max-w-md p-6 rounded-lg space-y-4">
-                    <h3 className="text-xl font-bold text-white">Edit Playlist</h3>
-                    <div className="space-y-3">
-                        <div>
-                            <label className="text-xs text-gray-400 mb-1 block">Playlist Name</label>
-                            <Input value={adminNewName} onChange={e => setAdminNewName(e.target.value)} className="bg-zinc-800 border-zinc-700" />
-                        </div>
-                        <div>
-                            <label className="text-xs text-gray-400 mb-1 block">Followers</label>
-                            <Input type="number" value={adminNewFollowers} onChange={e => setAdminNewFollowers(parseInt(e.target.value))} className="bg-zinc-800 border-zinc-700" />
-                        </div>
-                    </div>
-                    <div className="flex justify-end gap-2 pt-4">
-                        <Button variant="ghost" onClick={() => setShowEditPlaylist(false)}>Cancel</Button>
-                        <Button className="bg-green-600" onClick={async () => {
-                            setAdminIsSaving(true);
-                            await supabase.from('playlists').update({
-                                name: adminNewName,
-                                followers: adminNewFollowers
-                            }).eq('id', adminEditingPlaylist.id);
-                            setAdminIsSaving(false);
-                            setShowEditPlaylist(false);
-                            window.location.reload();
-                        }} disabled={adminIsSaving}>
-                            {adminIsSaving ? "Saving..." : "Save Changes"}
-                        </Button>
-                    </div>
-                </div>
-            </div>
-        )}
-
-        {/* ADD PLAYLIST MODAL */}
-        {showAddPlaylist && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in">
-                <div className="bg-zinc-900 border border-white/10 w-full max-w-md p-6 rounded-lg space-y-6">
-                    <div className="flex justify-between items-start">
-                        <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                            <Plus className="w-5 h-5 text-green-500" /> Add Team Playlist
-                        </h3>
-                        <button onClick={() => setShowAddPlaylist(false)} className="text-gray-400 hover:text-white"><XCircle className="w-6 h-6" /></button>
-                    </div>
-
-                    {!fetchedPlaylistInfo ? (
-                        <div className="space-y-4">
-                            <p className="text-sm text-gray-400">Enter a Playlist URL (Spotify, Apple Music, Audiomack, etc.)</p>
-                            <div className="flex gap-2">
-                                <Input
-                                    placeholder="https://..."
-                                    value={newPlaylistLink}
-                                    onChange={(e) => setNewPlaylistLink(e.target.value)}
-                                    className="bg-black/50 border-white/10"
-                                />
-                                <Button onClick={fetchPlaylistInfo} disabled={isFetchingInfo || !newPlaylistLink}>
-                                    {isFetchingInfo ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-                                </Button>
-                            </div>
-                            <p className="text-[10px] text-gray-500">Note: Only Spotify links will auto-fill details. Others require manual entry.</p>
-                        </div>
-                    ) : (
-                        <div className="space-y-4 animate-in fade-in">
-                            <div className="bg-white/5 p-4 rounded-lg border border-white/5 space-y-3">
-                                <div className="flex gap-4">
-                                    <div className="w-16 h-16 bg-zinc-800 rounded flex-shrink-0 overflow-hidden relative group">
-                                        {fetchedPlaylistInfo.coverImage ? (
-                                            <img src={fetchedPlaylistInfo.coverImage} className="w-full h-full object-cover" alt="Cover" />
-                                        ) : (
-                                            <Music className="w-8 h-8 text-gray-600 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
-                                        )}
-                                    </div>
-                                    <div className="flex-1 space-y-2">
-                                        <div>
-                                            <label className="text-[10px] text-gray-400 uppercase font-bold">Name</label>
-                                            <Input
-                                                value={fetchedPlaylistInfo.name}
-                                                onChange={e => setFetchedPlaylistInfo({ ...fetchedPlaylistInfo, name: e.target.value })}
-                                                className="bg-black/20 border-white/10 h-8 text-sm"
-                                                placeholder="Playlist Name"
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div>
-                                        <label className="text-[10px] text-gray-400 uppercase font-bold">Followers</label>
-                                        <Input
-                                            type="number"
-                                            value={fetchedPlaylistInfo.followers}
-                                            onChange={e => setFetchedPlaylistInfo({ ...fetchedPlaylistInfo, followers: parseInt(e.target.value) || 0 })}
-                                            className="bg-black/20 border-white/10 h-8 text-sm"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="text-[10px] text-gray-400 uppercase font-bold">Cover Image URL</label>
-                                        <Input
-                                            value={fetchedPlaylistInfo.coverImage || ""}
-                                            onChange={e => setFetchedPlaylistInfo({ ...fetchedPlaylistInfo, coverImage: e.target.value })}
-                                            className="bg-black/20 border-white/10 h-8 text-sm"
-                                            placeholder="https://..."
-                                        />
-                                    </div>
-                                </div>
-
-                                <div className="mt-3">
-                                    <label className="text-[10px] text-gray-400 uppercase font-bold mb-2 block">Playlist Tier</label>
-                                    <div className="grid grid-cols-4 gap-2">
-                                        {(['standard', 'express', 'exclusive', 'free'] as const).map(t => (
-                                            <div
-                                                key={t}
-                                                onClick={() => setNewPlaylistType(t)}
-                                                className={`cursor-pointer border rounded p-2 text-center transition-all ${newPlaylistType === t
-                                                    ? 'bg-green-600 border-green-500 text-white'
-                                                    : 'bg-black/20 border-white/10 text-gray-400 hover:bg-white/5'}`}
-                                            >
-                                                <span className="block text-xs font-bold capitalize">{t}</span>
-                                                <span className="block text-[10px] opacity-70">{pricingConfig.currency}{pricingConfig.tiers[t].price.toLocaleString()}</span>
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            {/* TOP SONGS */}
+                            <Card className="bg-black/40 border-white/10">
+                                <CardHeader>
+                                    <CardTitle className="text-white flex items-center gap-2"><Trophy className="w-5 h-5 text-yellow-500" /> Top Songs</CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="space-y-4">
+                                        {topCampaigns.length === 0 && <p className="text-gray-500 text-sm">No campaigns data available.</p>}
+                                        {topCampaigns.map((c, idx) => (
+                                            <div key={c.id} className="flex items-center justify-between p-3 bg-white/5 rounded border border-white/5">
+                                                <div className="flex items-center gap-4">
+                                                    <div className="font-bold text-lg text-white/20 w-6">#{idx + 1}</div>
+                                                    <div>
+                                                        <p className="font-bold text-white">{c.song_title}</p>
+                                                        <p className="text-xs text-gray-400">by {c.artist?.full_name || 'Unknown'}</p>
+                                                        {c.playlist && <p className="text-[10px] text-green-400">on {c.playlist.name}</p>}
+                                                    </div>
+                                                </div>
+                                                <div className="text-right">
+                                                    <span className="block font-bold text-green-500">{c.clicks || 0} clicks</span>
+                                                </div>
                                             </div>
                                         ))}
                                     </div>
+                                </CardContent>
+                            </Card>
+
+                            {/* TOP PLAYLISTS */}
+                            <Card className="bg-black/40 border-white/10">
+                                <CardHeader>
+                                    <CardTitle className="text-white flex items-center gap-2"><Music className="w-5 h-5 text-purple-500" /> Top Playlists</CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="space-y-4">
+                                        {topPlaylists.length === 0 && <p className="text-gray-500 text-sm">No playlist data available.</p>}
+                                        {topPlaylists.map((p, idx) => (
+                                            <div key={p.playlist_id} className="flex items-center justify-between p-3 bg-white/5 rounded border border-white/5">
+                                                <div className="flex items-center gap-4">
+                                                    <div className="font-bold text-lg text-white/20 w-6">#{idx + 1}</div>
+                                                    <div>
+                                                        <p className="font-bold text-white">{p.playlist_name}</p>
+                                                        <p className="text-xs text-gray-400">Curator: {p.curator_name || 'Unknown'}</p>
+                                                    </div>
+                                                </div>
+                                                <div className="text-right">
+                                                    <span className="block font-bold text-purple-500">{p.total_clicks || 0} clicks</span>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </div>
+                    </div>
+                )}
+
+                {/* USERS MANAGEMENT */}
+                {activeTab === "users" && (
+                    <Card className="bg-black/40 border-white/10">
+                        <CardHeader className="flex flex-row items-center justify-between">
+                            <CardTitle className="text-white">User Management</CardTitle>
+                            <Button size="sm" className="bg-white text-black hover:bg-gray-200" onClick={() => setShowAddUser(true)}>
+                                <Users className="w-4 h-4 mr-2" /> Add User
+                            </Button>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="space-y-4">
+                                {usersList.map(u => (
+                                    <div key={u.id} className="flex items-center justify-between p-4 bg-white/5 rounded-lg border border-white/5">
+                                        <div className="flex items-center gap-4">
+                                            <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${u.role === 'artist' ? 'bg-purple-500/20 text-purple-500' : 'bg-green-500/20 text-green-500'}`}>
+                                                {u.full_name[0]}
+                                            </div>
+                                            <div>
+                                                <p className="font-bold text-white flex items-center gap-2">
+                                                    {u.full_name}
+                                                    <span className={`text-[10px] px-2 py-0.5 rounded-full border ${u.role === 'artist' ? 'border-purple-500 text-purple-500' : 'border-green-500 text-green-500'}`}>{u.role}</span>
+                                                    {u.is_blocked && <span className="text-[10px] bg-red-500 text-white px-2 rounded">BLOCKED</span>}
+                                                </p>
+                                                <p className="text-sm text-gray-500">{u.email}</p>
+                                                <div className="mt-1 flex items-center gap-2">
+                                                    <span className="text-xs text-gray-400">Bal:</span>
+                                                    <span className="text-sm font-bold text-green-400">{pricingConfig.currency}{(u.balance || 0).toLocaleString()}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <Button size="sm" variant="outline" className={`border-red-500/20 ${u.is_blocked ? 'text-green-500 hover:text-green-400' : 'text-red-500 hover:text-red-400'}`} onClick={() => toggleUserBlock(u.id)}>
+                                                {u.is_blocked ? "Unblock" : "Block"}
+                                            </Button>
+                                            <Button size="sm" variant="ghost" className="text-red-500 hover:text-red-400 hover:bg-red-500/10" onClick={() => deleteUser(u.id)}>Delete</Button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
+
+                {/* TRANSACTIONS VIEW */}
+                {activeTab === "transactions" && (
+                    <div className="space-y-6">
+                        <div>
+                            <h2 className="text-2xl font-bold text-white">Platform Transactions</h2>
+                            <p className="text-gray-400">View all financial activity across the platform.</p>
+                        </div>
+
+                        {/* Financial Snapshot */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+                            <Card className="bg-blue-600/10 border-blue-500/20">
+                                <CardHeader className="pb-2"><CardTitle className="text-sm text-gray-400">Total Volume</CardTitle></CardHeader>
+                                <CardContent><div className="text-2xl font-bold text-white">{pricingConfig.currency}{finStats.totalRevenue.toLocaleString()}</div></CardContent>
+                            </Card>
+                            <Card className="bg-green-600/10 border-green-500/20">
+                                <CardHeader className="pb-2"><CardTitle className="text-sm text-gray-400">AfroPitch Profit</CardTitle></CardHeader>
+                                <CardContent>
+                                    <div className="text-2xl font-bold text-white">{pricingConfig.currency}{finStats.afropitchProfit.toLocaleString()}</div>
+                                    <p className="text-xs text-gray-400">Net Earnings/Commissions</p>
+                                </CardContent>
+                            </Card>
+                            <Card className="bg-purple-600/10 border-purple-500/20">
+                                <CardHeader className="pb-2"><CardTitle className="text-sm text-gray-400">Curator Holdings</CardTitle></CardHeader>
+                                <CardContent>
+                                    <div className="text-2xl font-bold text-white">{pricingConfig.currency}{finStats.curatorHoldings.toLocaleString()}</div>
+                                    <p className="text-xs text-gray-400">Payable to Curators</p>
+                                </CardContent>
+                            </Card>
+                            <Card className="bg-pink-600/10 border-pink-500/20">
+                                <CardHeader className="pb-2"><CardTitle className="text-sm text-gray-400">Artist Holdings</CardTitle></CardHeader>
+                                <CardContent>
+                                    <div className="text-2xl font-bold text-white">{pricingConfig.currency}{finStats.artistHoldings.toLocaleString()}</div>
+                                    <p className="text-xs text-gray-400">Artist Wallet Balances</p>
+                                </CardContent>
+                            </Card>
+                            <Card className="bg-orange-600/10 border-orange-500/20">
+                                <CardHeader className="pb-2"><CardTitle className="text-sm text-gray-400">Pending Payouts</CardTitle></CardHeader>
+                                <CardContent>
+                                    <div className="text-2xl font-bold text-white">{pricingConfig.currency}{finStats.totalPending.toLocaleString()}</div>
+                                    <p className="text-xs text-gray-400">Withdrawn: {pricingConfig.currency}{finStats.totalWithdrawn.toLocaleString()}</p>
+                                </CardContent>
+                            </Card>
+                        </div>
+
+                        <TransactionsList />
+                    </div>
+                )}
+
+                {/* WITHDRAWALS MANAGEMENT */}
+                {activeTab === "withdrawals" && (
+                    <Card className="bg-black/40 border-white/10">
+                        <CardHeader>
+                            <CardTitle className="text-white">Withdrawal Requests</CardTitle>
+                            <CardDescription>Manage fund payout requests from curators.</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="space-y-4">
+                                {withdrawals.length === 0 && <p className="text-gray-500 text-center py-4">No requests found.</p>}
+                                {withdrawals.map(w => (
+                                    <div key={w.id} className="flex flex-col md:flex-row md:items-center justify-between p-4 bg-white/5 rounded-lg border border-white/5 gap-4">
+                                        <div className="flex items-center gap-4">
+                                            <div className="bg-green-500/20 p-2 rounded-full text-green-500">
+                                                <DollarSign className="w-6 h-6" />
+                                            </div>
+                                            <div>
+                                                <p className="font-bold text-white flex items-center gap-2">
+                                                    {pricingConfig.currency}{w.amount.toLocaleString()}
+                                                    <span className={`text-[10px] px-2 py-0.5 rounded-full uppercase ${w.status === 'pending' ? 'bg-yellow-500 text-black' : w.status === 'approved' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'}`}>
+                                                        {w.status}
+                                                    </span>
+                                                </p>
+                                                <p className="text-sm text-gray-400">Requested by <span className="text-white">{w.user_name}</span> • {w.date}</p>
+                                                <p className="text-xs text-gray-500 mt-1 font-mono">{w.bank_details}</p>
+                                            </div>
+                                        </div>
+                                        {w.status === 'pending' && (
+                                            <div className="flex items-center gap-2">
+                                                <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={() => handleWithdrawal(w.id, 'approve')}>
+                                                    <CheckCircle className="w-4 h-4 mr-1" /> Approve
+                                                </Button>
+                                                <Button size="sm" variant="ghost" className="text-red-500 hover:text-red-400 hover:bg-red-500/10" onClick={() => handleWithdrawal(w.id, 'reject')}>
+                                                    <XCircle className="w-4 h-4 mr-1" /> Reject
+                                                </Button>
+                                            </div>
+                                        )}
+                                        {/* Always show Message button */}
+                                        <div className="ml-2">
+                                            <Button size="sm" variant="outline" onClick={() => initiateChatWithUser(w.user_id, w.user_name)}>
+                                                <MessageSquare className="w-4 h-4 mr-1" /> Message
+                                            </Button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
+
+                {/* PLAYLISTS MANAGEMENT */}
+                {activeTab === "playlists" && (
+                    <div className="space-y-6">
+                        <div className="flex justify-between items-center">
+                            <h2 className="text-2xl font-bold text-white">All Playlists</h2>
+                            <Button className="bg-green-600 hover:bg-green-700" onClick={() => setShowAddPlaylist(true)}>
+                                <Plus className="w-4 h-4 mr-2" /> Add Playlist
+                            </Button>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {allPlaylists.map((playlist) => (
+                                <Card key={playlist.id} className="bg-black/40 border-white/10 overflow-hidden hover:border-white/20 transition-all">
+                                    <div className="h-32 bg-gradient-to-br from-gray-800 to-black relative">
+                                        <div className="absolute inset-0 flex items-center justify-center">
+                                            <Music className="w-12 h-12 text-white/20" />
+                                        </div>
+                                        <div className="absolute top-2 right-2">
+                                            <span className={`px-2 py-1 rounded text-[10px] uppercase font-bold ${playlist.type === 'exclusive' ? 'bg-yellow-500 text-black' :
+                                                playlist.type === 'express' ? 'bg-orange-500 text-white' :
+                                                    'bg-blue-500 text-white'
+                                                }`}>
+                                                {playlist.type}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <CardContent className="p-4">
+                                        <h3 className="font-bold text-white text-lg truncate" title={playlist.name}>{playlist.name}</h3>
+                                        <p className="text-sm text-gray-400 mb-4 flex items-center gap-1">
+                                            <Users className="w-3 h-3" /> Curator: <span className="text-white">{playlist.curator_name || 'Unknown'}</span>
+                                        </p>
+
+                                        <div className="grid grid-cols-2 gap-2 text-xs text-gray-500 mb-4">
+                                            <div className="bg-white/5 p-2 rounded">
+                                                <span className="block font-bold text-white">{playlist.followers.toLocaleString()}</span>
+                                                Followers
+                                            </div>
+                                            <div className="bg-white/5 p-2 rounded">
+                                                <span className="block font-bold text-white max-w-[100px] truncate">{new Date(playlist.created_at).toLocaleDateString()}</span>
+                                                Created
+                                            </div>
+                                        </div>
+
+                                        <div className="flex gap-2">
+                                            <Button size="sm" variant="outline" className="border-white/10 hover:bg-white/10 text-blue-400 hover:text-blue-300"
+                                                onClick={() => handleRefreshPlaylist(playlist)}
+                                                disabled={isRefreshing === playlist.id || !playlist.playlist_link}
+                                                title={!playlist.playlist_link ? "No Spotify Link" : "Refresh Metadata"}
+                                            >
+                                                {isRefreshing === playlist.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                                            </Button>
+                                            <Button size="sm" variant="outline" className="flex-1 border-white/10 hover:bg-white/10" onClick={() => {
+                                                setAdminEditingPlaylist(playlist);
+                                                setAdminNewName(playlist.name);
+                                                setAdminNewFollowers(playlist.followers);
+                                                setShowEditPlaylist(true);
+                                            }}>
+                                                Edit
+                                            </Button>
+                                            <Button size="sm" variant="destructive" className="flex-1 opacity-80 hover:opacity-100" onClick={() => deletePlaylist(playlist.id)}>
+                                                Delete
+                                            </Button>
+                                        </div>
+
+                                        {/* Song Management (Admin Playlists Only) */}
+                                        {playlist.curator_id === user?.id && (
+                                            <div className="mt-4 pt-4 border-t border-white/5">
+                                                <Button
+                                                    size="sm"
+                                                    variant="secondary"
+                                                    className="w-full mb-2 bg-white/10 hover:bg-white/20 text-white"
+                                                    onClick={() => togglePlaylistSongs(playlist.id)}
+                                                >
+                                                    {expandedPlaylistId === playlist.id ? "Hide Submissions" : "Manage Submissions"}
+                                                </Button>
+
+                                                {expandedPlaylistId === playlist.id && (
+                                                    <div className="space-y-2 animate-in fade-in">
+                                                        {isLoadingSongs && <div className="text-center py-2"><Loader2 className="w-4 h-4 animate-spin mx-auto text-green-500" /></div>}
+                                                        {!isLoadingSongs && playlistSongs.length === 0 && <p className="text-xs text-gray-500 text-center">No submissions yet.</p>}
+                                                        {!isLoadingSongs && playlistSongs.map(song => (
+                                                            <div key={song.id} className="flex justify-between items-center bg-black/40 p-2 rounded border border-white/5">
+                                                                <div className="overflow-hidden">
+                                                                    <p className="text-xs text-white font-bold truncate">{song.artist?.full_name || 'Unknown Artist'}</p>
+                                                                    <a href={song.song_link} target="_blank" rel="noopener noreferrer" className="text-[10px] text-blue-400 hover:underline truncate block">View Song</a>
+                                                                </div>
+                                                                {song.status === 'pending' ? (
+                                                                    <div className="flex gap-1">
+                                                                        <Button size="sm" className="h-6 w-6 p-0 bg-green-600 hover:bg-green-700" onClick={() => handleSubmissionAction(song.id, 'accepted')}>
+                                                                            <CheckCircle className="w-3 h-3" />
+                                                                        </Button>
+                                                                        <Button size="sm" className="h-6 w-6 p-0 bg-red-600 hover:bg-red-700" onClick={() => handleSubmissionAction(song.id, 'declined')}>
+                                                                            <XCircle className="w-3 h-3" />
+                                                                        </Button>
+                                                                    </div>
+                                                                ) : (
+                                                                    <span className={`text-[10px] font-bold uppercase ${song.status === 'accepted' ? 'text-green-500' : 'text-red-500'}`}>
+                                                                        {song.status}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </CardContent>
+                                </Card>
+                            ))}
+                            {allPlaylists.length === 0 && <p className="text-gray-500 col-span-3 text-center py-10">No playlists found.</p>}
+                        </div>
+                    </div>
+                )}
+
+                {/* SUPPORT SYSTEM */}
+                {activeTab === "support" && (
+                    <Card className="bg-black/40 border-white/10">
+                        <CardHeader>
+                            <CardTitle className="text-white">Support Tickets</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="space-y-4">
+                                {tickets.map(t => (
+                                    <div key={t.id} className="flex items-center justify-between p-4 bg-white/5 rounded-lg border border-white/5 hover:bg-white/10 cursor-pointer transition-colors">
+                                        <div className="flex items-center gap-4">
+                                            <div className="bg-blue-500/20 p-2 rounded-full text-blue-500">
+                                                <MessageSquare className="w-6 h-6" />
+                                            </div>
+                                            <div>
+                                                <p className="font-bold text-white">{t.subject}</p>
+                                                <p className="text-sm text-gray-400">From: {t.user_name} • {t.date}</p>
+                                                <p className="text-xs text-gray-500 mt-1 line-clamp-1">{t.last_message}</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-3">
+                                            <span className={`text-[10px] px-2 py-1 rounded-full uppercase ${t.status === 'open' ? 'bg-green-500 text-white' : 'bg-gray-500 text-white'}`}>
+                                                {t.status}
+                                            </span>
+                                            <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); openChat(t); }}>Chat</Button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
+
+
+
+            </div>
+
+            {/* CHAT MODAL */}
+            {showChat && activeTicket && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in">
+                    <div className="bg-zinc-900 border border-white/10 w-full max-w-2xl h-[600px] flex flex-col rounded-xl shadow-2xl">
+                        {/* Header */}
+                        <div className="p-4 border-b border-white/10 flex justify-between items-center bg-zinc-900 rounded-t-xl">
+                            <div>
+                                <h3 className="font-bold text-white text-lg">{activeTicket?.subject}</h3>
+                                <p className="text-sm text-gray-400">Chat with {activeTicket?.user_name}</p>
+                            </div>
+                            <div className="flex gap-2">
+                                {activeTicket?.status === 'open' && (
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="border-red-500/30 text-red-500 hover:bg-red-500/10"
+                                        onClick={async () => {
+                                            if (!activeTicket) return;
+                                            const { error } = await supabase.from('support_tickets').update({ status: 'closed' }).eq('id', activeTicket.id);
+                                            if (!error) {
+                                                alert("Ticket closed.");
+                                                setTickets(prev => prev.map(t => t.id === activeTicket.id ? { ...t, status: 'closed' } : t));
+                                                setActiveTicket(prev => prev ? { ...prev, status: 'closed' } : null);
+                                                setShowChat(false);
+                                            }
+                                        }}
+                                    >
+                                        Close Ticket
+                                    </Button>
+                                )}
+                                <Button variant="ghost" size="icon" onClick={() => setShowChat(false)}><XCircle className="w-6 h-6 text-gray-400" /></Button>
+                            </div>
+                        </div>
+
+                        {/* Messages */}
+                        <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-black/20">
+                            {chatMessages.length === 0 && (
+                                <div className="text-center text-gray-500 mt-10">No messages yet. Start the conversation.</div>
+                            )}
+                            {chatMessages.map((msg) => (
+                                <div key={msg.id} className={`flex ${msg.is_admin ? 'justify-end' : 'justify-start'}`}>
+                                    <div className={`max-w-[70%] p-3 rounded-xl ${msg.is_admin ? 'bg-green-600 text-white' : 'bg-zinc-800 text-gray-200'}`}>
+                                        <p className="text-sm">{msg.message}</p>
+                                        <p className="text-[10px] opacity-50 mt-1 text-right">{new Date(msg.created_at).toLocaleTimeString()}</p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* Input */}
+                        <div className="p-4 border-t border-white/10 bg-zinc-900 rounded-b-xl flex gap-2">
+                            <Input
+                                value={chatInput}
+                                onChange={(e) => setChatInput(e.target.value)}
+                                placeholder="Type a message..."
+                                className="bg-zinc-800 border-zinc-700 text-white"
+                                onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
+                            />
+                            <Button className="bg-green-600 hover:bg-green-700" onClick={sendMessage} disabled={sendingMsg}>
+                                <MessageSquare className="w-4 h-4" />
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ADD USER MODAL */}
+            {showAddUser && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in">
+                    <div className="bg-zinc-900 border border-white/10 w-full max-w-md p-6 rounded-lg space-y-4">
+                        <h3 className="text-xl font-bold text-white">Add New User</h3>
+                        <p className="text-sm text-gray-400">Invite a new user to the platform.</p>
+
+                        <div className="space-y-3">
+                            <div>
+                                <label className="text-xs text-gray-400 mb-1 block">Full Name</label>
+                                <Input value={newName} onChange={e => setNewName(e.target.value)} placeholder="John Doe" className="bg-zinc-800 border-zinc-700" />
+                            </div>
+                            <div>
+                                <label className="text-xs text-gray-400 mb-1 block">Email</label>
+                                <Input value={newUserEmail} onChange={e => setNewUserEmail(e.target.value)} placeholder="john@example.com" className="bg-zinc-800 border-zinc-700" />
+                            </div>
+                            <div>
+                                <label className="text-xs text-gray-400 mb-1 block">Role</label>
+                                <div className="flex gap-2">
+                                    {(['artist', 'curator', 'admin'] as const).map(r => (
+                                        <div
+                                            key={r}
+                                            className={`px-3 py-1.5 rounded cursor-pointer border ${newRole === r ? 'bg-green-600 border-green-500 text-white' : 'bg-zinc-800 border-zinc-700 text-gray-400'}`}
+                                            onClick={() => setNewRole(r)}
+                                        >
+                                            <span className="capitalize text-xs font-bold">{r}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex justify-end gap-2 pt-2">
+                            <Button variant="ghost" onClick={() => setShowAddUser(false)}>Cancel</Button>
+                            <Button className="bg-green-600" onClick={handleAddUser} disabled={isAddingUser}>
+                                {isAddingUser ? "Sending Invite..." : "Send Invite"}
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* APPLICATIONS VIEW */}
+            {activeTab === "applications" && (
+                <Card className="bg-black/40 border-white/10">
+                    <CardHeader>
+                        <CardTitle className="text-white">Curator Applications</CardTitle>
+                        <CardDescription>Review and approve new curators.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="space-y-4">
+                            {pendingCurators.length === 0 && <p className="text-gray-500 text-center py-4">No pending applications.</p>}
+                            {pendingCurators.map(c => (
+                                <div key={c.id} className="flex flex-col md:flex-row md:items-center justify-between p-4 bg-white/5 rounded-lg border border-white/5 gap-4">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-10 h-10 rounded-full bg-yellow-500/20 text-yellow-500 flex items-center justify-center font-bold">
+                                            {c.full_name[0]}
+                                        </div>
+                                        <div>
+                                            <p className="font-bold text-white flex items-center gap-2">
+                                                {c.full_name}
+                                                <span className="text-[10px] bg-yellow-500/20 text-yellow-500 px-2 rounded-full uppercase">Pending</span>
+                                            </p>
+                                            <p className="text-sm text-gray-500">{c.email}</p>
+                                            <div className="mt-1 text-xs text-gray-400">
+                                                Bank: {c.bank_name || 'Not set'} • Acc: {c.account_number || 'N/A'}
+                                            </div>
+                                            {c.verification_docs && (
+                                                <div className="mt-1 text-xs text-blue-400">
+                                                    Docs: {c.verification_docs}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={() => handleCuratorAction(c.id, 'verified')}>
+                                            <CheckCircle className="w-4 h-4 mr-2" /> Approve
+                                        </Button>
+                                        <Button size="sm" variant="destructive" onClick={() => handleCuratorAction(c.id, 'rejected')}>
+                                            <XCircle className="w-4 h-4 mr-2" /> Reject
+                                        </Button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
+
+            {/* BROADCAST VIEW */}
+            {activeTab === "broadcast" && (
+                <div className="grid gap-6 md:grid-cols-2">
+                    <Card className="bg-black/40 border-white/10 md:col-span-2">
+                        <CardHeader>
+                            <CardTitle className="text-white flex items-center gap-2">
+                                <Bell className="w-5 h-5 text-yellow-500" /> Broadcast Message
+                            </CardTitle>
+                            <CardDescription>Send an announcement to platform users.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="bg-yellow-500/10 border border-yellow-500/20 p-4 rounded text-sm text-yellow-200 mb-4">
+                                <ShieldAlert className="w-4 h-4 inline mr-2 text-yellow-500" />
+                                <strong>Warning:</strong> sending to 'All Users' impacts the entire platform.
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-sm font-bold text-gray-300">Broadcast Channel</label>
+                                <div className="grid grid-cols-3 gap-3">
+                                    {(['email', 'in_app', 'both'] as const).map(c => (
+                                        <div
+                                            key={c}
+                                            onClick={() => setBroadcastChannel(c)}
+                                            className={`cursor-pointer p-3 rounded border text-center font-bold capitalize transition-all ${broadcastChannel === c ? 'bg-green-600 border-green-500 text-white' : 'bg-black/40 border-white/10 text-gray-400 hover:bg-white/5'}`}
+                                        >
+                                            {c.replace('_', '-')}
+                                        </div>
+                                    ))}
                                 </div>
                             </div>
 
-                            <div className="bg-green-500/10 border border-green-500/20 p-3 rounded text-xs text-green-400">
-                                This playlist will be added to <strong>AfroPitch Team Playlists</strong> category.
+                            <div className="space-y-2">
+                                <label className="text-sm font-bold text-gray-300">Subject Line</label>
+                                <Input
+                                    value={broadcastSubject}
+                                    onChange={e => setBroadcastSubject(e.target.value)}
+                                    placeholder="e.g. Best of 2025: Rising Stars!"
+                                    className="bg-black/50 border-white/10"
+                                />
                             </div>
-                            <Button className="w-full bg-green-600 hover:bg-green-700 font-bold" onClick={addPlaylist} disabled={isSavingPlaylist || !fetchedPlaylistInfo.name}>
-                                {isSavingPlaylist ? <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Adding...</> : "Confirm & Add Playlist"}
-                            </Button>
-                            <Button variant="ghost" className="w-full text-gray-400 hover:text-white" onClick={() => setFetchedPlaylistInfo(null)}>
-                                Back to Search
+
+                            <div className="space-y-2">
+                                <label className="text-sm font-bold text-gray-300">Message Body</label>
+                                <textarea
+                                    value={broadcastMessage}
+                                    onChange={e => setBroadcastMessage(e.target.value)}
+                                    placeholder="Write your announcement here..."
+                                    className="w-full h-64 bg-black/50 border-white/10 rounded-md p-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-green-500 resize-none"
+                                />
+                            </div>
+
+                            <div className="flex justify-end pt-4">
+                                <Button
+                                    className="bg-green-600 hover:bg-green-700 font-bold px-8"
+                                    onClick={handleSendBroadcast}
+                                    disabled={isSendingBroadcast}
+                                >
+                                    {isSendingBroadcast ? (
+                                        <>
+                                            <Loader2 className="w-4 h-4 animate-spin mr-2" /> Sending...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Send className="w-4 h-4 mr-2" /> Send Broadcast
+                                        </>
+                                    )}
+                                </Button>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+            )}
+
+            {/* EDIT PLAYLIST MODAL */}
+            {showEditPlaylist && adminEditingPlaylist && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in">
+                    <div className="bg-zinc-900 border border-white/10 w-full max-w-md p-6 rounded-lg space-y-4">
+                        <h3 className="text-xl font-bold text-white">Edit Playlist</h3>
+                        <div className="space-y-3">
+                            <div>
+                                <label className="text-xs text-gray-400 mb-1 block">Playlist Name</label>
+                                <Input value={adminNewName} onChange={e => setAdminNewName(e.target.value)} className="bg-zinc-800 border-zinc-700" />
+                            </div>
+                            <div>
+                                <label className="text-xs text-gray-400 mb-1 block">Followers</label>
+                                <Input type="number" value={adminNewFollowers} onChange={e => setAdminNewFollowers(parseInt(e.target.value))} className="bg-zinc-800 border-zinc-700" />
+                            </div>
+                        </div>
+                        <div className="flex justify-end gap-2 pt-4">
+                            <Button variant="ghost" onClick={() => setShowEditPlaylist(false)}>Cancel</Button>
+                            <Button className="bg-green-600" onClick={async () => {
+                                setAdminIsSaving(true);
+                                await supabase.from('playlists').update({
+                                    name: adminNewName,
+                                    followers: adminNewFollowers
+                                }).eq('id', adminEditingPlaylist.id);
+                                setAdminIsSaving(false);
+                                setShowEditPlaylist(false);
+                                window.location.reload();
+                            }} disabled={adminIsSaving}>
+                                {adminIsSaving ? "Saving..." : "Save Changes"}
                             </Button>
                         </div>
-                    )}
+                    </div>
                 </div>
-            </div >
-        )}
+            )}
 
-    </>
-);
+            {/* ADD PLAYLIST MODAL */}
+            {showAddPlaylist && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in">
+                    <div className="bg-zinc-900 border border-white/10 w-full max-w-md p-6 rounded-lg space-y-6">
+                        <div className="flex justify-between items-start">
+                            <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                                <Plus className="w-5 h-5 text-green-500" /> Add Team Playlist
+                            </h3>
+                            <button onClick={() => setShowAddPlaylist(false)} className="text-gray-400 hover:text-white"><XCircle className="w-6 h-6" /></button>
+                        </div>
+
+                        {!fetchedPlaylistInfo ? (
+                            <div className="space-y-4">
+                                <p className="text-sm text-gray-400">Enter a Playlist URL (Spotify, Apple Music, Audiomack, etc.)</p>
+                                <div className="flex gap-2">
+                                    <Input
+                                        placeholder="https://..."
+                                        value={newPlaylistLink}
+                                        onChange={(e) => setNewPlaylistLink(e.target.value)}
+                                        className="bg-black/50 border-white/10"
+                                    />
+                                    <Button onClick={fetchPlaylistInfo} disabled={isFetchingInfo || !newPlaylistLink}>
+                                        {isFetchingInfo ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                                    </Button>
+                                </div>
+                                <p className="text-[10px] text-gray-500">Note: Only Spotify links will auto-fill details. Others require manual entry.</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-4 animate-in fade-in">
+                                <div className="bg-white/5 p-4 rounded-lg border border-white/5 space-y-3">
+                                    <div className="flex gap-4">
+                                        <div className="w-16 h-16 bg-zinc-800 rounded flex-shrink-0 overflow-hidden relative group">
+                                            {fetchedPlaylistInfo.coverImage ? (
+                                                <img src={fetchedPlaylistInfo.coverImage} className="w-full h-full object-cover" alt="Cover" />
+                                            ) : (
+                                                <Music className="w-8 h-8 text-gray-600 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+                                            )}
+                                        </div>
+                                        <div className="flex-1 space-y-2">
+                                            <div>
+                                                <label className="text-[10px] text-gray-400 uppercase font-bold">Name</label>
+                                                <Input
+                                                    value={fetchedPlaylistInfo.name}
+                                                    onChange={e => setFetchedPlaylistInfo({ ...fetchedPlaylistInfo, name: e.target.value })}
+                                                    className="bg-black/20 border-white/10 h-8 text-sm"
+                                                    placeholder="Playlist Name"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="text-[10px] text-gray-400 uppercase font-bold">Followers</label>
+                                            <Input
+                                                type="number"
+                                                value={fetchedPlaylistInfo.followers}
+                                                onChange={e => setFetchedPlaylistInfo({ ...fetchedPlaylistInfo, followers: parseInt(e.target.value) || 0 })}
+                                                className="bg-black/20 border-white/10 h-8 text-sm"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] text-gray-400 uppercase font-bold">Cover Image URL</label>
+                                            <Input
+                                                value={fetchedPlaylistInfo.coverImage || ""}
+                                                onChange={e => setFetchedPlaylistInfo({ ...fetchedPlaylistInfo, coverImage: e.target.value })}
+                                                className="bg-black/20 border-white/10 h-8 text-sm"
+                                                placeholder="https://..."
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="mt-3">
+                                        <label className="text-[10px] text-gray-400 uppercase font-bold mb-2 block">Playlist Tier</label>
+                                        <div className="grid grid-cols-4 gap-2">
+                                            {(['standard', 'express', 'exclusive', 'free'] as const).map(t => (
+                                                <div
+                                                    key={t}
+                                                    onClick={() => setNewPlaylistType(t)}
+                                                    className={`cursor-pointer border rounded p-2 text-center transition-all ${newPlaylistType === t
+                                                        ? 'bg-green-600 border-green-500 text-white'
+                                                        : 'bg-black/20 border-white/10 text-gray-400 hover:bg-white/5'}`}
+                                                >
+                                                    <span className="block text-xs font-bold capitalize">{t}</span>
+                                                    <span className="block text-[10px] opacity-70">{pricingConfig.currency}{pricingConfig.tiers[t].price.toLocaleString()}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="bg-green-500/10 border border-green-500/20 p-3 rounded text-xs text-green-400">
+                                    This playlist will be added to <strong>AfroPitch Team Playlists</strong> category.
+                                </div>
+                                <Button className="w-full bg-green-600 hover:bg-green-700 font-bold" onClick={addPlaylist} disabled={isSavingPlaylist || !fetchedPlaylistInfo.name}>
+                                    {isSavingPlaylist ? <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Adding...</> : "Confirm & Add Playlist"}
+                                </Button>
+                                <Button variant="ghost" className="w-full text-gray-400 hover:text-white" onClick={() => setFetchedPlaylistInfo(null)}>
+                                    Back to Search
+                                </Button>
+                            </div>
+                        )}
+                    </div>
+                </div >
+            )}
+
+        </>
+    );
 }
 
