@@ -229,7 +229,7 @@ export default function AdminDashboard() {
                     name: p.name,
                     followers: p.followers,
                     type: p.type,
-
+                    playlist_link: p.playlist_link,
                     created_at: new Date(p.created_at).toLocaleDateString()
                 })));
             }
