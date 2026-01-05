@@ -275,7 +275,7 @@ export default function AdminDashboard() {
                     const amount = s.amount_paid || 0;
                     totalRev += amount;
 
-                    const isAdminPlaylist = s.playlist?.curator_id === user.id;
+                    const isAdminPlaylist = s.playlist?.curator_id === user?.id;
 
                     if (isAdminPlaylist) {
                         profit += amount;
