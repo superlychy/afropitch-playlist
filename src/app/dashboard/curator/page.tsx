@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { DollarSign, CheckCircle, XCircle, Clock, Settings, User, Plus, ListMusic, MoreVertical, Star, Zap, HelpCircle, Send, LogOut, Trash2, Edit, MessageSquare, ChevronLeft, AlertCircle, Bell } from "lucide-react";
+import { DollarSign, CheckCircle, XCircle, Clock, Settings, User, Plus, ListMusic, MoreVertical, Star, Zap, HelpCircle, Send, LogOut, Trash2, Edit, MessageSquare, ChevronLeft, AlertCircle, Bell, RefreshCw } from "lucide-react";
 import { pricingConfig } from "@/../config/pricing";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,6 +22,7 @@ interface Playlist {
     type: "free" | "standard" | "express" | "exclusive";
     cover_image: string;
     description?: string;
+    playlist_link?: string;
 }
 
 export default function CuratorDashboard() {
@@ -120,6 +121,7 @@ export default function CuratorDashboard() {
     // Real Data State
     const [reviews, setReviews] = useState<any[]>([]);
     const [loadingReviews, setLoadingReviews] = useState(true);
+    const [isRefreshing, setIsRefreshing] = useState<string | null>(null);
 
 
 
@@ -589,6 +591,43 @@ export default function CuratorDashboard() {
         setIsLoadingSongs(false);
     };
 
+    const handleRefreshPlaylist = async (playlist: Playlist) => {
+        if (!playlist.playlist_link) {
+            alert("Cannot refresh: No Spotify link found for this playlist.");
+            return;
+        }
+        setIsRefreshing(playlist.id);
+        try {
+            const res = await fetch('/api/playlist-info', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ link: playlist.playlist_link })
+            });
+            const data = await res.json();
+            if (data.success) {
+                // Update Supabase
+                const { error } = await supabase.from('playlists').update({
+                    name: data.name,
+                    cover_image: data.cover_image,
+                    followers: data.followers,
+                    description: `${data.total_tracks} songs`
+                }).eq('id', playlist.id);
+
+                if (error) throw error;
+
+                alert("Playlist updated successfully from Spotify!");
+                fetchCuratorData(); // Reload list
+            } else {
+                alert("Failed to fetch Spotify data: " + (data.error || "Unknown error"));
+            }
+        } catch (err) {
+            console.error("Refresh Error", err);
+            alert("Error refreshing playlist.");
+        } finally {
+            setIsRefreshing(null);
+        }
+    };
+
     // Auto-fetch info using our internal API
     useEffect(() => {
         if (newPlaylistLink.includes("spotify.com") && !newName) {
@@ -968,6 +1007,9 @@ export default function CuratorDashboard() {
                                             </div>
                                         </div>
                                         <div className="flex gap-2 justify-end">
+                                            <Button size="icon" variant="ghost" className="h-6 w-6 text-gray-500 hover:text-white" onClick={() => handleRefreshPlaylist(playlist)} disabled={isRefreshing === playlist.id} title="Refresh Metadata">
+                                                <RefreshCw className={`w-3 h-3 ${isRefreshing === playlist.id ? 'animate-spin' : ''}`} />
+                                            </Button>
                                             <Button size="icon" variant="ghost" className="h-6 w-6 text-gray-500 hover:text-white" onClick={() => openEditModal(playlist)}>
                                                 <Edit className="w-3 h-3" />
                                             </Button>
@@ -1079,14 +1121,14 @@ export default function CuratorDashboard() {
 
                             <div className="space-y-4">
                                 <h4 className="text-sm font-bold text-gray-400 border-b border-white/10 pb-2">Profile Avatar</h4>
-                                <div className="grid grid-cols-4 gap-4">
-                                    {[1, 2, 3, 4].map((num) => (
+                                <div className="grid grid-cols-5 gap-4">
+                                    {['/logo.png', '/avatars/curator_avatar_1.png', '/avatars/curator_avatar_2.png', '/avatars/curator_avatar_3.png', '/avatars/curator_avatar_4.png'].map((src, idx) => (
                                         <div
-                                            key={num}
-                                            onClick={() => setProfileAvatar(`/avatars/curator_avatar_${num}.png`)}
-                                            className={`aspect-square rounded-full overflow-hidden cursor-pointer border-2 transition-all ${profileAvatar === `/avatars/curator_avatar_${num}.png` ? 'border-green-500 scale-110' : 'border-transparent hover:border-white/50'}`}
+                                            key={idx}
+                                            onClick={() => setProfileAvatar(src)}
+                                            className={`aspect-square rounded-full overflow-hidden cursor-pointer border-2 transition-all ${profileAvatar === src ? 'border-green-500 scale-110' : 'border-transparent hover:border-white/50'}`}
                                         >
-                                            <img src={`/avatars/curator_avatar_${num}.png`} alt={`Avatar ${num}`} className="w-full h-full object-cover" />
+                                            <img src={src} alt={`Avatar ${idx}`} className="w-full h-full object-cover" />
                                         </div>
                                     ))}
                                 </div>
