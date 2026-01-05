@@ -44,13 +44,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         let mounted = true;
 
-        // Safety timeout to prevent infinite loading
+        // Safety timeout to prevent infinite loading (User requested 6s)
         const loadingTimeout = setTimeout(() => {
             if (mounted && isLoading) {
-                console.warn("Auth check timed out, forcing load completion.");
+                console.warn("Auth check timed out (6s), forcing load completion.");
                 setIsLoading(false);
             }
-        }, 8000); // 8 seconds backup
+        }, 6000);
 
         const syncProfile = async (session: any) => {
             if (!session?.user) {
@@ -66,13 +66,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     .eq('id', session.user.id)
                     .single();
 
-                if (error) {
-                    // If error is "Row not found" (PGRST116), it's fine, we create one.
-                    // But if it's connection error, we might want to be careful.
-                    // For now, proceed to create if missing.
-                    if (error.code !== 'PGRST116') {
-                        console.error("Profile fetch error:", error);
-                    }
+                if (error && error.code !== 'PGRST116') {
+                    console.error("Profile fetch error:", error);
+                    // Do NOT logout here, just try to survive
                 }
 
                 if (profile && mounted) {
@@ -91,10 +87,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     return;
                 }
 
-                // 2. If no profile, create one (First time login or data wiped)
+                // 2. If no profile or fetch failed, create/fallback
                 const role = session.user.user_metadata?.role || (session.user.email?.includes("curator") ? "curator" : "artist");
                 const name = session.user.user_metadata?.full_name || session.user.email?.split("@")[0] || "User";
 
+                // Only attempt insert if we really think it's missing (PGRST116) or just try blindly (upsert might be better but let's stick to logic)
+                // If it was a connection error, insert might also fail.
                 const newProfile = {
                     id: session.user.id,
                     email: session.user.email,
@@ -118,8 +116,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                         earnings: 0
                     });
                 } else if (mounted) {
-                    // Critical fallback if DB is partial but Auth is valid
-                    console.error("Error creating profile during sync:", insertError);
+                    // Fallback to session data so user is technically "logged in" even if DB is flaky
+                    console.warn("Using session fallback due to DB error:", insertError || error);
                     setUser({
                         id: session.user.id,
                         name: name,
@@ -131,30 +129,55 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 }
 
             } catch (e) {
-                console.error("Profile sync unexpected error", e);
-                // If profile sync fails catastrophically, we might want to nullify user to prevent broken UI
-                // But let's keep them logged in with basic info if possible logic above handles it.
+                console.error("Profile sync truly unexpected error", e);
+                // Even here, keep them logged in if we have session
+                if (session?.user && mounted) {
+                    setUser({
+                        id: session.user.id,
+                        name: session.user.email?.split("@")[0] || "User",
+                        email: session.user.email || "",
+                        role: "artist", // Default to safe role
+                        balance: 0,
+                        earnings: 0
+                    });
+                }
             }
         };
 
         const getSession = async () => {
-            try {
-                const { data: { session }, error } = await supabase.auth.getSession();
-                if (error) {
-                    console.error("getSession error:", error);
-                    // If session is invalid, clear it
-                    if (error.message.includes("invalid")) {
-                        await supabase.auth.signOut();
+            let attempts = 0;
+            const maxAttempts = 3;
+
+            while (attempts < maxAttempts) {
+                try {
+                    const { data: { session }, error } = await supabase.auth.getSession();
+
+                    if (!error) {
+                        if (mounted) await syncProfile(session);
+                        break; // Success
                     }
+
+                    console.warn(`getSession attempt ${attempts + 1} failed:`, error);
+                    attempts++;
+
+                    if (attempts < maxAttempts) {
+                        // Wait 1s before auto-retry (User requested "refresh automatically")
+                        await new Promise(r => setTimeout(r, 1000));
+                    } else {
+                        // Final failure after retries
+                        console.error("All auth attempts failed.");
+                        // We DO NOT signOut. We just let it be.
+                    }
+                } catch (err) {
+                    console.error("Auth Exception:", err);
+                    attempts++;
+                    if (attempts < maxAttempts) await new Promise(r => setTimeout(r, 1000));
                 }
-                if (mounted) await syncProfile(session);
-            } catch (error) {
-                console.error("Auth initialization error:", error);
-            } finally {
-                if (mounted) {
-                    clearTimeout(loadingTimeout);
-                    setIsLoading(false);
-                }
+            }
+
+            if (mounted) {
+                clearTimeout(loadingTimeout);
+                setIsLoading(false);
             }
         };
 
