@@ -107,7 +107,8 @@ export default function AdminDashboard() {
         afropitchProfit: 0,
         curatorHoldings: 0,
         totalWithdrawn: 0,
-        totalPending: 0
+        totalPending: 0,
+        artistHoldings: 0
     });
 
     const pendingWithdrawalsCount = withdrawals.filter(w => w.status === 'pending').length;
@@ -294,12 +295,18 @@ export default function AdminDashboard() {
 
                 const holdings = curatorShareTotal - withdrawn;
 
+                // Calculate Artist Holdings (Sum of balances of all artists)
+                // We reuse 'users' from Step 1 if available, otherwise 0.
+                const artistHoldings = users?.filter((u: any) => u.role === 'artist')
+                    .reduce((acc: number, curr: any) => acc + (curr.balance || 0), 0) || 0;
+
                 setFinStats({
                     totalRevenue: totalRev,
                     afropitchProfit: profit,
                     curatorHoldings: holdings,
                     totalWithdrawn: withdrawn,
-                    totalPending: pendingWithdrawals
+                    totalPending: pendingWithdrawals,
+                    artistHoldings: artistHoldings
                 });
             } setTopPlaylists(topPl as TopPlaylist[]);
         }
@@ -581,6 +588,42 @@ const handleRefreshPlaylist = async (playlist: any) => {
         alert("Error refreshing playlist: " + err.message);
     } finally {
         setIsRefreshing(null);
+    }
+};
+
+const togglePlaylistSongs = async (playlistId: string) => {
+    if (expandedPlaylistId === playlistId) {
+        setExpandedPlaylistId(null);
+        return;
+    }
+    setExpandedPlaylistId(playlistId);
+    setIsLoadingSongs(true);
+
+    const { data } = await supabase
+        .from('submissions')
+        .select('*, artist:profiles(full_name)')
+        .eq('playlist_id', playlistId)
+        // Show all statuses so admin can see history, or just pending? 
+        // User: "accept or reject". So at least pending.
+        .order('created_at', { ascending: false });
+
+    if (data) setPlaylistSongs(data);
+    setIsLoadingSongs(false);
+};
+
+const handleSubmissionAction = async (submissionId: string, action: 'accepted' | 'declined') => {
+    if (!confirm(`Are you sure you want to ${action} this song?`)) return;
+
+    const { error } = await supabase
+        .from('submissions')
+        .update({ status: action })
+        .eq('id', submissionId);
+
+    if (error) {
+        alert("Error: " + error.message);
+    } else {
+        alert(`Song ${action}!`);
+        setPlaylistSongs(prev => prev.map(s => s.id === submissionId ? { ...s, status: action } : s));
     }
 };
 
@@ -927,7 +970,7 @@ return (
                     </div>
 
                     {/* Financial Snapshot */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
                         <Card className="bg-blue-600/10 border-blue-500/20">
                             <CardHeader className="pb-2"><CardTitle className="text-sm text-gray-400">Total Volume</CardTitle></CardHeader>
                             <CardContent><div className="text-2xl font-bold text-white">{pricingConfig.currency}{finStats.totalRevenue.toLocaleString()}</div></CardContent>
@@ -944,6 +987,13 @@ return (
                             <CardContent>
                                 <div className="text-2xl font-bold text-white">{pricingConfig.currency}{finStats.curatorHoldings.toLocaleString()}</div>
                                 <p className="text-xs text-gray-400">Payable to Curators</p>
+                            </CardContent>
+                        </Card>
+                        <Card className="bg-pink-600/10 border-pink-500/20">
+                            <CardHeader className="pb-2"><CardTitle className="text-sm text-gray-400">Artist Holdings</CardTitle></CardHeader>
+                            <CardContent>
+                                <div className="text-2xl font-bold text-white">{pricingConfig.currency}{finStats.artistHoldings.toLocaleString()}</div>
+                                <p className="text-xs text-gray-400">Artist Wallet Balances</p>
                             </CardContent>
                         </Card>
                         <Card className="bg-orange-600/10 border-orange-500/20">
@@ -1071,6 +1121,49 @@ return (
                                             Delete
                                         </Button>
                                     </div>
+
+                                    {/* Song Management (Admin Playlists Only) */}
+                                    {playlist.curator_id === user?.id && (
+                                        <div className="mt-4 pt-4 border-t border-white/5">
+                                            <Button
+                                                size="sm"
+                                                variant="secondary"
+                                                className="w-full mb-2 bg-white/10 hover:bg-white/20 text-white"
+                                                onClick={() => togglePlaylistSongs(playlist.id)}
+                                            >
+                                                {expandedPlaylistId === playlist.id ? "Hide Submissions" : "Manage Submissions"}
+                                            </Button>
+
+                                            {expandedPlaylistId === playlist.id && (
+                                                <div className="space-y-2 animate-in fade-in">
+                                                    {isLoadingSongs && <div className="text-center py-2"><Loader2 className="w-4 h-4 animate-spin mx-auto text-green-500" /></div>}
+                                                    {!isLoadingSongs && playlistSongs.length === 0 && <p className="text-xs text-gray-500 text-center">No submissions yet.</p>}
+                                                    {!isLoadingSongs && playlistSongs.map(song => (
+                                                        <div key={song.id} className="flex justify-between items-center bg-black/40 p-2 rounded border border-white/5">
+                                                            <div className="overflow-hidden">
+                                                                <p className="text-xs text-white font-bold truncate">{song.artist?.full_name || 'Unknown Artist'}</p>
+                                                                <a href={song.song_link} target="_blank" rel="noopener noreferrer" className="text-[10px] text-blue-400 hover:underline truncate block">View Song</a>
+                                                            </div>
+                                                            {song.status === 'pending' ? (
+                                                                <div className="flex gap-1">
+                                                                    <Button size="sm" className="h-6 w-6 p-0 bg-green-600 hover:bg-green-700" onClick={() => handleSubmissionAction(song.id, 'accepted')}>
+                                                                        <CheckCircle className="w-3 h-3" />
+                                                                    </Button>
+                                                                    <Button size="sm" className="h-6 w-6 p-0 bg-red-600 hover:bg-red-700" onClick={() => handleSubmissionAction(song.id, 'declined')}>
+                                                                        <XCircle className="w-3 h-3" />
+                                                                    </Button>
+                                                                </div>
+                                                            ) : (
+                                                                <span className={`text-[10px] font-bold uppercase ${song.status === 'accepted' ? 'text-green-500' : 'text-red-500'}`}>
+                                                                    {song.status}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
                                 </CardContent>
                             </Card>
                         ))}
