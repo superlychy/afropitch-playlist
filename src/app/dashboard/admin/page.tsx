@@ -1097,8 +1097,8 @@ export default function AdminDashboard() {
                                             <div className="mt-4 pt-4 border-t border-white/5">
                                                 <Button
                                                     size="sm"
-                                                    variant="secondary"
-                                                    className="w-full mb-2 bg-white/10 hover:bg-white/20 text-white"
+                                                    variant="outline"
+                                                    className="w-full mb-2 bg-white/10 hover:bg-white/20 text-white border-white/10"
                                                     onClick={() => togglePlaylistSongs(playlist.id)}
                                                 >
                                                     {expandedPlaylistId === playlist.id ? "Hide Submissions" : "Manage Submissions"}
