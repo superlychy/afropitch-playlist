@@ -95,7 +95,7 @@ export default function ArtistDashboard() {
         const { data } = await supabase
             .from('broadcasts')
             .select('*')
-            .or('target_role.eq.all,target_role.is.null,target_role.eq.artist')
+            .or('target_role.eq.all,target_role.is.null,target_role.eq.artist') // Fetch meaningful notifications for artist
             .order('created_at', { ascending: false })
             .limit(20);
 
