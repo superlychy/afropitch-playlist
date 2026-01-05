@@ -242,7 +242,7 @@ export default function PlaylistsPage() {
                                             <div className="flex items-center justify-between">
                                                 <div className="w-16 h-16 rounded-full bg-zinc-800 flex items-center justify-center text-2xl font-bold text-white overflow-hidden border-2 border-white/10">
                                                     {curator.role === 'admin' ? (
-                                                        <img src="/logo.png" className="w-full h-full object-contain p-1" alt="Admin" />
+                                                        <img src="/admin_avatar.png" className="w-full h-full object-cover" alt="Admin" />
                                                     ) : curator.avatar_url ? (
                                                         <img src={curator.avatar_url} className="w-full h-full object-cover" alt={curator.full_name} />
                                                     ) : (

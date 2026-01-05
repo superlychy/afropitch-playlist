@@ -865,7 +865,7 @@ export default function CuratorDashboard() {
                                                 <div key={idx} className={`flex items-end gap-2 ${isMe ? 'justify-end' : 'justify-start'}`}>
                                                     {!isMe && (
                                                         <div className="w-6 h-6 rounded-full overflow-hidden bg-white shrink-0 mb-1">
-                                                            <img src="/logo.png" alt="Admin" className="w-full h-full object-contain" />
+                                                            <img src="/admin_avatar.png" alt="Admin" className="w-full h-full object-cover" />
                                                         </div>
                                                     )}
                                                     <div className={`max-w-[75%] p-3 rounded-xl text-sm ${isMe ? 'bg-green-600 text-white rounded-br-none' : 'bg-zinc-700 text-gray-200 rounded-bl-none'}`}>
