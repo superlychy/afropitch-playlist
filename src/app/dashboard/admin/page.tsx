@@ -307,7 +307,8 @@ export default function AdminDashboard() {
                     curatorHoldings: holdings,
                     totalWithdrawn: withdrawn,
                     totalPending: pendingWithdrawals,
-                    artistHoldings: artistHoldings
+                    artistHoldings: artistHoldings,
+                    totalHoldings: holdings + artistHoldings
                 });
             }
         };
