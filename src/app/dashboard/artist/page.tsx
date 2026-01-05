@@ -103,7 +103,9 @@ export default function ArtistDashboard() {
             // The previous code had `.in('channel', ...`.
             // Let's broaden it to ensure we catch the 'email' ones too if they double as in-app, or just all.
             // Simplified:
-            .or('channel.eq.in_app,channel.eq.both,channel.eq.email')
+            .from('broadcasts')
+            .select('*')
+            .or('target_role.eq.all,target_role.is.null,target_role.eq.artist')
             .order('created_at', { ascending: false })
             .limit(20);
 

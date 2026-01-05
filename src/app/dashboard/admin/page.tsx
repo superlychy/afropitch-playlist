@@ -600,21 +600,29 @@ export default function AdminDashboard() {
         }
         setIsSendingBroadcast(true);
 
-        const { error } = await supabase.from('broadcasts').insert({
-            subject: broadcastSubject,
-            message: broadcastMessage,
-            sender_id: user?.id,
-            channel: broadcastChannel
-        });
+        try {
+            const { error } = await supabase.from('broadcasts').insert({
+                subject: broadcastSubject,
+                message: broadcastMessage,
+                sender_id: user?.id,
+                channel: broadcastChannel,
+                target_role: 'all' // Explicitly set target to all for now
+            });
 
-        if (error) {
-            alert("Error sending broadcast: " + error.message);
-        } else {
-            alert("Broadcast queued! Emails will be sent shortly.");
-            setBroadcastSubject("");
-            setBroadcastMessage("");
+            if (error) {
+                console.error("Broadcast Error:", error);
+                alert("Error sending broadcast: " + error.message);
+            } else {
+                alert("Broadcast queued successfully! Users will receive it shortly.");
+                setBroadcastSubject("");
+                setBroadcastMessage("");
+            }
+        } catch (err: any) {
+            console.error("Unexpected Broadcast Error:", err);
+            alert("An unexpected error occurred while sending broadcast.");
+        } finally {
+            setIsSendingBroadcast(false);
         }
-        setIsSendingBroadcast(false);
     };
 
     if (isLoading) return <div className="p-10 text-center text-white">Loading Admin...</div>;

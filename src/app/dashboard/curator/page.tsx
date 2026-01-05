@@ -282,7 +282,7 @@ export default function CuratorDashboard() {
         const { data } = await supabase
             .from('broadcasts')
             .select('*')
-            .or('channel.eq.in_app,channel.eq.both,channel.eq.email')
+            .or('target_role.eq.all,target_role.is.null,target_role.eq.curator')
             .order('created_at', { ascending: false })
             .limit(20);
 
