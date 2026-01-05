@@ -36,7 +36,7 @@ export default function PlaylistsPage() {
                 const fetchCuratorsPromise = supabase
                     .from('profiles')
                     .select('*, playlists(count)')
-                    .eq('role', 'curator');
+                    .or('role.eq.curator,role.eq.admin');
 
                 const timeoutPromise = new Promise((_, reject) =>
                     setTimeout(() => reject(new Error("Request timed out")), 15000)
@@ -241,8 +241,10 @@ export default function PlaylistsPage() {
                                         <CardHeader className="pb-2">
                                             <div className="flex items-center justify-between">
                                                 <div className="w-16 h-16 rounded-full bg-zinc-800 flex items-center justify-center text-2xl font-bold text-white overflow-hidden border-2 border-white/10">
-                                                    {curator.avatar_url ? (
-                                                        <img src={curator.avatar_url} className="w-full h-full object-cover" />
+                                                    {curator.role === 'admin' ? (
+                                                        <img src="/logo.png" className="w-full h-full object-contain p-1" alt="Admin" />
+                                                    ) : curator.avatar_url ? (
+                                                        <img src={curator.avatar_url} className="w-full h-full object-cover" alt={curator.full_name} />
                                                     ) : (
                                                         curator.full_name?.[0] || <User className="w-8 h-8 text-gray-500" />
                                                     )}
