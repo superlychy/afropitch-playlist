@@ -17,5 +17,8 @@ export const siteConfig = {
     "Nigerian music promotion", "Ghanaian music", "South African Amapiano",
     "Francophone African playlists", "music marketing africa", "independent artist",
     "Afropitch", "Afrobeat playlists", "Amapiano playlists"
-  ]
+  ],
+  contact: {
+    email: "hello@afropitchplaylist.com"
+  }
 };
