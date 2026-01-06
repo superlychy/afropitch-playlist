@@ -17,7 +17,7 @@ declare
   -- URL: https://gildytqinnntmtvbagxm.supabase.co/functions/v1/notify-admin
   -- KEY: (Assuming standard Anon Key from prev migration)
   endpoint_url text := 'https://gildytqinnntmtvbagxm.supabase.co/functions/v1/notify-admin';
-  api_key text := 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdpbGR5dHFpbm5udG10dmJhZ3htIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY3MDIzOTEsImV4cCI6MjA4MjI3ODM5MX0.9x7utKiltdD8zzwWWi_8D2PTW0Y17Pi9dHQ5eTnX7fg';
+  api_key text := 'YOUR_SUPABASE_ANON_KEY'; -- Replace this in Supabase Dashboard SQL Editor
 begin
   payload = jsonb_build_object(
     'type', TG_OP,
