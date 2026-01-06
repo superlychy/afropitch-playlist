@@ -16,7 +16,9 @@ export const siteConfig = {
     "Audiomack playlists", "Boomplay curation", "Deezer playlists",
     "Nigerian music promotion", "Ghanaian music", "South African Amapiano",
     "Francophone African playlists", "music marketing africa", "independent artist",
-    "Afropitch", "Afrobeat playlists", "Amapiano playlists"
+    "Afrobeat playlists", "Amapiano playlists",
+    "pitch afro playlist", "nigerian playlist", "ghanian playlist",
+    "free playlist in nigeria", "afrobeats playlist submission free"
   ],
   contact: {
     email: "hello@afropitchplaylist.com"
