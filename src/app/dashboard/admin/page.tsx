@@ -883,14 +883,40 @@ export default function AdminDashboard() {
                         </div>
                         <Button variant="outline" size="sm" className="hidden md:flex border-green-500/20 text-green-500 hover:bg-green-500/10 mr-2" onClick={async () => {
                             if (!confirm("Send a test notification to your configured Webhook?")) return;
-                            const { error } = await supabase.functions.invoke('notify-admin', {
-                                body: {
-                                    event_type: 'MANUAL_LOG',
-                                    message: "🔔 Test Notification from Admin Dashboard"
+
+                            // Debugging: Try direct fetch to see status code
+                            try {
+                                const { data: { session } } = await supabase.auth.getSession();
+                                const token = session?.access_token;
+
+                                // Construct URL (assuming standard Supabase pattern)
+                                // Function URL is normally: https://[project].supabase.co/functions/v1/notify-admin
+                                // We can get project ref from env or just rely on relative path /functions/v1/notify-admin if proxying? 
+                                // No, Next.js doesn't proxy functions by default.
+                                // We'll stick to invoke() but unwrap error better.
+
+                                const { data, error } = await supabase.functions.invoke('notify-admin', {
+                                    body: {
+                                        event_type: 'MANUAL_LOG',
+                                        message: "🔔 Test Notification from Admin Dashboard"
+                                    }
+                                });
+
+                                if (error) {
+                                    // Supabase FunctionsHttpError has status
+                                    console.error("Invoke Error:", error);
+                                    let status = "Unknown";
+                                    if (error && typeof error === 'object' && 'context' in error) {
+                                        // Try to dig out status
+                                    }
+
+                                    // Try raw fetch alternative to debug
+                                    alert(`Invoke Failed: ${error.message}. Check Console for details.`);
                                 }
-                            });
-                            if (error) alert("Failed: " + error.message);
-                            else alert("Test sent! Check your Discord/Slack.");
+                                else alert("Test sent! Check your Discord/Slack.");
+                            } catch (e: any) {
+                                alert("Unexpected Client Error: " + e.message);
+                            }
                         }}>
                             Test Webhook
                         </Button>
