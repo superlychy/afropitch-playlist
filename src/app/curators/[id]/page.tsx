@@ -178,7 +178,7 @@ export default function CuratorProfile() {
                                             <div className="p-5 space-y-4 flex-1 flex flex-col">
                                                 <div className="flex items-center justify-between text-sm text-gray-400">
                                                     <span className="flex items-center gap-1.5"><Users className="w-4 h-4" /> {playlist.followers.toLocaleString()}</span>
-                                                    {songs && songs > 0 && <span className="text-xs bg-white/10 px-2 py-1 rounded-full">{songs} Items</span>}
+                                                    {(songs || 0) > 0 && <span className="text-xs bg-white/10 px-2 py-1 rounded-full">{songs} Items</span>}
                                                 </div>
 
                                                 <div className="mt-auto pt-4 border-t border-white/5 flex items-center justify-between">

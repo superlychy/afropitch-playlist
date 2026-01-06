@@ -193,10 +193,12 @@ export default function PlaylistsPage() {
                                         </div>
 
                                         <div className="p-5 space-y-4 flex-1 flex flex-col">
-                                            <p className="text-sm text-gray-400 line-clamp-2">{playlist.description}</p>
+                                            <p className="text-sm text-gray-400 line-clamp-2">
+                                                {(playlist.description && !playlist.description.match(/^0\s+(songs|items)/i)) ? playlist.description : "No description available."}
+                                            </p>
                                             <div className="flex items-center justify-between text-sm text-gray-400">
                                                 <span className="flex items-center gap-1.5"><Users className="w-4 h-4" /> {playlist.followers.toLocaleString()}</span>
-                                                {playlist.songCount && playlist.songCount > 0 && <span className="text-xs bg-white/10 px-2 py-1 rounded-full">{playlist.songCount} Items</span>}
+                                                {(playlist.songCount || 0) > 0 && <span className="text-xs bg-white/10 px-2 py-1 rounded-full">{playlist.songCount} Items</span>}
                                             </div>
 
                                             <div className="mt-auto pt-4 border-t border-white/5 flex items-center justify-between gap-3">

@@ -507,7 +507,7 @@ export default function CuratorDashboard() {
             cover_image: newCoverImage,
             followers: newFollowers,
             type: newPlaylistType,
-            description: `${songsCount} songs`,
+            description: `Playlist · ${user.name || 'Curator'} · ${songsCount} items · ${newFollowers.toLocaleString()} saves`,
             playlist_link: newPlaylistLink
         };
 
@@ -628,7 +628,7 @@ export default function CuratorDashboard() {
                     name: data.name,
                     cover_image: data.cover_image,
                     followers: data.followers,
-                    description: `${data.total_tracks} songs`
+                    description: `Playlist · ${user?.name || 'Curator'} · ${data.songsCount} items · ${data.followers.toLocaleString()} saves`
                 }).eq('id', playlist.id);
 
                 if (error) throw error;

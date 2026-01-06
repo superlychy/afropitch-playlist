@@ -51,7 +51,7 @@ export default function PlaylistDetail() {
 
     // Parse song count from description if available
     const songCountMatch = (playlist.description || "").match(/(\d+)\s+(songs|items|tracks)/i);
-    const songCount = songCountMatch ? songCountMatch[1] : "?";
+    const songCount = songCountMatch ? parseInt(songCountMatch[1]) : 0;
 
     return (
         <div className="min-h-screen bg-black text-white pb-20">
@@ -93,10 +93,12 @@ export default function PlaylistDetail() {
                                 <span className="text-white font-bold text-lg">{playlist.followers.toLocaleString()}</span>
                                 <span>Followers</span>
                             </div>
-                            <div className="flex flex-col">
-                                <span className="text-white font-bold text-lg">{songCount}</span>
-                                <span>Items</span>
-                            </div>
+                            {songCount > 0 && (
+                                <div className="flex flex-col">
+                                    <span className="text-white font-bold text-lg">{songCount}</span>
+                                    <span>Items</span>
+                                </div>
+                            )}
                             <div className="flex flex-col">
                                 <span className="text-white font-bold text-lg">
                                     {playlist.type === 'exclusive'
