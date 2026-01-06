@@ -29,21 +29,37 @@ Deno.serve(async (req) => {
         return new Response("Configuration Error", { status: 500, headers: corsHeaders });
     }
 
+    let payload;
+    let bodyText = "";
+
     try {
-        let payload;
-        try {
-            payload = await req.json();
-        } catch (jsonErr) {
-            console.error("Failed to parse JSON body:", jsonErr);
-            const textBody = await req.text();
-            console.error("RAW BODY RECEIVED:", textBody);
-            return new Response("Invalid JSON Body", { status: 400, headers: corsHeaders });
+        bodyText = await req.text();
+        if (!bodyText) {
+            console.log("Empty body received. Headers:", JSON.stringify(Object.fromEntries(req.headers.entries())));
+            return new Response("Empty Body", { status: 200, headers: corsHeaders }); // Return 200 to silence retries
         }
 
-        console.log("🚨 FULL PAYLOAD RECEIVED:", JSON.stringify(payload)); // DEBUG LOG
+        try {
+            payload = JSON.parse(bodyText);
+        } catch (e) {
+            console.error("JSON Parse Error. Raw Body Preview:", bodyText.substring(0, 500));
+            // Force return 200 to stop retry loops if it's junk data
+            return new Response("Invalid JSON", { status: 200, headers: corsHeaders });
+        }
+    } catch (e) {
+        console.error("Body Read Error:", e);
+        return new Response("Body Read Error", { status: 500, headers: corsHeaders });
+    }
+
+    console.log("🚨 FULL PAYLOAD RECEIVED:", JSON.stringify(payload));
+
+    try {
+        if (!payload || typeof payload !== 'object') {
+            console.log("Payload is not an object");
+            return new Response("Invalid Payload Structure", { status: 200, headers: corsHeaders });
+        }
 
         const { table, type, record, schema, event_type, user_data } = payload;
-
         console.log(`🔔 Admin Notification: ${table || event_type}`);
 
         let message = "";
@@ -59,16 +75,17 @@ Deno.serve(async (req) => {
 
         // 2. Curator Verification (Profiles Update)
         else if (table === 'profiles' && type === 'UPDATE') {
-            console.log("Profile Update Debug:", {
-                new_status: record.verification_status,
-                old_status: payload.old_record?.verification_status,
-                role: record.role
-            });
+            const newStatus = record.verification_status;
+            // Safer access to old_record even if missing
+            const oldStatus = payload.old_record?.verification_status;
 
-            if (record.verification_status === 'verified' && payload.old_record?.verification_status !== 'verified') {
+            console.log("Profile Update Debug:", { new_status: newStatus, old_status: oldStatus, role: record.role });
+
+            if (newStatus === 'verified' && oldStatus !== 'verified') {
                 message = `✅ **Curator Verified**`;
                 details = `Curator: ${record.full_name}\nEmail: ${record.email}`;
-            } else if (record.verification_status === 'pending' && payload.old_record?.verification_status !== 'pending') {
+            } else if (newStatus === 'pending') {
+                // Relaxed check: Notify on any pending status update (filtering duplicates is secondary to reliability right now)
                 message = `📝 **New Curator Verification Request**`;
                 details = `User: ${record.full_name}\nEmail: ${record.email}\nNIN: ${record.nin_number || 'N/A'}`;
             } else if (record.role === 'curator' && payload.old_record?.role !== 'curator') {
@@ -81,8 +98,7 @@ Deno.serve(async (req) => {
         else if (table === 'submissions' && type === 'INSERT') {
             message = `🎵 **New Song Submission**`;
             details = `Song: ${record.song_title}\nArtist ID: ${record.artist_id}\nPlaylist ID: ${record.playlist_id}\nAmount: ₦${record.amount_paid}`;
-
-            // Enrich with names if possible (async lookup)
+            // Enrich
             const { data: artist } = await supabase.from('profiles').select('full_name, email').eq('id', record.artist_id).single();
             if (artist) details += `\nArtist: ${artist.full_name} (${artist.email})`;
         }
@@ -99,14 +115,13 @@ Deno.serve(async (req) => {
             details = `Type: ${record.type}\nAmount: ₦${record.amount}\nUser ID: ${record.user_id}`;
         }
 
-        // 6. Withdrawal Request (Withdrawals Insert/Update)
-        // If checking 'withdrawals' table directly or 'transactions' with type 'withdrawal'
+        // 6. Withdrawal Request 
         else if (table === 'withdrawals' && type === 'INSERT') {
             message = `🏦 **New Payout Request**`;
             details = `Amount: ₦${record.amount}\nUser ID: ${record.user_id}\nType: Wallet Withdrawal`;
         }
 
-        // 7. Support Ticket (Support Tickets Insert)
+        // 7. Support Ticket
         else if (table === 'support_tickets' && type === 'INSERT') {
             message = `🎫 **New Support Ticket**`;
             details = `Subject: ${record.subject}\nUser ID: ${record.user_id}\nStatus: ${record.status}`;
@@ -123,8 +138,8 @@ Deno.serve(async (req) => {
             message = `🛡️ **Admin Logged In**`;
             details = `User: ${user_data?.email || 'Unknown'}\nTime: ${new Date().toLocaleString()}`;
         }
-        else if (event_type === 'MANUAL_LOG') {
-            message = `📝 **System Log**`;
+        else if (event_type === 'MANUAL_LOG' || payload.type === 'MANUAL_TEST') {
+            message = `📝 **System Log / Test**`;
             details = payload.message || JSON.stringify(payload);
         }
 
@@ -137,20 +152,15 @@ Deno.serve(async (req) => {
         }
 
     } catch (e) {
-        console.error("Error:", e);
+        console.error("Logic Error:", e);
         return new Response(JSON.stringify({ error: e.message }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 });
 
 async function postToWebhook(title: string, description: string) {
     const payload = {
-        // Discord Format
-        content: `${title}\n${description}`,
-        // Slack Format
-        text: `${title}\n${description}`,
-        // Generic JSON
-        message: title,
-        details: description
+        content: title ? `${title}\n${description}` : description,
+        username: "AfroPitch Bot"
     };
 
     try {
@@ -160,10 +170,12 @@ async function postToWebhook(title: string, description: string) {
             body: JSON.stringify(payload)
         });
         if (!res.ok) {
-            console.error("Webhook failed:", await res.text());
+            const errText = await res.text();
+            console.error("Webhook failed:", errText);
+        } else {
+            console.log("Webhook sent successfully");
         }
     } catch (err) {
-        console.error("Webhook fetch error (Check ADMIN_WEBHOOK_URL config):", err);
-        // Do not throw, just log.
+        console.error("Webhook fetch error:", err);
     }
 }
