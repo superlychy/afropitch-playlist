@@ -1,13 +1,24 @@
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.8';
 
 const WEBHOOK_URL = Deno.env.get('ADMIN_WEBHOOK_URL');
 const SITE_URL = Deno.env.get('SITE_URL') ?? 'https://afropitchplay.best';
 
-const supabase = createClient(
-    Deno.env.get('SUPABASE_URL') ?? '',
-    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-);
+// Lazy init Supabase to prevent startup crashes
+const getSupabase = () => {
+    const url = Deno.env.get('SUPABASE_URL');
+    const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    if (!url || !key) {
+        console.error("Missing SUPABASE env vars");
+        return null;
+    }
+    try {
+        return createClient(url, key);
+    } catch (e) {
+        console.error("Supabase Client Init Error:", e);
+        return null;
+    }
+};
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -25,8 +36,7 @@ Deno.serve(async (req) => {
     }
 
     if (!WEBHOOK_URL) {
-        console.error("Missing ADMIN_WEBHOOK_URL");
-        return new Response("Configuration Error", { status: 500, headers: corsHeaders });
+        console.error("Missing ADMIN_WEBHOOK_URL - Notifications will fail silently");
     }
 
     let payload;
@@ -36,14 +46,13 @@ Deno.serve(async (req) => {
         bodyText = await req.text();
         if (!bodyText) {
             console.log("Empty body received. Headers:", JSON.stringify(Object.fromEntries(req.headers.entries())));
-            return new Response("Empty Body", { status: 200, headers: corsHeaders }); // Return 200 to silence retries
+            return new Response("Empty Body", { status: 200, headers: corsHeaders });
         }
 
         try {
             payload = JSON.parse(bodyText);
         } catch (e) {
             console.error("JSON Parse Error. Raw Body Preview:", bodyText.substring(0, 500));
-            // Force return 200 to stop retry loops if it's junk data
             return new Response("Invalid JSON", { status: 200, headers: corsHeaders });
         }
     } catch (e) {
@@ -65,6 +74,9 @@ Deno.serve(async (req) => {
         let message = "";
         let details = "";
 
+        // Get Client lazily
+        const supabase = getSupabase();
+
         // --- DB EVENT HANDLERS ---
 
         // 1. New User (Profiles Insert)
@@ -76,7 +88,6 @@ Deno.serve(async (req) => {
         // 2. Curator Verification (Profiles Update)
         else if (table === 'profiles' && type === 'UPDATE') {
             const newStatus = record.verification_status;
-            // Safer access to old_record even if missing
             const oldStatus = payload.old_record?.verification_status;
 
             console.log("Profile Update Debug:", { new_status: newStatus, old_status: oldStatus, role: record.role });
@@ -85,7 +96,6 @@ Deno.serve(async (req) => {
                 message = `✅ **Curator Verified**`;
                 details = `Curator: ${record.full_name}\nEmail: ${record.email}`;
             } else if (newStatus === 'pending') {
-                // Relaxed check: Notify on any pending status update (filtering duplicates is secondary to reliability right now)
                 message = `📝 **New Curator Verification Request**`;
                 details = `User: ${record.full_name}\nEmail: ${record.email}\nNIN: ${record.nin_number || 'N/A'}`;
             } else if (record.role === 'curator' && payload.old_record?.role !== 'curator') {
@@ -99,8 +109,10 @@ Deno.serve(async (req) => {
             message = `🎵 **New Song Submission**`;
             details = `Song: ${record.song_title}\nArtist ID: ${record.artist_id}\nPlaylist ID: ${record.playlist_id}\nAmount: ₦${record.amount_paid}`;
             // Enrich
-            const { data: artist } = await supabase.from('profiles').select('full_name, email').eq('id', record.artist_id).single();
-            if (artist) details += `\nArtist: ${artist.full_name} (${artist.email})`;
+            if (supabase) {
+                const { data: artist } = await supabase.from('profiles').select('full_name, email').eq('id', record.artist_id).single();
+                if (artist) details += `\nArtist: ${artist.full_name} (${artist.email})`;
+            }
         }
 
         // 4. New Playlist (Playlists Insert)
