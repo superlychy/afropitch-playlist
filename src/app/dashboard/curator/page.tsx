@@ -1363,8 +1363,8 @@ export default function CuratorDashboard() {
                             <div className="space-y-2">
                                 <Label>NIN Number <span className="text-red-500">*</span></Label>
                                 <Input
-                                    value={appIdLink}
-                                    onChange={e => setAppIdLink(e.target.value)}
+                                    value={appNin}
+                                    onChange={e => setAppNin(e.target.value)}
                                     placeholder="Enter your 11-digit NIN"
                                     className="bg-black/40 border-white/10"
                                 />
