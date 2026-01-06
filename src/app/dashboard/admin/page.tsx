@@ -1284,7 +1284,6 @@ export default function AdminDashboard() {
                                         ))}
                                     {allPlaylists.length === 0 && <p className="text-gray-500 col-span-3 text-center py-10">No playlists found.</p>}
                                 </div>
-                        )}
                             </div>
                         )}
 
