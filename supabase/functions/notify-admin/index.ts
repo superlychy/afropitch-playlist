@@ -9,14 +9,24 @@ const supabase = createClient(
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 );
 
+const corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
+
 Deno.serve(async (req) => {
+    // 1. Handle CORS Preflight
+    if (req.method === 'OPTIONS') {
+        return new Response('ok', { headers: corsHeaders })
+    }
+
     if (req.method !== 'POST') {
-        return new Response('Method Not Allowed', { status: 405 });
+        return new Response('Method Not Allowed', { status: 405, headers: corsHeaders });
     }
 
     if (!WEBHOOK_URL) {
         console.error("Missing ADMIN_WEBHOOK_URL");
-        return new Response("Configuration Error", { status: 500 });
+        return new Response("Configuration Error", { status: 500, headers: corsHeaders });
     }
 
     try {
@@ -95,14 +105,14 @@ Deno.serve(async (req) => {
         // Send to Webhook (if message generated)
         if (message) {
             await postToWebhook(message, details);
-            return new Response(JSON.stringify({ success: true, msg: "Notification Sent" }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+            return new Response(JSON.stringify({ success: true, msg: "Notification Sent" }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
         } else {
-            return new Response(JSON.stringify({ success: true, msg: "No notification criteria met" }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+            return new Response(JSON.stringify({ success: true, msg: "No notification criteria met" }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
         }
 
     } catch (e) {
         console.error("Error:", e);
-        return new Response(JSON.stringify({ error: e.message }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+        return new Response(JSON.stringify({ error: e.message }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 });
 
