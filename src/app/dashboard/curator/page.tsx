@@ -117,6 +117,9 @@ export default function CuratorDashboard() {
     const [playlistSongs, setPlaylistSongs] = useState<any[]>([]);
     const [isLoadingSongs, setIsLoadingSongs] = useState(false);
 
+    // Tab State
+    const [activeTab, setActiveTab] = useState<"submissions" | "playlists">("submissions");
+
 
     // Real Data State
     const [reviews, setReviews] = useState<any[]>([]);
@@ -915,6 +918,21 @@ export default function CuratorDashboard() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">
                 {/* Left Column: Work Area (2/3) */}
                 <div className="lg:col-span-2 space-y-12">
+                    <div className="flex space-x-4 mb-4">
+                        <button
+                            onClick={() => setActiveTab('submissions')}
+                            className={`px-4 py-2 rounded-md font-bold transition-colors ${activeTab === 'submissions' ? 'bg-green-600 text-white' : 'bg-zinc-800 text-gray-400 hover:text-white'}`}
+                        >
+                            Incoming Submissions {stats.pending > 0 && <span className="ml-2 bg-white text-green-600 text-xs px-1.5 py-0.5 rounded-full">{stats.pending}</span>}
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('playlists')}
+                            className={`px-4 py-2 rounded-md font-bold transition-colors ${activeTab === 'playlists' ? 'bg-green-600 text-white' : 'bg-zinc-800 text-gray-400 hover:text-white'}`}
+                        >
+                            My Playlists
+                        </button>
+                    </div>
+
                     {/* Stats Row */}
                     <div className="grid grid-cols-2 gap-4">
                         <Card className="bg-blue-900/10 border-blue-500/20">
@@ -932,158 +950,162 @@ export default function CuratorDashboard() {
                     </div>
 
                     {/* Incoming Submissions */}
-                    <div className="space-y-6">
-                        <h3 className="font-bold text-white text-xl">Incoming Submissions</h3>
-                        <div className="space-y-4">
-                            {loadingReviews && <p className="text-gray-500">Loading...</p>}
-                            {!loadingReviews && reviews.length === 0 && <p className="text-gray-500">No pending submissions.</p>}
+                    {activeTab === 'submissions' && (
+                        <div className="space-y-6">
+                            <h3 className="font-bold text-white text-xl">Incoming Submissions</h3>
+                            <div className="space-y-4">
+                                {loadingReviews && <p className="text-gray-500">Loading...</p>}
+                                {!loadingReviews && reviews.length === 0 && <p className="text-gray-500">No pending submissions.</p>}
 
-                            {reviews.map(review => (
-                                <div key={review.id} className="bg-white/5 border border-white/5 rounded-lg overflow-hidden">
-                                    <div className="p-4 sm:p-6 flex flex-col sm:flex-row items-start justify-between gap-4">
-                                        <div className="flex-1 space-y-2">
-                                            <div className="flex items-center gap-2">
-                                                <span className={`px-2 py-0.5 rounded text-[10px] uppercase font-bold ${review.tier === 'exclusive' ? 'bg-yellow-500 text-black' :
-                                                    review.tier === 'express' ? 'bg-orange-500 text-white' :
-                                                        'bg-blue-500 text-white'
-                                                    } `}>
-                                                    {review.tier}
-                                                </span>
-                                                <span className="text-xs text-gray-400">• {new Date(review.created_at).toLocaleDateString()}</span>
-                                            </div>
-                                            <h3 className="text-lg font-bold text-white">{review.song_title}</h3>
-                                            <div className="flex items-center gap-2 text-sm text-gray-300">
-                                                <User className="w-4 h-4 text-gray-500" /> {review.artist_name}
-                                            </div>
-                                            <a href={review.song_link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-green-400 hover:underline mt-1">
-                                                Listen to Track <Zap className="w-3 h-3" />
-                                            </a>
+                                {reviews.map(review => (
+                                    <div key={review.id} className="bg-white/5 border border-white/5 rounded-lg overflow-hidden">
+                                        <div className="p-4 sm:p-6 flex flex-col sm:flex-row items-start justify-between gap-4">
+                                            <div className="flex-1 space-y-2">
+                                                <div className="flex items-center gap-2">
+                                                    <span className={`px-2 py-0.5 rounded text-[10px] uppercase font-bold ${review.tier === 'exclusive' ? 'bg-yellow-500 text-black' :
+                                                        review.tier === 'express' ? 'bg-orange-500 text-white' :
+                                                            'bg-blue-500 text-white'
+                                                        } `}>
+                                                        {review.tier}
+                                                    </span>
+                                                    <span className="text-xs text-gray-400">• {new Date(review.created_at).toLocaleDateString()}</span>
+                                                </div>
+                                                <h3 className="text-lg font-bold text-white">{review.song_title}</h3>
+                                                <div className="flex items-center gap-2 text-sm text-gray-300">
+                                                    <User className="w-4 h-4 text-gray-500" /> {review.artist_name}
+                                                </div>
+                                                <a href={review.song_link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-green-400 hover:underline mt-1">
+                                                    Listen to Track <Zap className="w-3 h-3" />
+                                                </a>
 
-                                            <div className="mt-3 p-3 bg-black/30 rounded text-xs text-gray-400 space-y-1">
-                                                <p><span className="text-gray-500">Bio:</span> {review.artist?.bio || "No bio"}</p>
-                                                <div className="flex gap-3 mt-2">
-                                                    {review.artist?.instagram && <a href={`https://instagram.com/${review.artist.instagram}`} target="_blank" className="hover:text-white">IG: @{review.artist.instagram}</a>}
-                                                    {review.artist?.twitter && <a href={`https://twitter.com/${review.artist.twitter}`} target="_blank" className="hover:text-white">TW: @{review.artist.twitter}</a>}
+                                                <div className="mt-3 p-3 bg-black/30 rounded text-xs text-gray-400 space-y-1">
+                                                    <p><span className="text-gray-500">Bio:</span> {review.artist?.bio || "No bio"}</p>
+                                                    <div className="flex gap-3 mt-2">
+                                                        {review.artist?.instagram && <a href={`https://instagram.com/${review.artist.instagram}`} target="_blank" className="hover:text-white">IG: @{review.artist.instagram}</a>}
+                                                        {review.artist?.twitter && <a href={`https://twitter.com/${review.artist.twitter}`} target="_blank" className="hover:text-white">TW: @{review.artist.twitter}</a>}
+                                                    </div >
                                                 </div >
                                             </div >
-                                        </div >
 
-                                        {
-                                            review.status === 'pending' ? (
-                                                <div className="flex flex-col gap-2 min-w-[140px]">
-                                                    <p className="text-right font-bold text-white mb-2">{pricingConfig.currency}{review.amount_paid}</p>
-                                                    <Button className="bg-green-600 hover:bg-green-700 w-full" onClick={() => handleReviewAction(review.id, 'accepted', 'Great track! Added to playlist.')}>
-                                                        <CheckCircle className="w-4 h-4 mr-2" /> Accept
-                                                    </Button>
-                                                    <Button variant="destructive" className="w-full" onClick={() => openDeclineModal(review.id)}>
-                                                        <XCircle className="w-4 h-4 mr-2" /> Decline
-                                                    </Button>
-                                                </div>
-                                            ) : (
-                                                <div className="text-right min-w-[140px]">
-                                                    <p className="font-bold text-white mb-2">{pricingConfig.currency}{review.amount_paid}</p>
-                                                    <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold uppercase ${review.status === 'accepted' ? 'bg-green-500/20 text-green-500' : 'bg-red-500/20 text-red-500'}`}>
-                                                        {review.status}
-                                                    </span>
-                                                </div>
-                                            )
-                                        }
+                                            {
+                                                review.status === 'pending' ? (
+                                                    <div className="flex flex-col gap-2 min-w-[140px]">
+                                                        <p className="text-right font-bold text-white mb-2">{pricingConfig.currency}{review.amount_paid}</p>
+                                                        <Button className="bg-green-600 hover:bg-green-700 w-full" onClick={() => handleReviewAction(review.id, 'accepted', 'Great track! Added to playlist.')}>
+                                                            <CheckCircle className="w-4 h-4 mr-2" /> Accept
+                                                        </Button>
+                                                        <Button variant="destructive" className="w-full" onClick={() => openDeclineModal(review.id)}>
+                                                            <XCircle className="w-4 h-4 mr-2" /> Decline
+                                                        </Button>
+                                                    </div>
+                                                ) : (
+                                                    <div className="text-right min-w-[140px]">
+                                                        <p className="font-bold text-white mb-2">{pricingConfig.currency}{review.amount_paid}</p>
+                                                        <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold uppercase ${review.status === 'accepted' ? 'bg-green-500/20 text-green-500' : 'bg-red-500/20 text-red-500'}`}>
+                                                            {review.status}
+                                                        </span>
+                                                    </div>
+                                                )
+                                            }
+                                        </div >
                                     </div >
-                                </div >
-                            ))}
-                        </div >
-                    </div>
+                                ))}
+                            </div >
+                        </div>
+                    )}
 
                     {/* My Playlists */}
-                    <div className="space-y-6">
-                        <div className="flex items-center justify-between">
-                            <h3 className="font-bold text-white text-xl">My Playlists</h3>
-                            {verificationStatus === 'verified' ? (
-                                <Button size="sm" variant="outline" className="border-dashed border-white/20 hover:border-white/50" onClick={() => { setEditingPlaylist(null); setNewName(""); setNewGenre(""); setShowAddPlaylist(true); }}>
-                                    <Plus className="w-4 h-4 mr-2" /> New
-                                </Button>
-                            ) : (
-                                <div onClick={() => setShowProfile(true)} className="cursor-pointer px-3 py-1.5 bg-red-500/10 border border-red-500/20 rounded text-red-500 text-xs font-bold hover:bg-red-500/20 flex items-center animate-pulse">
-                                    <AlertCircle className="w-3 h-3 mr-1" />
-                                    Verify to add playlists
-                                </div>
-                            )}
-                        </div>
+                    {activeTab === 'playlists' && (
+                        <div className="space-y-6">
+                            <div className="flex items-center justify-between">
+                                <h3 className="font-bold text-white text-xl">My Playlists</h3>
+                                {verificationStatus === 'verified' ? (
+                                    <Button size="sm" variant="outline" className="border-dashed border-white/20 hover:border-white/50" onClick={() => { setEditingPlaylist(null); setNewName(""); setNewGenre(""); setShowAddPlaylist(true); }}>
+                                        <Plus className="w-4 h-4 mr-2" /> New
+                                    </Button>
+                                ) : (
+                                    <div onClick={() => setShowProfile(true)} className="cursor-pointer px-3 py-1.5 bg-red-500/10 border border-red-500/20 rounded text-red-500 text-xs font-bold hover:bg-red-500/20 flex items-center animate-pulse">
+                                        <AlertCircle className="w-3 h-3 mr-1" />
+                                        Verify to add playlists
+                                    </div>
+                                )}
+                            </div>
 
-                        <div className="space-y-4">
-                            {myPlaylists.length === 0 && <p className="text-gray-500 text-sm">No playlists yet.</p>}
-                            {myPlaylists.map(playlist => (
-                                <Card key={playlist.id} className="bg-white/5 border-none">
-                                    <CardContent className="p-4 flex flex-col gap-4">
-                                        <div className="flex items-center gap-4">
-                                            <div className={`w-12 h-12 rounded bg-zinc-800 flex items-center justify-center overflow-hidden shrink-0`}>
-                                                {playlist.cover_image?.startsWith('http') ? <img src={playlist.cover_image} className="w-full h-full object-cover" /> : <ListMusic className="w-6 h-6 text-white/50" />}
-                                            </div>
-                                            <div className="flex-1 min-w-0">
-                                                <h4 className="font-bold text-white truncate">{playlist.name}</h4>
-                                                <p className="text-xs text-gray-400">{playlist.followers.toLocaleString()} followers</p>
-                                            </div>
-                                            <div className="text-right">
-                                                <span className="block font-bold text-green-500">{playlist.submissions}</span>
-                                                <span className="text-xs text-gray-500">Pending</span>
-                                            </div>
-                                        </div>
-                                        <div className="flex gap-2 justify-end">
-                                            <Button size="icon" variant="ghost" className="h-6 w-6 text-gray-500 hover:text-white" onClick={() => handleRefreshPlaylist(playlist)} disabled={isRefreshing === playlist.id} title="Refresh Metadata">
-                                                <RefreshCw className={`w-3 h-3 ${isRefreshing === playlist.id ? 'animate-spin' : ''}`} />
-                                            </Button>
-                                            <Button size="icon" variant="ghost" className="h-6 w-6 text-gray-500 hover:text-white" onClick={() => openEditModal(playlist)}>
-                                                <Edit className="w-3 h-3" />
-                                            </Button>
-                                            <Button size="icon" variant="ghost" className="h-6 w-6 text-gray-500 hover:text-red-500" onClick={() => handleDeletePlaylist(playlist.id)}>
-                                                <Trash2 className="w-3 h-3" />
-                                            </Button>
-                                        </div>
-                                        <div className="pt-2 border-t border-white/5">
-                                            <Button
-                                                variant="ghost"
-                                                className="w-full text-xs text-gray-400 hover:text-white hover:bg-white/5 h-8 justify-between"
-                                                onClick={() => togglePlaylistSongs(playlist.id)}
-                                            >
-                                                {expandedPlaylistId === playlist.id ? "Hide Songs" : "View Accepted Songs"}
-                                            </Button>
-
-                                            {expandedPlaylistId === playlist.id && (
-                                                <div className="mt-2 space-y-2 animate-in slide-in-from-top-2">
-                                                    {isLoadingSongs ? (
-                                                        <div className="text-center py-2 text-gray-500 text-xs">Loading...</div>
-                                                    ) : playlistSongs.length > 0 ? (
-                                                        playlistSongs.map((song) => (
-                                                            <div key={song.id} className="flex items-center justify-between p-2 rounded bg-black/40 border border-white/5 text-xs">
-                                                                <div className="flex items-center gap-2 overflow-hidden">
-                                                                    <span className="text-white truncate max-w-[120px]">{song.song_title}</span>
-                                                                    {song.ranking_boosted_at && <span className="text-[10px] bg-green-500 text-black px-1 rounded font-bold animate-pulse">Rising</span>}
-                                                                </div>
-                                                                <div className="flex items-center gap-2">
-                                                                    <a href={song.song_link} target="_blank" className="text-gray-400 hover:text-white">Link</a>
-                                                                    <Button
-                                                                        size="icon"
-                                                                        variant="ghost"
-                                                                        className={`h-6 w-6 ${song.ranking_boosted_at ? 'text-green-500' : 'text-gray-600 hover:text-green-500'}`}
-                                                                        onClick={() => toggleRankingBoost(song.id)}
-                                                                        title="Notify Artist of Ranking Boost"
-                                                                    >
-                                                                        <Zap className="w-3 h-3" />
-                                                                    </Button>
-                                                                </div>
-                                                            </div>
-                                                        ))
-                                                    ) : (
-                                                        <div className="text-center py-2 text-gray-500 text-xs">No accepted songs.</div>
-                                                    )}
+                            <div className="space-y-4">
+                                {myPlaylists.length === 0 && <p className="text-gray-500 text-sm">No playlists yet.</p>}
+                                {myPlaylists.map(playlist => (
+                                    <Card key={playlist.id} className="bg-white/5 border-none">
+                                        <CardContent className="p-4 flex flex-col gap-4">
+                                            <div className="flex items-center gap-4">
+                                                <div className={`w-12 h-12 rounded bg-zinc-800 flex items-center justify-center overflow-hidden shrink-0`}>
+                                                    {playlist.cover_image?.startsWith('http') ? <img src={playlist.cover_image} className="w-full h-full object-cover" /> : <ListMusic className="w-6 h-6 text-white/50" />}
                                                 </div>
-                                            )}
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            ))}
+                                                <div className="flex-1 min-w-0">
+                                                    <h4 className="font-bold text-white truncate">{playlist.name}</h4>
+                                                    <p className="text-xs text-gray-400">{playlist.followers.toLocaleString()} followers</p>
+                                                </div>
+                                                <div className="text-right">
+                                                    <span className="block font-bold text-green-500">{playlist.submissions}</span>
+                                                    <span className="text-xs text-gray-500">Pending</span>
+                                                </div>
+                                            </div>
+                                            <div className="flex gap-2 justify-end">
+                                                <Button size="icon" variant="ghost" className="h-6 w-6 text-gray-500 hover:text-white" onClick={() => handleRefreshPlaylist(playlist)} disabled={isRefreshing === playlist.id} title="Refresh Metadata">
+                                                    <RefreshCw className={`w-3 h-3 ${isRefreshing === playlist.id ? 'animate-spin' : ''}`} />
+                                                </Button>
+                                                <Button size="icon" variant="ghost" className="h-6 w-6 text-gray-500 hover:text-white" onClick={() => openEditModal(playlist)}>
+                                                    <Edit className="w-3 h-3" />
+                                                </Button>
+                                                <Button size="icon" variant="ghost" className="h-6 w-6 text-gray-500 hover:text-red-500" onClick={() => handleDeletePlaylist(playlist.id)}>
+                                                    <Trash2 className="w-3 h-3" />
+                                                </Button>
+                                            </div>
+                                            <div className="pt-2 border-t border-white/5">
+                                                <Button
+                                                    variant="ghost"
+                                                    className="w-full text-xs text-gray-400 hover:text-white hover:bg-white/5 h-8 justify-between"
+                                                    onClick={() => togglePlaylistSongs(playlist.id)}
+                                                >
+                                                    {expandedPlaylistId === playlist.id ? "Hide Songs" : "View Accepted Songs"}
+                                                </Button>
+
+                                                {expandedPlaylistId === playlist.id && (
+                                                    <div className="mt-2 space-y-2 animate-in slide-in-from-top-2">
+                                                        {isLoadingSongs ? (
+                                                            <div className="text-center py-2 text-gray-500 text-xs">Loading...</div>
+                                                        ) : playlistSongs.length > 0 ? (
+                                                            playlistSongs.map((song) => (
+                                                                <div key={song.id} className="flex items-center justify-between p-2 rounded bg-black/40 border border-white/5 text-xs">
+                                                                    <div className="flex items-center gap-2 overflow-hidden">
+                                                                        <span className="text-white truncate max-w-[120px]">{song.song_title}</span>
+                                                                        {song.ranking_boosted_at && <span className="text-[10px] bg-green-500 text-black px-1 rounded font-bold animate-pulse">Rising</span>}
+                                                                    </div>
+                                                                    <div className="flex items-center gap-2">
+                                                                        <a href={song.song_link} target="_blank" className="text-gray-400 hover:text-white">Link</a>
+                                                                        <Button
+                                                                            size="icon"
+                                                                            variant="ghost"
+                                                                            className={`h-6 w-6 ${song.ranking_boosted_at ? 'text-green-500' : 'text-gray-600 hover:text-green-500'}`}
+                                                                            onClick={() => toggleRankingBoost(song.id)}
+                                                                            title="Notify Artist of Ranking Boost"
+                                                                        >
+                                                                            <Zap className="w-3 h-3" />
+                                                                        </Button>
+                                                                    </div>
+                                                                </div>
+                                                            ))
+                                                        ) : (
+                                                            <div className="text-center py-2 text-gray-500 text-xs">No accepted songs.</div>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                ))}
+                            </div>
                         </div>
-                    </div>
+                    )}
                 </div>
 
                 {/* Right Column: Finance (1/3) */}
