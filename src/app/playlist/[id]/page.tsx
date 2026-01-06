@@ -50,7 +50,7 @@ export default function PlaylistDetail() {
     if (!playlist) return <div className="min-h-screen flex items-center justify-center text-white bg-black">Playlist not found</div>;
 
     // Parse song count from description if available
-    const songCountMatch = (playlist.description || "").match(/(\d+)\s+songs/i);
+    const songCountMatch = (playlist.description || "").match(/(\d+)\s+(songs|items|tracks)/i);
     const songCount = songCountMatch ? songCountMatch[1] : "?";
 
     return (
@@ -95,7 +95,7 @@ export default function PlaylistDetail() {
                             </div>
                             <div className="flex flex-col">
                                 <span className="text-white font-bold text-lg">{songCount}</span>
-                                <span>Songs</span>
+                                <span>Items</span>
                             </div>
                             <div className="flex flex-col">
                                 <span className="text-white font-bold text-lg">

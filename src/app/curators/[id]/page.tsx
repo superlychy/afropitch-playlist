@@ -154,8 +154,8 @@ export default function CuratorProfile() {
                     <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                         {playlists.map((playlist) => {
                             // Parse song count
-                            const songMatch = (playlist.description || "").match(/(\d+)\s+songs/i);
-                            const songs = songMatch ? songMatch[1] : null;
+                            const songMatch = (playlist.description || "").match(/(\d+)\s+(songs|items|tracks)/i);
+                            const songs = songMatch ? parseInt(songMatch[1]) : null;
 
                             return (
                                 <Link key={playlist.id} href={`/playlist/${playlist.id}`} className="group">
@@ -178,16 +178,22 @@ export default function CuratorProfile() {
                                             <div className="p-5 space-y-4 flex-1 flex flex-col">
                                                 <div className="flex items-center justify-between text-sm text-gray-400">
                                                     <span className="flex items-center gap-1.5"><Users className="w-4 h-4" /> {playlist.followers.toLocaleString()}</span>
-                                                    {songs && <span className="text-xs bg-white/10 px-2 py-1 rounded-full">{songs} Songs</span>}
+                                                    {songs && songs > 0 && <span className="text-xs bg-white/10 px-2 py-1 rounded-full">{songs} Items</span>}
                                                 </div>
 
                                                 <div className="mt-auto pt-4 border-t border-white/5 flex items-center justify-between">
                                                     <div className="text-sm">
                                                         <span className="block text-[10px] text-gray-500 uppercase tracking-wider">Fee</span>
                                                         <span className="font-bold text-white">
-                                                            {playlist.submission_fee === 0
-                                                                ? <span className="text-green-400">FREE</span>
-                                                                : `${pricingConfig.currency}${playlist.submission_fee.toLocaleString()}`
+                                                            {playlist.type === 'exclusive'
+                                                                ? `${pricingConfig.currency}${pricingConfig.tiers.exclusive.price.toLocaleString()}`
+                                                                : playlist.type === 'express'
+                                                                    ? `${pricingConfig.currency}${pricingConfig.tiers.express.price.toLocaleString()}`
+                                                                    : playlist.type === 'standard'
+                                                                        ? `${pricingConfig.currency}${pricingConfig.tiers.standard.price.toLocaleString()}`
+                                                                        : playlist.submission_fee > 0
+                                                                            ? `${pricingConfig.currency}${playlist.submission_fee.toLocaleString()}`
+                                                                            : <span className="text-green-400">FREE</span>
                                                             }
                                                         </span>
                                                     </div>
