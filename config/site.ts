@@ -18,7 +18,10 @@ export const siteConfig = {
     "Francophone African playlists", "music marketing africa", "independent artist",
     "Afrobeat playlists", "Amapiano playlists",
     "pitch afro playlist", "nigerian playlist", "ghanian playlist",
-    "free playlist in nigeria", "afrobeats playlist submission free"
+    "free playlist in nigeria", "afrobeats playlist submission free",
+    "free afrobeat playlist submission", "submit afrobeat music free",
+    "free music promotion nigeria", "how to promote afrobeat music",
+    "spotify playlist curators free"
   ],
   contact: {
     email: "hello@afropitchplaylist.com"
