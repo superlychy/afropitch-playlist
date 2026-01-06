@@ -83,7 +83,7 @@ export default function CuratorDashboard() {
     const [appGenres, setAppGenres] = useState("");
     const [appReason, setAppReason] = useState("");
     const [appPhone, setAppPhone] = useState("");
-    const [appIdLink, setAppIdLink] = useState("");
+    const [appNin, setAppNin] = useState("");
     const [isApplying, setIsApplying] = useState(false);
 
     // Support Modal State
@@ -231,8 +231,8 @@ export default function CuratorDashboard() {
     };
 
     const handleApplyCurator = async () => {
-        if (!appPortfolio || !appExperience || !appPhone || !appIdLink) {
-            alert("Please fill in all required fields (Portfolio, Experience, Phone, and ID/NIN Link).");
+        if (!appPortfolio || !appExperience || !appPhone || !appNin) {
+            alert("Please fill in all required fields (Portfolio, Experience, Phone, and NIN).");
             return;
         }
         setIsApplying(true);
@@ -243,13 +243,14 @@ export default function CuratorDashboard() {
             genres: appGenres,
             reason: appReason,
             phone: appPhone,
-            id_document: appIdLink
+            id_document: appNin
         });
 
         try {
             const { error } = await supabase.from('profiles').update({
                 verification_status: 'pending',
-                verification_docs: docs
+                verification_docs: docs,
+                nin_number: appNin
             }).eq('id', user?.id);
 
             if (error) {
@@ -265,7 +266,7 @@ export default function CuratorDashboard() {
                 setAppGenres("");
                 setAppReason("");
                 setAppPhone("");
-                setAppIdLink("");
+                setAppNin("");
             }
         } catch (err) {
             console.error("Unexpected error applying:", err);
@@ -490,6 +491,10 @@ export default function CuratorDashboard() {
 
     const handleCreatePlaylist = async () => {
         if (!user || !newName) return;
+        if (verificationStatus !== 'verified') {
+            alert("Verification required to add playlists.");
+            return;
+        }
         setIsCreating(true);
 
         const payload: any = {
@@ -993,9 +998,11 @@ export default function CuratorDashboard() {
                     <div className="space-y-6">
                         <div className="flex items-center justify-between">
                             <h3 className="font-bold text-white text-xl">My Playlists</h3>
-                            <Button size="sm" variant="outline" className="border-dashed border-white/20 hover:border-white/50" onClick={() => { setEditingPlaylist(null); setNewName(""); setNewGenre(""); setShowAddPlaylist(true); }}>
-                                <Plus className="w-4 h-4 mr-2" /> New
-                            </Button>
+                            {verificationStatus === 'verified' && (
+                                <Button size="sm" variant="outline" className="border-dashed border-white/20 hover:border-white/50" onClick={() => { setEditingPlaylist(null); setNewName(""); setNewGenre(""); setShowAddPlaylist(true); }}>
+                                    <Plus className="w-4 h-4 mr-2" /> New
+                                </Button>
+                            )}
                         </div>
 
                         <div className="space-y-4">
