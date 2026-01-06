@@ -137,6 +137,7 @@ async function postToWebhook(title: string, description: string) {
             console.error("Webhook failed:", await res.text());
         }
     } catch (err) {
-        console.error("Webhook fetch error:", err);
+        console.error("Webhook fetch error (Check ADMIN_WEBHOOK_URL config):", err);
+        // Do not throw, just log.
     }
 }
