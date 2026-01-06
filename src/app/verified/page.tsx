@@ -25,7 +25,7 @@ export default function VerifiedPage() {
                 {/* Assuming the main login trigger is on the home page or via a modal, 
                     since I don't see a /login route. If there is one, we link to it. 
                     For now, redirecting to Home where user can click Login. */}
-                <Link href="/?login=true">
+                <Link href="/portal">
                     <Button size="lg" className="bg-green-500 hover:bg-green-600 text-black font-bold">
                         Log In Now
                     </Button>
