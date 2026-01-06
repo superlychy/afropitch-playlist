@@ -1155,13 +1155,13 @@ export default function CuratorDashboard() {
                                 <div className="flex items-center justify-between">
                                     <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${verificationStatus === 'verified' ? 'bg-green-500/20 text-green-500' :
                                         verificationStatus === 'pending' ? 'bg-yellow-500/20 text-yellow-500' :
-                                            'bg-red-500/20 text-gray-400'
+                                            'bg-red-500/20 text-red-500'
                                         }`}>
                                         {verificationStatus}
                                     </span>
-                                    {verificationStatus === 'none' && (
+                                    {(verificationStatus === 'none' || verificationStatus === 'rejected') && (
                                         <Button size="sm" variant="outline" onClick={() => setShowApplicationModal(true)}>
-                                            Request Verification
+                                            {verificationStatus === 'rejected' ? 'Re-Apply' : 'Request Verification'}
                                         </Button>
                                     )}
                                 </div>

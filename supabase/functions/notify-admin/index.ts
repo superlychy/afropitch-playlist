@@ -62,6 +62,9 @@ Deno.serve(async (req) => {
             if (record.verification_status === 'verified' && payload.old_record?.verification_status !== 'verified') {
                 message = `✅ **Curator Verified**`;
                 details = `Curator: ${record.full_name}\nEmail: ${record.email}`;
+            } else if (record.verification_status === 'pending' && payload.old_record?.verification_status !== 'pending') {
+                message = `📝 **New Curator Verification Request**`;
+                details = `User: ${record.full_name}\nEmail: ${record.email}\nNIN: ${record.nin_number || 'N/A'}`;
             } else if (record.role === 'curator' && payload.old_record?.role !== 'curator') {
                 message = `🎓 **User Promoted to Curator**`;
                 details = `User: ${record.full_name} (${record.email})`;
