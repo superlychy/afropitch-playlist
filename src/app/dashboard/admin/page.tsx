@@ -154,6 +154,28 @@ export default function AdminDashboard() {
     const [broadcastMessage, setBroadcastMessage] = useState("");
     const [broadcastChannel, setBroadcastChannel] = useState<'email' | 'in_app' | 'both'>('email');
     const [isSendingBroadcast, setIsSendingBroadcast] = useState(false);
+
+    // Notify Admin Login
+    useEffect(() => {
+        if (user && user.role === 'admin') {
+            const hasNotified = sessionStorage.getItem('admin_notified');
+            if (!hasNotified) {
+                // Determine user email safely
+                const email = user.email || 'Admin';
+
+                // Invoke Edge Function directly
+                supabase.functions.invoke('notify-admin', {
+                    body: {
+                        event_type: 'ADMIN_LOGIN',
+                        user_data: { email }
+                    }
+                }).then(() => {
+                    sessionStorage.setItem('admin_notified', 'true');
+                }).catch(err => console.error("Login notify error", err));
+            }
+        }
+    }, [user]);
+
     useEffect(() => {
         if (!isLoading && (!user || user.role !== "admin")) {
             router.push("/portal");

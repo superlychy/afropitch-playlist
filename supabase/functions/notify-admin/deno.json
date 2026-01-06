@@ -1,0 +1,8 @@
+{
+    "tasks": {
+        "test": "deno test --allow-env --allow-net --allow-read"
+    },
+    "imports": {
+        "https://esm.sh/@supabase/supabase-js@2": "https://esm.sh/@supabase/supabase-js@2"
+    }
+}
