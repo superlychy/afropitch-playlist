@@ -1705,6 +1705,7 @@ export default function AdminDashboard() {
                 )
             }
 
-            );
+        </>
+    );
 }
 
