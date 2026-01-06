@@ -103,6 +103,12 @@ Deno.serve(async (req) => {
             details = `Subject: ${record.subject}\nUser ID: ${record.user_id}\nStatus: ${record.status}`;
         }
 
+        // 8. Curator Application (New Request)
+        else if (table === 'curator_applications' && type === 'INSERT') {
+            message = `📝 **New Curator Application**`;
+            details = `Name: ${record.name}\nEmail: ${record.email}\nPlaylist: ${record.playlist_link}`;
+        }
+
         // --- MANUAL EVENT HANDLERS ---
         else if (event_type === 'ADMIN_LOGIN') {
             message = `🛡️ **Admin Logged In**`;

@@ -7,19 +7,42 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Headphones, CheckCircle, Loader2 } from "lucide-react";
+import { supabase } from "@/lib/supabase";
 
 export default function JoinCuratorsPage() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isSuccess, setIsSuccess] = useState(false);
 
-    const onSubmit = (e: React.FormEvent) => {
+    const onSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsSubmitting(true);
-        // Simulate API
-        setTimeout(() => {
-            setIsSubmitting(false);
+
+        try {
+            // Socials object
+            const socials = {
+                instagram: (document.getElementById('instagram') as HTMLInputElement).value,
+                twitter: (document.getElementById('twitter') as HTMLInputElement).value,
+                website: (document.getElementById('website') as HTMLInputElement).value,
+            };
+
+            const { error } = await supabase
+                .from('curator_applications')
+                .insert({
+                    name: (document.getElementById('name') as HTMLInputElement).value,
+                    email: (document.getElementById('email') as HTMLInputElement).value,
+                    bio: (document.getElementById('bio') as HTMLTextAreaElement).value,
+                    playlist_link: (document.getElementById('playlistLink') as HTMLInputElement).value,
+                    social_links: socials,
+                });
+
+            if (error) throw error;
             setIsSuccess(true);
-        }, 1500);
+        } catch (err) {
+            console.error("Application failed:", err);
+            alert("Something went wrong. Please try again.");
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     if (isSuccess) {
