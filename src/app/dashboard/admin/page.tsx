@@ -1285,191 +1285,34 @@ export default function AdminDashboard() {
                             </div>
                         </div>
                     )}
-
-                    {/* SUPPORT SYSTEM */}
-                    {activeTab === "support" && (
-                        <Card className="bg-black/40 border-white/10">
-                            <CardHeader>
-                                <CardTitle className="text-white">Support Tickets</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="space-y-4">
-                                    {tickets.map(t => (
-                                        <div key={t.id} className="flex items-center justify-between p-4 bg-white/5 rounded-lg border border-white/5 hover:bg-white/10 cursor-pointer transition-colors">
-                                            <div className="flex items-center gap-4">
-                                                <div className="bg-blue-500/20 p-2 rounded-full text-blue-500">
-                                                    <MessageSquare className="w-6 h-6" />
-                                                </div>
-                                                <div>
-                                                    <p className="font-bold text-white">{t.subject}</p>
-                                                    <p className="text-sm text-gray-400">From: {t.user_name} • {t.date}</p>
-                                                    <p className="text-xs text-gray-500 mt-1 line-clamp-1">{t.last_message}</p>
-                                                </div>
-                                            </div>
-                                            <div className="flex items-center gap-3">
-                                                <span className={`text-[10px] px-2 py-1 rounded-full uppercase ${t.status === 'open' ? 'bg-green-500 text-white' : 'bg-gray-500 text-white'}`}>
-                                                    {t.status}
-                                                </span>
-                                                <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); openChat(t); }}>Chat</Button>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </CardContent>
-                        </Card>
-                    )}
-
-
-
-                </div>
-
-            {/* CHAT MODAL */}
-            {showChat && activeTicket && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in">
-                    <div className="bg-zinc-900 border border-white/10 w-full max-w-2xl h-[600px] flex flex-col rounded-xl shadow-2xl">
-                        {/* Header */}
-                        <div className="p-4 border-b border-white/10 flex justify-between items-center bg-zinc-900 rounded-t-xl">
-                            <div>
-                                <h3 className="font-bold text-white text-lg">{activeTicket?.subject}</h3>
-                                <p className="text-sm text-gray-400">Chat with {activeTicket?.user_name}</p>
-                            </div>
-                            <div className="flex gap-2">
-                                {activeTicket?.status === 'open' && (
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        className="border-red-500/30 text-red-500 hover:bg-red-500/10"
-                                        onClick={async () => {
-                                            if (!activeTicket) return;
-                                            const { error } = await supabase.from('support_tickets').update({ status: 'closed' }).eq('id', activeTicket.id);
-                                            if (!error) {
-                                                alert("Ticket closed.");
-                                                setTickets(prev => prev.map(t => t.id === activeTicket.id ? { ...t, status: 'closed' } : t));
-                                                setActiveTicket(prev => prev ? { ...prev, status: 'closed' } : null);
-                                                setShowChat(false);
-                                            }
-                                        }}
-                                    >
-                                        Close Ticket
-                                    </Button>
-                                )}
-                                <Button variant="ghost" size="icon" onClick={() => setShowChat(false)}><XCircle className="w-6 h-6 text-gray-400" /></Button>
-                            </div>
-                        </div>
-
-                        {/* Messages */}
-                        <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-black/20">
-                            {chatMessages.length === 0 && (
-                                <div className="text-center text-gray-500 mt-10">No messages yet. Start the conversation.</div>
-                            )}
-                            {chatMessages.map((msg) => (
-                                <div key={msg.id} className={`flex ${msg.is_admin ? 'justify-end' : 'justify-start'}`}>
-                                    <div className={`max-w-[70%] p-3 rounded-xl ${msg.is_admin ? 'bg-green-600 text-white' : 'bg-zinc-800 text-gray-200'}`}>
-                                        <p className="text-sm">{msg.message}</p>
-                                        <p className="text-[10px] opacity-50 mt-1 text-right">{new Date(msg.created_at).toLocaleTimeString()}</p>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-
-                        {/* Input */}
-                        <div className="p-4 border-t border-white/10 bg-zinc-900 rounded-b-xl flex gap-2">
-                            <Input
-                                value={chatInput}
-                                onChange={(e) => setChatInput(e.target.value)}
-                                placeholder="Type a message..."
-                                className="bg-zinc-800 border-zinc-700 text-white"
-                                onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
-                            />
-                            <Button className="bg-green-600 hover:bg-green-700" onClick={sendMessage} disabled={sendingMsg}>
-                                <MessageSquare className="w-4 h-4" />
-                            </Button>
-                        </div>
-                    </div>
                 </div>
             )}
 
-            {/* ADD USER MODAL */}
-            {showAddUser && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in">
-                    <div className="bg-zinc-900 border border-white/10 w-full max-w-md p-6 rounded-lg space-y-4">
-                        <h3 className="text-xl font-bold text-white">Add New User</h3>
-                        <p className="text-sm text-gray-400">Invite a new user to the platform.</p>
-
-                        <div className="space-y-3">
-                            <div>
-                                <label className="text-xs text-gray-400 mb-1 block">Full Name</label>
-                                <Input value={newName} onChange={e => setNewName(e.target.value)} placeholder="John Doe" className="bg-zinc-800 border-zinc-700" />
-                            </div>
-                            <div>
-                                <label className="text-xs text-gray-400 mb-1 block">Email</label>
-                                <Input value={newUserEmail} onChange={e => setNewUserEmail(e.target.value)} placeholder="john@example.com" className="bg-zinc-800 border-zinc-700" />
-                            </div>
-                            <div>
-                                <label className="text-xs text-gray-400 mb-1 block">Role</label>
-                                <div className="flex gap-2">
-                                    {(['artist', 'curator', 'admin'] as const).map(r => (
-                                        <div
-                                            key={r}
-                                            className={`px-3 py-1.5 rounded cursor-pointer border ${newRole === r ? 'bg-green-600 border-green-500 text-white' : 'bg-zinc-800 border-zinc-700 text-gray-400'}`}
-                                            onClick={() => setNewRole(r)}
-                                        >
-                                            <span className="capitalize text-xs font-bold">{r}</span>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="flex justify-end gap-2 pt-2">
-                            <Button variant="ghost" onClick={() => setShowAddUser(false)}>Cancel</Button>
-                            <Button className="bg-green-600" onClick={handleAddUser} disabled={isAddingUser}>
-                                {isAddingUser ? "Sending Invite..." : "Send Invite"}
-                            </Button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* APPLICATIONS VIEW */}
-            {activeTab === "applications" && (
+            {/* SUPPORT SYSTEM */}
+            {activeTab === "support" && (
                 <Card className="bg-black/40 border-white/10">
                     <CardHeader>
-                        <CardTitle className="text-white">Curator Applications</CardTitle>
-                        <CardDescription>Review and approve new curators.</CardDescription>
+                        <CardTitle className="text-white">Support Tickets</CardTitle>
                     </CardHeader>
                     <CardContent>
                         <div className="space-y-4">
-                            {pendingCurators.length === 0 && <p className="text-gray-500 text-center py-4">No pending applications.</p>}
-                            {pendingCurators.map(c => (
-                                <div key={c.id} className="flex flex-col md:flex-row md:items-center justify-between p-4 bg-white/5 rounded-lg border border-white/5 gap-4">
+                            {tickets.map(t => (
+                                <div key={t.id} className="flex items-center justify-between p-4 bg-white/5 rounded-lg border border-white/5 hover:bg-white/10 cursor-pointer transition-colors">
                                     <div className="flex items-center gap-4">
-                                        <div className="w-10 h-10 rounded-full bg-yellow-500/20 text-yellow-500 flex items-center justify-center font-bold">
-                                            {c.full_name[0]}
+                                        <div className="bg-blue-500/20 p-2 rounded-full text-blue-500">
+                                            <MessageSquare className="w-6 h-6" />
                                         </div>
                                         <div>
-                                            <p className="font-bold text-white flex items-center gap-2">
-                                                {c.full_name}
-                                                <span className="text-[10px] bg-yellow-500/20 text-yellow-500 px-2 rounded-full uppercase">Pending</span>
-                                            </p>
-                                            <p className="text-sm text-gray-500">{c.email}</p>
-                                            <div className="mt-1 text-xs text-gray-400">
-                                                Bank: {c.bank_name || 'Not set'} • Acc: {c.account_number || 'N/A'}
-                                            </div>
-                                            {c.verification_docs && (
-                                                <div className="mt-1 text-xs text-blue-400">
-                                                    Docs: {c.verification_docs}
-                                                </div>
-                                            )}
+                                            <p className="font-bold text-white">{t.subject}</p>
+                                            <p className="text-sm text-gray-400">From: {t.user_name} • {t.date}</p>
+                                            <p className="text-xs text-gray-500 mt-1 line-clamp-1">{t.last_message}</p>
                                         </div>
                                     </div>
-                                    <div className="flex items-center gap-2">
-                                        <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={() => handleCuratorAction(c.id, 'verified')}>
-                                            <CheckCircle className="w-4 h-4 mr-2" /> Approve
-                                        </Button>
-                                        <Button size="sm" variant="destructive" onClick={() => handleCuratorAction(c.id, 'rejected')}>
-                                            <XCircle className="w-4 h-4 mr-2" /> Reject
-                                        </Button>
+                                    <div className="flex items-center gap-3">
+                                        <span className={`text-[10px] px-2 py-1 rounded-full uppercase ${t.status === 'open' ? 'bg-green-500 text-white' : 'bg-gray-500 text-white'}`}>
+                                            {t.status}
+                                        </span>
+                                        <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); openChat(t); }}>Chat</Button>
                                     </div>
                                 </div>
                             ))}
@@ -1478,217 +1321,388 @@ export default function AdminDashboard() {
                 </Card>
             )}
 
-            {/* BROADCAST VIEW */}
-            {activeTab === "broadcast" && (
-                <div className="grid gap-6 md:grid-cols-2">
-                    <Card className="bg-black/40 border-white/10 md:col-span-2">
-                        <CardHeader>
-                            <CardTitle className="text-white flex items-center gap-2">
-                                <Bell className="w-5 h-5 text-yellow-500" /> Broadcast Message
-                            </CardTitle>
-                            <CardDescription>Send an announcement to platform users.</CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="bg-yellow-500/10 border border-yellow-500/20 p-4 rounded text-sm text-yellow-200 mb-4">
-                                <ShieldAlert className="w-4 h-4 inline mr-2 text-yellow-500" />
-                                <strong>Warning:</strong> sending to 'All Users' impacts the entire platform.
-                            </div>
 
-                            <div className="space-y-2">
-                                <label className="text-sm font-bold text-gray-300">Broadcast Channel</label>
-                                <div className="grid grid-cols-3 gap-3">
-                                    {(['email', 'in_app', 'both'] as const).map(c => (
-                                        <div
-                                            key={c}
-                                            onClick={() => setBroadcastChannel(c)}
-                                            className={`cursor-pointer p-3 rounded border text-center font-bold capitalize transition-all ${broadcastChannel === c ? 'bg-green-600 border-green-500 text-white' : 'bg-black/40 border-white/10 text-gray-400 hover:bg-white/5'}`}
-                                        >
-                                            {c.replace('_', '-')}
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
 
-                            <div className="space-y-2">
-                                <label className="text-sm font-bold text-gray-300">Subject Line</label>
-                                <Input
-                                    value={broadcastSubject}
-                                    onChange={e => setBroadcastSubject(e.target.value)}
-                                    placeholder="e.g. Best of 2025: Rising Stars!"
-                                    className="bg-black/50 border-white/10"
-                                />
-                            </div>
+        </div>
 
-                            <div className="space-y-2">
-                                <label className="text-sm font-bold text-gray-300">Message Body</label>
-                                <textarea
-                                    value={broadcastMessage}
-                                    onChange={e => setBroadcastMessage(e.target.value)}
-                                    placeholder="Write your announcement here..."
-                                    className="w-full h-64 bg-black/50 border-white/10 rounded-md p-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-green-500 resize-none"
-                                />
-                            </div>
-
-                            <div className="flex justify-end pt-4">
-                                <Button
-                                    className="bg-green-600 hover:bg-green-700 font-bold px-8"
-                                    onClick={handleSendBroadcast}
-                                    disabled={isSendingBroadcast}
-                                >
-                                    {isSendingBroadcast ? (
-                                        <>
-                                            <Loader2 className="w-4 h-4 animate-spin mr-2" /> Sending...
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Send className="w-4 h-4 mr-2" /> Send Broadcast
-                                        </>
-                                    )}
-                                </Button>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
-            )}
-
-            {/* EDIT PLAYLIST MODAL */}
-            {showEditPlaylist && adminEditingPlaylist && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in">
-                    <div className="bg-zinc-900 border border-white/10 w-full max-w-md p-6 rounded-lg space-y-4">
-                        <h3 className="text-xl font-bold text-white">Edit Playlist</h3>
-                        <div className="space-y-3">
-                            <div>
-                                <label className="text-xs text-gray-400 mb-1 block">Playlist Name</label>
-                                <Input value={adminNewName} onChange={e => setAdminNewName(e.target.value)} className="bg-zinc-800 border-zinc-700" />
-                            </div>
-                            <div>
-                                <label className="text-xs text-gray-400 mb-1 block">Followers</label>
-                                <Input type="number" value={adminNewFollowers} onChange={e => setAdminNewFollowers(parseInt(e.target.value))} className="bg-zinc-800 border-zinc-700" />
-                            </div>
+            {/* CHAT MODAL */ }
+    {
+        showChat && activeTicket && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in">
+                <div className="bg-zinc-900 border border-white/10 w-full max-w-2xl h-[600px] flex flex-col rounded-xl shadow-2xl">
+                    {/* Header */}
+                    <div className="p-4 border-b border-white/10 flex justify-between items-center bg-zinc-900 rounded-t-xl">
+                        <div>
+                            <h3 className="font-bold text-white text-lg">{activeTicket?.subject}</h3>
+                            <p className="text-sm text-gray-400">Chat with {activeTicket?.user_name}</p>
                         </div>
-                        <div className="flex justify-end gap-2 pt-4">
-                            <Button variant="ghost" onClick={() => setShowEditPlaylist(false)}>Cancel</Button>
-                            <Button className="bg-green-600" onClick={async () => {
-                                setAdminIsSaving(true);
-                                await supabase.from('playlists').update({
-                                    name: adminNewName,
-                                    followers: adminNewFollowers
-                                }).eq('id', adminEditingPlaylist.id);
-                                setAdminIsSaving(false);
-                                setShowEditPlaylist(false);
-                                window.location.reload();
-                            }} disabled={adminIsSaving}>
-                                {adminIsSaving ? "Saving..." : "Save Changes"}
-                            </Button>
+                        <div className="flex gap-2">
+                            {activeTicket?.status === 'open' && (
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="border-red-500/30 text-red-500 hover:bg-red-500/10"
+                                    onClick={async () => {
+                                        if (!activeTicket) return;
+                                        const { error } = await supabase.from('support_tickets').update({ status: 'closed' }).eq('id', activeTicket.id);
+                                        if (!error) {
+                                            alert("Ticket closed.");
+                                            setTickets(prev => prev.map(t => t.id === activeTicket.id ? { ...t, status: 'closed' } : t));
+                                            setActiveTicket(prev => prev ? { ...prev, status: 'closed' } : null);
+                                            setShowChat(false);
+                                        }
+                                    }}
+                                >
+                                    Close Ticket
+                                </Button>
+                            )}
+                            <Button variant="ghost" size="icon" onClick={() => setShowChat(false)}><XCircle className="w-6 h-6 text-gray-400" /></Button>
                         </div>
                     </div>
+
+                    {/* Messages */}
+                    <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-black/20">
+                        {chatMessages.length === 0 && (
+                            <div className="text-center text-gray-500 mt-10">No messages yet. Start the conversation.</div>
+                        )}
+                        {chatMessages.map((msg) => (
+                            <div key={msg.id} className={`flex ${msg.is_admin ? 'justify-end' : 'justify-start'}`}>
+                                <div className={`max-w-[70%] p-3 rounded-xl ${msg.is_admin ? 'bg-green-600 text-white' : 'bg-zinc-800 text-gray-200'}`}>
+                                    <p className="text-sm">{msg.message}</p>
+                                    <p className="text-[10px] opacity-50 mt-1 text-right">{new Date(msg.created_at).toLocaleTimeString()}</p>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Input */}
+                    <div className="p-4 border-t border-white/10 bg-zinc-900 rounded-b-xl flex gap-2">
+                        <Input
+                            value={chatInput}
+                            onChange={(e) => setChatInput(e.target.value)}
+                            placeholder="Type a message..."
+                            className="bg-zinc-800 border-zinc-700 text-white"
+                            onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
+                        />
+                        <Button className="bg-green-600 hover:bg-green-700" onClick={sendMessage} disabled={sendingMsg}>
+                            <MessageSquare className="w-4 h-4" />
+                        </Button>
+                    </div>
                 </div>
-            )}
+            </div>
+        )
+    }
 
-            {/* ADD PLAYLIST MODAL */}
-            {showAddPlaylist && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in">
-                    <div className="bg-zinc-900 border border-white/10 w-full max-w-md p-6 rounded-lg space-y-6">
-                        <div className="flex justify-between items-start">
-                            <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                                <Plus className="w-5 h-5 text-green-500" /> Add Team Playlist
-                            </h3>
-                            <button onClick={() => setShowAddPlaylist(false)} className="text-gray-400 hover:text-white"><XCircle className="w-6 h-6" /></button>
+    {/* ADD USER MODAL */ }
+    {
+        showAddUser && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in">
+                <div className="bg-zinc-900 border border-white/10 w-full max-w-md p-6 rounded-lg space-y-4">
+                    <h3 className="text-xl font-bold text-white">Add New User</h3>
+                    <p className="text-sm text-gray-400">Invite a new user to the platform.</p>
+
+                    <div className="space-y-3">
+                        <div>
+                            <label className="text-xs text-gray-400 mb-1 block">Full Name</label>
+                            <Input value={newName} onChange={e => setNewName(e.target.value)} placeholder="John Doe" className="bg-zinc-800 border-zinc-700" />
                         </div>
+                        <div>
+                            <label className="text-xs text-gray-400 mb-1 block">Email</label>
+                            <Input value={newUserEmail} onChange={e => setNewUserEmail(e.target.value)} placeholder="john@example.com" className="bg-zinc-800 border-zinc-700" />
+                        </div>
+                        <div>
+                            <label className="text-xs text-gray-400 mb-1 block">Role</label>
+                            <div className="flex gap-2">
+                                {(['artist', 'curator', 'admin'] as const).map(r => (
+                                    <div
+                                        key={r}
+                                        className={`px-3 py-1.5 rounded cursor-pointer border ${newRole === r ? 'bg-green-600 border-green-500 text-white' : 'bg-zinc-800 border-zinc-700 text-gray-400'}`}
+                                        onClick={() => setNewRole(r)}
+                                    >
+                                        <span className="capitalize text-xs font-bold">{r}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
 
-                        {!fetchedPlaylistInfo ? (
-                            <div className="space-y-4">
-                                <p className="text-sm text-gray-400">Enter a Playlist URL (Spotify, Apple Music, Audiomack, etc.)</p>
-                                <div className="flex gap-2">
-                                    <Input
-                                        placeholder="https://..."
-                                        value={newPlaylistLink}
-                                        onChange={(e) => setNewPlaylistLink(e.target.value)}
-                                        className="bg-black/50 border-white/10"
-                                    />
-                                    <Button onClick={fetchPlaylistInfo} disabled={isFetchingInfo || !newPlaylistLink}>
-                                        {isFetchingInfo ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                    <div className="flex justify-end gap-2 pt-2">
+                        <Button variant="ghost" onClick={() => setShowAddUser(false)}>Cancel</Button>
+                        <Button className="bg-green-600" onClick={handleAddUser} disabled={isAddingUser}>
+                            {isAddingUser ? "Sending Invite..." : "Send Invite"}
+                        </Button>
+                    </div>
+                </div>
+            </div>
+        )
+    }
+
+    {/* APPLICATIONS VIEW */ }
+    {
+        activeTab === "applications" && (
+            <Card className="bg-black/40 border-white/10">
+                <CardHeader>
+                    <CardTitle className="text-white">Curator Applications</CardTitle>
+                    <CardDescription>Review and approve new curators.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <div className="space-y-4">
+                        {pendingCurators.length === 0 && <p className="text-gray-500 text-center py-4">No pending applications.</p>}
+                        {pendingCurators.map(c => (
+                            <div key={c.id} className="flex flex-col md:flex-row md:items-center justify-between p-4 bg-white/5 rounded-lg border border-white/5 gap-4">
+                                <div className="flex items-center gap-4">
+                                    <div className="w-10 h-10 rounded-full bg-yellow-500/20 text-yellow-500 flex items-center justify-center font-bold">
+                                        {c.full_name[0]}
+                                    </div>
+                                    <div>
+                                        <p className="font-bold text-white flex items-center gap-2">
+                                            {c.full_name}
+                                            <span className="text-[10px] bg-yellow-500/20 text-yellow-500 px-2 rounded-full uppercase">Pending</span>
+                                        </p>
+                                        <p className="text-sm text-gray-500">{c.email}</p>
+                                        <div className="mt-1 text-xs text-gray-400">
+                                            Bank: {c.bank_name || 'Not set'} • Acc: {c.account_number || 'N/A'}
+                                        </div>
+                                        {c.verification_docs && (
+                                            <div className="mt-1 text-xs text-blue-400">
+                                                Docs: {c.verification_docs}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={() => handleCuratorAction(c.id, 'verified')}>
+                                        <CheckCircle className="w-4 h-4 mr-2" /> Approve
+                                    </Button>
+                                    <Button size="sm" variant="destructive" onClick={() => handleCuratorAction(c.id, 'rejected')}>
+                                        <XCircle className="w-4 h-4 mr-2" /> Reject
                                     </Button>
                                 </div>
-                                <p className="text-[10px] text-gray-500">Note: Only Spotify links will auto-fill details. Others require manual entry.</p>
                             </div>
-                        ) : (
-                            <div className="space-y-4 animate-in fade-in">
-                                <div className="bg-white/5 p-4 rounded-lg border border-white/5 space-y-3">
-                                    <div className="flex gap-4">
-                                        <div className="w-16 h-16 bg-zinc-800 rounded flex-shrink-0 overflow-hidden relative group">
-                                            {fetchedPlaylistInfo.coverImage ? (
-                                                <img src={fetchedPlaylistInfo.coverImage} className="w-full h-full object-cover" alt="Cover" />
-                                            ) : (
-                                                <Music className="w-8 h-8 text-gray-600 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
-                                            )}
-                                        </div>
-                                        <div className="flex-1 space-y-2">
-                                            <div>
-                                                <label className="text-[10px] text-gray-400 uppercase font-bold">Name</label>
-                                                <Input
-                                                    value={fetchedPlaylistInfo.name}
-                                                    onChange={e => setFetchedPlaylistInfo({ ...fetchedPlaylistInfo, name: e.target.value })}
-                                                    className="bg-black/20 border-white/10 h-8 text-sm"
-                                                    placeholder="Playlist Name"
-                                                />
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <div>
-                                            <label className="text-[10px] text-gray-400 uppercase font-bold">Followers</label>
-                                            <Input
-                                                type="number"
-                                                value={fetchedPlaylistInfo.followers}
-                                                onChange={e => setFetchedPlaylistInfo({ ...fetchedPlaylistInfo, followers: parseInt(e.target.value) || 0 })}
-                                                className="bg-black/20 border-white/10 h-8 text-sm"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="text-[10px] text-gray-400 uppercase font-bold">Cover Image URL</label>
-                                            <Input
-                                                value={fetchedPlaylistInfo.coverImage || ""}
-                                                onChange={e => setFetchedPlaylistInfo({ ...fetchedPlaylistInfo, coverImage: e.target.value })}
-                                                className="bg-black/20 border-white/10 h-8 text-sm"
-                                                placeholder="https://..."
-                                            />
-                                        </div>
-                                    </div>
-
-                                    <div className="mt-3">
-                                        <label className="text-[10px] text-gray-400 uppercase font-bold mb-2 block">Playlist Tier</label>
-                                        <div className="grid grid-cols-4 gap-2">
-                                            {(['standard', 'express', 'exclusive', 'free'] as const).map(t => (
-                                                <div
-                                                    key={t}
-                                                    onClick={() => setNewPlaylistType(t)}
-                                                    className={`cursor-pointer border rounded p-2 text-center transition-all ${newPlaylistType === t
-                                                        ? 'bg-green-600 border-green-500 text-white'
-                                                        : 'bg-black/20 border-white/10 text-gray-400 hover:bg-white/5'}`}
-                                                >
-                                                    <span className="block text-xs font-bold capitalize">{t}</span>
-                                                    <span className="block text-[10px] opacity-70">{pricingConfig.currency}{pricingConfig.tiers[t].price.toLocaleString()}</span>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="bg-green-500/10 border border-green-500/20 p-3 rounded text-xs text-green-400">
-                                    This playlist will be added to <strong>AfroPitch Team Playlists</strong> category.
-                                </div>
-                                <Button className="w-full bg-green-600 hover:bg-green-700 font-bold" onClick={addPlaylist} disabled={isSavingPlaylist || !fetchedPlaylistInfo.name}>
-                                    {isSavingPlaylist ? <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Adding...</> : "Confirm & Add Playlist"}
-                                </Button>
-                                <Button variant="ghost" className="w-full text-gray-400 hover:text-white" onClick={() => setFetchedPlaylistInfo(null)}>
-                                    Back to Search
-                                </Button>
-                            </div>
-                        )}
+                        ))}
                     </div>
-                </div >
-            )}
+                </CardContent>
+            </Card>
+        )
+    }
+
+    {/* BROADCAST VIEW */ }
+    {
+        activeTab === "broadcast" && (
+            <div className="grid gap-6 md:grid-cols-2">
+                <Card className="bg-black/40 border-white/10 md:col-span-2">
+                    <CardHeader>
+                        <CardTitle className="text-white flex items-center gap-2">
+                            <Bell className="w-5 h-5 text-yellow-500" /> Broadcast Message
+                        </CardTitle>
+                        <CardDescription>Send an announcement to platform users.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div className="bg-yellow-500/10 border border-yellow-500/20 p-4 rounded text-sm text-yellow-200 mb-4">
+                            <ShieldAlert className="w-4 h-4 inline mr-2 text-yellow-500" />
+                            <strong>Warning:</strong> sending to 'All Users' impacts the entire platform.
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="text-sm font-bold text-gray-300">Broadcast Channel</label>
+                            <div className="grid grid-cols-3 gap-3">
+                                {(['email', 'in_app', 'both'] as const).map(c => (
+                                    <div
+                                        key={c}
+                                        onClick={() => setBroadcastChannel(c)}
+                                        className={`cursor-pointer p-3 rounded border text-center font-bold capitalize transition-all ${broadcastChannel === c ? 'bg-green-600 border-green-500 text-white' : 'bg-black/40 border-white/10 text-gray-400 hover:bg-white/5'}`}
+                                    >
+                                        {c.replace('_', '-')}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="text-sm font-bold text-gray-300">Subject Line</label>
+                            <Input
+                                value={broadcastSubject}
+                                onChange={e => setBroadcastSubject(e.target.value)}
+                                placeholder="e.g. Best of 2025: Rising Stars!"
+                                className="bg-black/50 border-white/10"
+                            />
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="text-sm font-bold text-gray-300">Message Body</label>
+                            <textarea
+                                value={broadcastMessage}
+                                onChange={e => setBroadcastMessage(e.target.value)}
+                                placeholder="Write your announcement here..."
+                                className="w-full h-64 bg-black/50 border-white/10 rounded-md p-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-green-500 resize-none"
+                            />
+                        </div>
+
+                        <div className="flex justify-end pt-4">
+                            <Button
+                                className="bg-green-600 hover:bg-green-700 font-bold px-8"
+                                onClick={handleSendBroadcast}
+                                disabled={isSendingBroadcast}
+                            >
+                                {isSendingBroadcast ? (
+                                    <>
+                                        <Loader2 className="w-4 h-4 animate-spin mr-2" /> Sending...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Send className="w-4 h-4 mr-2" /> Send Broadcast
+                                    </>
+                                )}
+                            </Button>
+                        </div>
+                    </CardContent>
+                </Card>
+            </div>
+        )
+    }
+
+    {/* EDIT PLAYLIST MODAL */ }
+    {
+        showEditPlaylist && adminEditingPlaylist && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in">
+                <div className="bg-zinc-900 border border-white/10 w-full max-w-md p-6 rounded-lg space-y-4">
+                    <h3 className="text-xl font-bold text-white">Edit Playlist</h3>
+                    <div className="space-y-3">
+                        <div>
+                            <label className="text-xs text-gray-400 mb-1 block">Playlist Name</label>
+                            <Input value={adminNewName} onChange={e => setAdminNewName(e.target.value)} className="bg-zinc-800 border-zinc-700" />
+                        </div>
+                        <div>
+                            <label className="text-xs text-gray-400 mb-1 block">Followers</label>
+                            <Input type="number" value={adminNewFollowers} onChange={e => setAdminNewFollowers(parseInt(e.target.value))} className="bg-zinc-800 border-zinc-700" />
+                        </div>
+                    </div>
+                    <div className="flex justify-end gap-2 pt-4">
+                        <Button variant="ghost" onClick={() => setShowEditPlaylist(false)}>Cancel</Button>
+                        <Button className="bg-green-600" onClick={async () => {
+                            setAdminIsSaving(true);
+                            await supabase.from('playlists').update({
+                                name: adminNewName,
+                                followers: adminNewFollowers
+                            }).eq('id', adminEditingPlaylist.id);
+                            setAdminIsSaving(false);
+                            setShowEditPlaylist(false);
+                            window.location.reload();
+                        }} disabled={adminIsSaving}>
+                            {adminIsSaving ? "Saving..." : "Save Changes"}
+                        </Button>
+                    </div>
+                </div>
+            </div>
+        )
+    }
+
+    {/* ADD PLAYLIST MODAL */ }
+    {
+        showAddPlaylist && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in">
+                <div className="bg-zinc-900 border border-white/10 w-full max-w-md p-6 rounded-lg space-y-6">
+                    <div className="flex justify-between items-start">
+                        <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                            <Plus className="w-5 h-5 text-green-500" /> Add Team Playlist
+                        </h3>
+                        <button onClick={() => setShowAddPlaylist(false)} className="text-gray-400 hover:text-white"><XCircle className="w-6 h-6" /></button>
+                    </div>
+
+                    {!fetchedPlaylistInfo ? (
+                        <div className="space-y-4">
+                            <p className="text-sm text-gray-400">Enter a Playlist URL (Spotify, Apple Music, Audiomack, etc.)</p>
+                            <div className="flex gap-2">
+                                <Input
+                                    placeholder="https://..."
+                                    value={newPlaylistLink}
+                                    onChange={(e) => setNewPlaylistLink(e.target.value)}
+                                    className="bg-black/50 border-white/10"
+                                />
+                                <Button onClick={fetchPlaylistInfo} disabled={isFetchingInfo || !newPlaylistLink}>
+                                    {isFetchingInfo ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                                </Button>
+                            </div>
+                            <p className="text-[10px] text-gray-500">Note: Only Spotify links will auto-fill details. Others require manual entry.</p>
+                        </div>
+                    ) : (
+                        <div className="space-y-4 animate-in fade-in">
+                            <div className="bg-white/5 p-4 rounded-lg border border-white/5 space-y-3">
+                                <div className="flex gap-4">
+                                    <div className="w-16 h-16 bg-zinc-800 rounded flex-shrink-0 overflow-hidden relative group">
+                                        {fetchedPlaylistInfo.coverImage ? (
+                                            <img src={fetchedPlaylistInfo.coverImage} className="w-full h-full object-cover" alt="Cover" />
+                                        ) : (
+                                            <Music className="w-8 h-8 text-gray-600 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+                                        )}
+                                    </div>
+                                    <div className="flex-1 space-y-2">
+                                        <div>
+                                            <label className="text-[10px] text-gray-400 uppercase font-bold">Name</label>
+                                            <Input
+                                                value={fetchedPlaylistInfo.name}
+                                                onChange={e => setFetchedPlaylistInfo({ ...fetchedPlaylistInfo, name: e.target.value })}
+                                                className="bg-black/20 border-white/10 h-8 text-sm"
+                                                placeholder="Playlist Name"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="text-[10px] text-gray-400 uppercase font-bold">Followers</label>
+                                        <Input
+                                            type="number"
+                                            value={fetchedPlaylistInfo.followers}
+                                            onChange={e => setFetchedPlaylistInfo({ ...fetchedPlaylistInfo, followers: parseInt(e.target.value) || 0 })}
+                                            className="bg-black/20 border-white/10 h-8 text-sm"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] text-gray-400 uppercase font-bold">Cover Image URL</label>
+                                        <Input
+                                            value={fetchedPlaylistInfo.coverImage || ""}
+                                            onChange={e => setFetchedPlaylistInfo({ ...fetchedPlaylistInfo, coverImage: e.target.value })}
+                                            className="bg-black/20 border-white/10 h-8 text-sm"
+                                            placeholder="https://..."
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="mt-3">
+                                    <label className="text-[10px] text-gray-400 uppercase font-bold mb-2 block">Playlist Tier</label>
+                                    <div className="grid grid-cols-4 gap-2">
+                                        {(['standard', 'express', 'exclusive', 'free'] as const).map(t => (
+                                            <div
+                                                key={t}
+                                                onClick={() => setNewPlaylistType(t)}
+                                                className={`cursor-pointer border rounded p-2 text-center transition-all ${newPlaylistType === t
+                                                    ? 'bg-green-600 border-green-500 text-white'
+                                                    : 'bg-black/20 border-white/10 text-gray-400 hover:bg-white/5'}`}
+                                            >
+                                                <span className="block text-xs font-bold capitalize">{t}</span>
+                                                <span className="block text-[10px] opacity-70">{pricingConfig.currency}{pricingConfig.tiers[t].price.toLocaleString()}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="bg-green-500/10 border border-green-500/20 p-3 rounded text-xs text-green-400">
+                                This playlist will be added to <strong>AfroPitch Team Playlists</strong> category.
+                            </div>
+                            <Button className="w-full bg-green-600 hover:bg-green-700 font-bold" onClick={addPlaylist} disabled={isSavingPlaylist || !fetchedPlaylistInfo.name}>
+                                {isSavingPlaylist ? <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Adding...</> : "Confirm & Add Playlist"}
+                            </Button>
+                            <Button variant="ghost" className="w-full text-gray-400 hover:text-white" onClick={() => setFetchedPlaylistInfo(null)}>
+                                Back to Search
+                            </Button>
+                        </div>
+                    )}
+                </div>
+            </div >
+        )
+    }
 
             );
 }
