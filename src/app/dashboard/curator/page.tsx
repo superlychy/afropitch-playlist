@@ -998,10 +998,15 @@ export default function CuratorDashboard() {
                     <div className="space-y-6">
                         <div className="flex items-center justify-between">
                             <h3 className="font-bold text-white text-xl">My Playlists</h3>
-                            {verificationStatus === 'verified' && (
+                            {verificationStatus === 'verified' ? (
                                 <Button size="sm" variant="outline" className="border-dashed border-white/20 hover:border-white/50" onClick={() => { setEditingPlaylist(null); setNewName(""); setNewGenre(""); setShowAddPlaylist(true); }}>
                                     <Plus className="w-4 h-4 mr-2" /> New
                                 </Button>
+                            ) : (
+                                <div onClick={() => setShowProfile(true)} className="cursor-pointer px-3 py-1.5 bg-red-500/10 border border-red-500/20 rounded text-red-500 text-xs font-bold hover:bg-red-500/20 flex items-center animate-pulse">
+                                    <AlertCircle className="w-3 h-3 mr-1" />
+                                    Verify to add playlists
+                                </div>
                             )}
                         </div>
 
