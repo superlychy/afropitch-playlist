@@ -79,6 +79,7 @@ export default function AdminDashboard() {
     // DATA STATE
     const [usersList, setUsersList] = useState<AdminUser[]>([]);
     const [pendingCurators, setPendingCurators] = useState<any[]>([]); // New state
+    const [pendingSubmissionsCount, setPendingSubmissionsCount] = useState(0); // New State
     const [withdrawals, setWithdrawals] = useState<WithdrawalRequest[]>([]);
     const [tickets, setTickets] = useState<SupportTicket[]>([]);
 
@@ -172,6 +173,10 @@ export default function AdminDashboard() {
                 .eq('verification_status', 'pending');
 
             if (pending) setPendingCurators(pending);
+
+            // New: Count Pending Submissions
+            const { count: subCount } = await supabase.from('submissions').select('*', { count: 'exact', head: true }).eq('status', 'pending');
+            setPendingSubmissionsCount(subCount || 0);
 
 
             // 2. Fetch Withdrawals
@@ -784,31 +789,54 @@ export default function AdminDashboard() {
                     <div>
                         <h1 className="text-3xl font-bold text-white flex items-center gap-3">
                             Admin Dashboard
-                            {(pendingWithdrawalsCount + openTicketsCount) > 0 && (
+                            {(pendingWithdrawalsCount + openTicketsCount + pendingCurators.length + pendingSubmissionsCount) > 0 && (
                                 <span className="bg-red-500 text-white text-sm px-2 py-0.5 rounded-full animate-pulse shadow-lg shadow-red-500/20">
-                                    {pendingWithdrawalsCount + openTicketsCount} Updates
+                                    {pendingWithdrawalsCount + openTicketsCount + pendingCurators.length + pendingSubmissionsCount} Updates
                                 </span>
                             )}
                         </h1>
                         <p className="text-gray-400">Welcome, <span className="text-green-500">{user?.name || 'Admin'}</span>. Platform Management System</p>
+
+                        {/* Notification Action Cards */}
+                        <div className="flex flex-wrap gap-2 mt-4">
+                            {pendingSubmissionsCount > 0 && (
+                                <div className="bg-blue-500/10 border border-blue-500/20 px-3 py-1.5 rounded-lg flex items-center gap-2 cursor-pointer hover:bg-blue-500/20 transition-colors" onClick={() => setActiveTab('playlists')}>
+                                    <Music className="w-4 h-4 text-blue-500" />
+                                    <span className="text-xs font-bold text-blue-400">{pendingSubmissionsCount} Songs Pending</span>
+                                </div>
+                            )}
+                            {pendingCurators.length > 0 && (
+                                <div className="bg-yellow-500/10 border border-yellow-500/20 px-3 py-1.5 rounded-lg flex items-center gap-2 cursor-pointer hover:bg-yellow-500/20 transition-colors" onClick={() => setActiveTab('applications')}>
+                                    <Users className="w-4 h-4 text-yellow-500" />
+                                    <span className="text-xs font-bold text-yellow-400">{pendingCurators.length} Applications</span>
+                                </div>
+                            )}
+                            {pendingWithdrawalsCount > 0 && (
+                                <div className="bg-red-500/10 border border-red-500/20 px-3 py-1.5 rounded-lg flex items-center gap-2 cursor-pointer hover:bg-red-500/20 transition-colors" onClick={() => setActiveTab('withdrawals')}>
+                                    <DollarSign className="w-4 h-4 text-red-500" />
+                                    <span className="text-xs font-bold text-red-400">{pendingWithdrawalsCount} Withdrawals</span>
+                                </div>
+                            )}
+                        </div>
                     </div>
                     <div className="flex items-center gap-4">
-                        <div className="flex bg-white/5 p-1 rounded-lg border border-white/10">
+                        <div className="flex bg-white/5 p-1 rounded-lg border border-white/10 hidden md:flex">
                             {["overview", "users", "withdrawals", "transactions", "support", "playlists", "applications", "broadcast"].map((tab) => {
                                 let count = 0;
                                 if (tab === 'withdrawals') count = pendingWithdrawalsCount;
                                 if (tab === 'support') count = openTicketsCount;
                                 if (tab === 'applications') count = pendingCurators.length;
+                                if (tab === 'playlists') count = pendingSubmissionsCount;
 
                                 return (
                                     <button
                                         key={tab}
                                         onClick={() => setActiveTab(tab as any)}
-                                        className={`px-4 py-2 rounded-md text-sm font-medium capitalize transition-all relative ${activeTab === tab ? "bg-green-600 text-white" : "text-gray-400 hover:text-white"}`}
+                                        className={`px-3 py-1.5 rounded-md text-xs font-medium capitalize transition-all relative ${activeTab === tab ? "bg-green-600 text-white" : "text-gray-400 hover:text-white"}`}
                                     >
                                         {tab}
                                         {count > 0 && (
-                                            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] w-4 h-4 flex items-center justify-center rounded-full animate-pulse font-bold">
+                                            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] w-3 h-3 flex items-center justify-center rounded-full animate-pulse font-bold">
                                                 {count}
                                             </span>
                                         )}
