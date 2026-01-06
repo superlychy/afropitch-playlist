@@ -137,6 +137,7 @@ export default function AdminDashboard() {
     const [adminNewName, setAdminNewName] = useState("");
     const [adminNewFollowers, setAdminNewFollowers] = useState(0);
     const [adminIsSaving, setAdminIsSaving] = useState(false);
+    const [playlistTab, setPlaylistTab] = useState<"submissions" | "all">("submissions"); // Inner tab state for Playlists section
 
     // Add Playlist State (Admin)
     const [showAddPlaylist, setShowAddPlaylist] = useState(false);
@@ -1104,118 +1105,153 @@ export default function AdminDashboard() {
                 {/* PLAYLISTS MANAGEMENT */}
                 {activeTab === "playlists" && (
                     <div className="space-y-6">
-                        <div className="flex justify-between items-center">
-                            <h2 className="text-2xl font-bold text-white">All Playlists</h2>
+                        <div className="flex justify-between items-center mb-6">
+                            <div className="flex bg-black/40 p-1 rounded-lg border border-white/10">
+                                <button
+                                    onClick={() => setPlaylistTab("submissions")}
+                                    className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${playlistTab === "submissions" ? "bg-blue-600 text-white" : "text-gray-400 hover:text-white"}`}
+                                >
+                                    Pending Submissions
+                                    {pendingSubmissionsCount > 0 && (
+                                        <span className="ml-2 bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full animate-pulse">{pendingSubmissionsCount}</span>
+                                    )}
+                                </button>
+                                <button
+                                    onClick={() => setPlaylistTab("all")}
+                                    className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${playlistTab === "all" ? "bg-green-600 text-white" : "text-gray-400 hover:text-white"}`}
+                                >
+                                    All Playlists
+                                    <span className="ml-2 bg-white/10 text-white text-[10px] px-1.5 py-0.5 rounded-full">{allPlaylists.length}</span>
+                                </button>
+                            </div>
+
                             <Button className="bg-green-600 hover:bg-green-700" onClick={() => setShowAddPlaylist(true)}>
                                 <Plus className="w-4 h-4 mr-2" /> Add Playlist
                             </Button>
-                            <div className="flex justify-between items-center">
-                                <h2 className="text-2xl font-bold text-white">All Playlists</h2>
-                                <Button className="bg-green-600 hover:bg-green-700" onClick={() => setShowAddPlaylist(true)}>
-                                    <Plus className="w-4 h-4 mr-2" /> Add Playlist
-                                </Button>
-                            </div>
+                        </div>
 
-                            {/* GLOBAL PENDING SUBMISSIONS SECTION */}
-                            <div className="bg-blue-900/10 border border-blue-500/20 rounded-xl p-6 space-y-4">
-                                <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                                    <Music className="w-5 h-5 text-blue-500" /> Pending Submissions ({pendingSubmissionsCount})
-                                </h3>
-                                <p className="text-sm text-gray-400">Review all incoming submissions across all playlists here.</p>
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                    {allPlaylists.flatMap(p =>
-                                        (playlistSongs.filter(s => s.playlist_id === p.id && s.status === 'pending') || []).map(s => ({ ...s, playlistName: p.name }))
-                                    ).length === 0 && (
-                                            <div className="col-span-3 text-center py-8 text-gray-500">
-                                                <p>No pending submissions loaded. Click a playlist regarding to load specific songs or implement global fetch.</p>
-                                                <Button size="sm" variant="outline" className="mt-2" onClick={() => fetchGlobalPendingSongs()}>Load All Pending</Button>
-                                            </div>
-                                        )}
-
-                                    {playlistSongs.filter(s => s.status === 'pending').map(song => (
-                                        <div key={song.id} className="bg-black/40 p-3 rounded border border-white/5 flex flex-col gap-2 relative group">
-                                            <div className="flex justify-between items-start">
-                                                <div>
-                                                    <p className="text-sm text-white font-bold truncate pr-6">{song.artist?.full_name || 'Unknown Artist'}</p>
-                                                    <p className="text-xs text-gray-400 truncate">{song.song_title || 'Untitled Track'}</p>
-                                                    <p className="text-[10px] text-blue-400 mt-1">Playlist: {allPlaylists.find(p => p.id === song.playlist_id)?.name}</p>
-                                                </div>
-                                                <a href={song.song_link} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-white transition-colors">
-                                                    <Music className="w-4 h-4" />
-                                                </a>
-                                            </div>
-                                            <div className="flex gap-2 mt-2">
-                                                <Button size="sm" className="flex-1 bg-green-600 hover:bg-green-700 h-8 text-xs" onClick={() => handleSubmissionAction(song.id, 'accepted')}>
-                                                    <CheckCircle className="w-3 h-3 mr-1" /> Accept
-                                                </Button>
-                                                <Button size="sm" variant="destructive" className="flex-1 h-8 text-xs" onClick={() => handleSubmissionAction(song.id, 'declined')}>
-                                                    <XCircle className="w-3 h-3 mr-1" /> Decline
-                                                </Button>
-                                            </div>
+                        {/* TAB 1: PENDING SUBMISSIONS */}
+                        {playlistTab === "submissions" && (
+                            <div className="space-y-4">
+                                <div className="bg-blue-900/10 border border-blue-500/20 rounded-xl p-6">
+                                    <div className="flex items-center gap-3 mb-4">
+                                        <div className="p-2 bg-blue-500/20 rounded-full text-blue-500">
+                                            <Music className="w-6 h-6" />
                                         </div>
-                                    ))}
-                                </div>
-                            </div>
-                            {allPlaylists.map((playlist) => (
-                                <Card key={playlist.id} className="bg-black/40 border-white/10 overflow-hidden hover:border-white/20 transition-all">
-                                    <div className="h-32 bg-gradient-to-br from-gray-800 to-black relative">
-                                        <div className="absolute inset-0 flex items-center justify-center">
-                                            <Music className="w-12 h-12 text-white/20" />
-                                        </div>
-                                        <div className="absolute top-2 right-2">
-                                            <span className={`px-2 py-1 rounded text-[10px] uppercase font-bold ${playlist.type === 'exclusive' ? 'bg-yellow-500 text-black' :
-                                                playlist.type === 'express' ? 'bg-orange-500 text-white' :
-                                                    'bg-blue-500 text-white'
-                                                }`}>
-                                                {playlist.type}
-                                            </span>
+                                        <div>
+                                            <h3 className="text-xl font-bold text-white">Pending Submissions Review</h3>
+                                            <p className="text-sm text-gray-400">Manage all incoming song submissions across the platform.</p>
                                         </div>
                                     </div>
-                                    <CardContent className="p-4">
-                                        <h3 className="font-bold text-white text-lg truncate" title={playlist.name}>{playlist.name}</h3>
-                                        <p className="text-sm text-gray-400 mb-4 flex items-center gap-1">
-                                            <Users className="w-3 h-3" /> Curator: <span className="text-white">{playlist.curator_name || 'Unknown'}</span>
-                                        </p>
 
-                                        <div className="grid grid-cols-2 gap-2 text-xs text-gray-500 mb-4">
-                                            <div className="bg-white/5 p-2 rounded">
-                                                <span className="block font-bold text-white">{playlist.followers.toLocaleString()}</span>
-                                                Followers
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                        {allPlaylists.flatMap(p =>
+                                            (playlistSongs.filter(s => s.playlist_id === p.id && s.status === 'pending') || []).map(s => ({ ...s, playlistName: p.name }))
+                                        ).length === 0 && (
+                                                <div className="col-span-3 text-center py-12 text-gray-500 bg-black/20 rounded-xl border border-white/5 border-dashed">
+                                                    <Music className="w-12 h-12 mx-auto text-gray-600 mb-2" />
+                                                    <p>No pending submissions found.</p>
+                                                    <p className="text-xs text-gray-600 mt-1">New submissions will appear here automatically.</p>
+                                                    <Button size="sm" variant="outline" className="mt-4 border-white/10" onClick={() => fetchGlobalPendingSongs()}>Force Refresh</Button>
+                                                </div>
+                                            )}
+
+                                        {playlistSongs.filter(s => s.status === 'pending').map(song => (
+                                            <div key={song.id} className="bg-black/40 p-4 rounded-xl border border-white/10 flex flex-col gap-3 relative group hover:border-blue-500/30 transition-colors">
+                                                <div className="flex justify-between items-start">
+                                                    <div>
+                                                        <div className="flex items-center gap-2 mb-1">
+                                                            <span className="text-[10px] bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded-full uppercase font-bold tracking-wider">
+                                                                {allPlaylists.find(p => p.id === song.playlist_id)?.name || 'Unknown Playlist'}
+                                                            </span>
+                                                        </div>
+                                                        <p className="text-sm text-white font-bold truncate pr-6">{song.artist?.full_name || 'Unknown Artist'}</p>
+                                                        <p className="text-xs text-gray-400 truncate">{song.song_title || 'Untitled Track'}</p>
+                                                    </div>
+                                                    <a href={song.song_link} target="_blank" rel="noopener noreferrer" className="p-2 bg-white/5 rounded-full hover:bg-white/20 transition-colors text-blue-400">
+                                                        <Music className="w-4 h-4" />
+                                                    </a>
+                                                </div>
+
+                                                <div className="grid grid-cols-2 gap-2 mt-auto">
+                                                    <Button size="sm" className="bg-green-600 hover:bg-green-700 h-9 text-xs font-bold" onClick={() => handleSubmissionAction(song.id, 'accepted')}>
+                                                        <CheckCircle className="w-3 h-3 mr-1.5" /> Accept
+                                                    </Button>
+                                                    <Button size="sm" variant="destructive" className="h-9 text-xs font-bold bg-red-600/80 hover:bg-red-600" onClick={() => handleSubmissionAction(song.id, 'declined')}>
+                                                        <XCircle className="w-3 h-3 mr-1.5" /> Decline
+                                                    </Button>
+                                                </div>
                                             </div>
-                                            <div className="bg-white/5 p-2 rounded">
-                                                <span className="block font-bold text-white max-w-[100px] truncate">{new Date(playlist.created_at).toLocaleDateString()}</span>
-                                                Created
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* TAB 2: ALL PLAYLISTS */}
+                        {playlistTab === "all" && (
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                {allPlaylists.map((playlist) => (
+                                    <Card key={playlist.id} className="bg-black/40 border-white/10 overflow-hidden hover:border-white/20 transition-all group">
+                                        <div className="h-32 bg-gradient-to-br from-gray-800 to-black relative">
+                                            <div className="absolute inset-0 flex items-center justify-center">
+                                                <Music className="w-12 h-12 text-white/20 group-hover:scale-110 transition-transform duration-500" />
+                                            </div>
+                                            <div className="absolute top-2 right-2">
+                                                <span className={`px-2 py-1 rounded text-[10px] uppercase font-bold ${playlist.type === 'exclusive' ? 'bg-yellow-500 text-black' :
+                                                    playlist.type === 'express' ? 'bg-orange-500 text-white' :
+                                                        'bg-blue-500 text-white'
+                                                    }`}>
+                                                    {playlist.type}
+                                                </span>
                                             </div>
                                         </div>
+                                        <CardContent className="p-4">
+                                            <div className="mb-4">
+                                                <h3 className="font-bold text-white text-lg truncate mb-1" title={playlist.name}>{playlist.name}</h3>
+                                                <p className="text-sm text-gray-400 flex items-center gap-1.5">
+                                                    <Users className="w-3 h-3 text-gray-500" />
+                                                    <span className="text-gray-300">{playlist.curator_name || 'Unknown'}</span>
+                                                </p>
+                                            </div>
 
-                                        <div className="flex gap-2">
-                                            <Button size="sm" variant="outline" className="border-white/10 hover:bg-white/10 text-blue-400 hover:text-blue-300"
-                                                onClick={() => handleRefreshPlaylist(playlist)}
-                                                disabled={isRefreshing === playlist.id || !playlist.playlist_link}
-                                                title={!playlist.playlist_link ? "No Spotify Link" : "Refresh Metadata"}
-                                            >
-                                                {isRefreshing === playlist.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-                                            </Button>
-                                            <Button size="sm" variant="outline" className="flex-1 border-white/10 hover:bg-white/10" onClick={() => {
-                                                setAdminEditingPlaylist(playlist);
-                                                setAdminNewName(playlist.name);
-                                                setAdminNewFollowers(playlist.followers);
-                                                setShowEditPlaylist(true);
-                                            }}>
-                                                Edit
-                                            </Button>
-                                            <Button size="sm" variant="destructive" className="flex-1 opacity-80 hover:opacity-100" onClick={() => deletePlaylist(playlist.id)}>
-                                                Delete
-                                            </Button>
-                                        </div>
+                                            <div className="grid grid-cols-2 gap-2 text-xs text-gray-500 mb-4">
+                                                <div className="bg-white/5 p-2 rounded text-center border border-white/5">
+                                                    <span className="block font-bold text-white text-sm">{playlist.followers.toLocaleString()}</span>
+                                                    Followers
+                                                </div>
+                                                <div className="bg-white/5 p-2 rounded text-center border border-white/5">
+                                                    <span className="block font-bold text-white text-sm">{new Date(playlist.created_at).toLocaleDateString()}</span>
+                                                    Created
+                                                </div>
+                                            </div>
 
-                                        {/* Song Management Removed as per user request */}
-                                    </CardContent>
-                                </Card>
-                            ))}
-                            {allPlaylists.length === 0 && <p className="text-gray-500 col-span-3 text-center py-10">No playlists found.</p>}
-                        </div>
+                                            <div className="flex gap-2">
+                                                <Button size="sm" variant="outline" className="border-white/10 hover:bg-white/10 text-blue-400 hover:text-blue-300 px-3"
+                                                    onClick={() => handleRefreshPlaylist(playlist)}
+                                                    disabled={isRefreshing === playlist.id || !playlist.playlist_link}
+                                                    title={!playlist.playlist_link ? "No Spotify Link" : "Refresh Metadata"}
+                                                >
+                                                    {isRefreshing === playlist.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                                                </Button>
+                                                <Button size="sm" variant="outline" className="flex-1 border-white/10 hover:bg-white/10" onClick={() => {
+                                                    setAdminEditingPlaylist(playlist);
+                                                    setAdminNewName(playlist.name);
+                                                    setAdminNewFollowers(playlist.followers);
+                                                    setShowEditPlaylist(true);
+                                                }}>
+                                                    Edit
+                                                </Button>
+                                                <Button size="sm" variant="destructive" className="flex-1 opacity-80 hover:opacity-100" onClick={() => deletePlaylist(playlist.id)}>
+                                                    Delete
+                                                </Button>
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                ))}
+                                {allPlaylists.length === 0 && <p className="text-gray-500 col-span-3 text-center py-10">No playlists found.</p>}
+                            </div>
+                        )}
                     </div>
                 )}
 
