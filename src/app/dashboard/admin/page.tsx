@@ -588,7 +588,19 @@ export default function AdminDashboard() {
             .order('created_at', { ascending: false });
 
         if (data) setPlaylistSongs(data);
+        if (data) setPlaylistSongs(data);
         setIsLoadingSongs(false);
+    };
+
+    // New Function to fetch specific Pending Songs globally
+    const fetchGlobalPendingSongs = async () => {
+        const { data } = await supabase
+            .from('submissions')
+            .select('*, artist:profiles(full_name)')
+            .eq('status', 'pending')
+            .order('created_at', { ascending: false });
+
+        if (data) setPlaylistSongs(data);
     };
 
     const handleSubmissionAction = async (submissionId: string, action: 'accepted' | 'declined') => {
@@ -1097,8 +1109,54 @@ export default function AdminDashboard() {
                             <Button className="bg-green-600 hover:bg-green-700" onClick={() => setShowAddPlaylist(true)}>
                                 <Plus className="w-4 h-4 mr-2" /> Add Playlist
                             </Button>
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            <div className="flex justify-between items-center">
+                                <h2 className="text-2xl font-bold text-white">All Playlists</h2>
+                                <Button className="bg-green-600 hover:bg-green-700" onClick={() => setShowAddPlaylist(true)}>
+                                    <Plus className="w-4 h-4 mr-2" /> Add Playlist
+                                </Button>
+                            </div>
+
+                            {/* GLOBAL PENDING SUBMISSIONS SECTION */}
+                            <div className="bg-blue-900/10 border border-blue-500/20 rounded-xl p-6 space-y-4">
+                                <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                                    <Music className="w-5 h-5 text-blue-500" /> Pending Submissions ({pendingSubmissionsCount})
+                                </h3>
+                                <p className="text-sm text-gray-400">Review all incoming submissions across all playlists here.</p>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                    {allPlaylists.flatMap(p =>
+                                        (playlistSongs.filter(s => s.playlist_id === p.id && s.status === 'pending') || []).map(s => ({ ...s, playlistName: p.name }))
+                                    ).length === 0 && (
+                                            <div className="col-span-3 text-center py-8 text-gray-500">
+                                                <p>No pending submissions loaded. Click a playlist regarding to load specific songs or implement global fetch.</p>
+                                                <Button size="sm" variant="outline" className="mt-2" onClick={() => fetchGlobalPendingSongs()}>Load All Pending</Button>
+                                            </div>
+                                        )}
+
+                                    {playlistSongs.filter(s => s.status === 'pending').map(song => (
+                                        <div key={song.id} className="bg-black/40 p-3 rounded border border-white/5 flex flex-col gap-2 relative group">
+                                            <div className="flex justify-between items-start">
+                                                <div>
+                                                    <p className="text-sm text-white font-bold truncate pr-6">{song.artist?.full_name || 'Unknown Artist'}</p>
+                                                    <p className="text-xs text-gray-400 truncate">{song.song_title || 'Untitled Track'}</p>
+                                                    <p className="text-[10px] text-blue-400 mt-1">Playlist: {allPlaylists.find(p => p.id === song.playlist_id)?.name}</p>
+                                                </div>
+                                                <a href={song.song_link} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-white transition-colors">
+                                                    <Music className="w-4 h-4" />
+                                                </a>
+                                            </div>
+                                            <div className="flex gap-2 mt-2">
+                                                <Button size="sm" className="flex-1 bg-green-600 hover:bg-green-700 h-8 text-xs" onClick={() => handleSubmissionAction(song.id, 'accepted')}>
+                                                    <CheckCircle className="w-3 h-3 mr-1" /> Accept
+                                                </Button>
+                                                <Button size="sm" variant="destructive" className="flex-1 h-8 text-xs" onClick={() => handleSubmissionAction(song.id, 'declined')}>
+                                                    <XCircle className="w-3 h-3 mr-1" /> Decline
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
                             {allPlaylists.map((playlist) => (
                                 <Card key={playlist.id} className="bg-black/40 border-white/10 overflow-hidden hover:border-white/20 transition-all">
                                     <div className="h-32 bg-gradient-to-br from-gray-800 to-black relative">
@@ -1152,48 +1210,7 @@ export default function AdminDashboard() {
                                             </Button>
                                         </div>
 
-                                        {/* Song Management (Admin Playlists Only) */}
-                                        {playlist.curator_id === user?.id && (
-                                            <div className="mt-4 pt-4 border-t border-white/5">
-                                                <Button
-                                                    size="sm"
-                                                    variant="outline"
-                                                    className="w-full mb-2 bg-white/10 hover:bg-white/20 text-white border-white/10"
-                                                    onClick={() => togglePlaylistSongs(playlist.id)}
-                                                >
-                                                    {expandedPlaylistId === playlist.id ? "Hide Submissions" : "Manage Submissions"}
-                                                </Button>
-
-                                                {expandedPlaylistId === playlist.id && (
-                                                    <div className="space-y-2 animate-in fade-in">
-                                                        {isLoadingSongs && <div className="text-center py-2"><Loader2 className="w-4 h-4 animate-spin mx-auto text-green-500" /></div>}
-                                                        {!isLoadingSongs && playlistSongs.length === 0 && <p className="text-xs text-gray-500 text-center">No submissions yet.</p>}
-                                                        {!isLoadingSongs && playlistSongs.map(song => (
-                                                            <div key={song.id} className="flex justify-between items-center bg-black/40 p-2 rounded border border-white/5">
-                                                                <div className="overflow-hidden">
-                                                                    <p className="text-xs text-white font-bold truncate">{song.artist?.full_name || 'Unknown Artist'}</p>
-                                                                    <a href={song.song_link} target="_blank" rel="noopener noreferrer" className="text-[10px] text-blue-400 hover:underline truncate block">View Song</a>
-                                                                </div>
-                                                                {song.status === 'pending' ? (
-                                                                    <div className="flex gap-1">
-                                                                        <Button size="sm" className="h-6 w-6 p-0 bg-green-600 hover:bg-green-700" onClick={() => handleSubmissionAction(song.id, 'accepted')}>
-                                                                            <CheckCircle className="w-3 h-3" />
-                                                                        </Button>
-                                                                        <Button size="sm" className="h-6 w-6 p-0 bg-red-600 hover:bg-red-700" onClick={() => handleSubmissionAction(song.id, 'declined')}>
-                                                                            <XCircle className="w-3 h-3" />
-                                                                        </Button>
-                                                                    </div>
-                                                                ) : (
-                                                                    <span className={`text-[10px] font-bold uppercase ${song.status === 'accepted' ? 'text-green-500' : 'text-red-500'}`}>
-                                                                        {song.status}
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        )}
+                                        {/* Song Management Removed as per user request */}
                                     </CardContent>
                                 </Card>
                             ))}
