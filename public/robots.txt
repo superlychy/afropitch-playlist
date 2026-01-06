@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Disallow: /dashboard/
+Disallow: /portal/
+Disallow: /admin/
+Disallow: /verify/
+
+Sitemap: https://afropitchplay.best/sitemap.xml

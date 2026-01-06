@@ -1,5 +1,5 @@
 
-import { Metadata } from 'next';
+
 
 export const siteConfig = {
   name: "AfroPitch Playlist",
