@@ -30,7 +30,18 @@ Deno.serve(async (req) => {
     }
 
     try {
-        const payload = await req.json();
+        let payload;
+        try {
+            payload = await req.json();
+        } catch (jsonErr) {
+            console.error("Failed to parse JSON body:", jsonErr);
+            const textBody = await req.text();
+            console.error("RAW BODY RECEIVED:", textBody);
+            return new Response("Invalid JSON Body", { status: 400, headers: corsHeaders });
+        }
+
+        console.log("🚨 FULL PAYLOAD RECEIVED:", JSON.stringify(payload)); // DEBUG LOG
+
         const { table, type, record, schema, event_type, user_data } = payload;
 
         console.log(`🔔 Admin Notification: ${table || event_type}`);

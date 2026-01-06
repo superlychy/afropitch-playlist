@@ -96,7 +96,12 @@ async function handleTransaction(record: any) {
     if (record.type === 'refund') subject = `Refund Processed: ${CURRENCY}${record.amount}`;
     if (record.type === 'deposit') subject = `Funds Added: ${CURRENCY}${record.amount}`;
 
-    // Skip small earnings notifications if frequent? User asked for "all necessary places".
+    // User requested to NOT send email for withdrawal requests until approved.
+    // The 'handleWithdrawalUpdate' function handles the 'approved' status notification.
+    if (record.type === 'withdrawal') {
+        console.log("Skipping email for withdrawal request (pending approval).");
+        return;
+    }
     // Let's send for all for now.
 
     const html = getTransactionReceiptTemplate({
