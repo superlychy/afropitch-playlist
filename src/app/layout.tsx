@@ -71,6 +71,27 @@ export default function RootLayout({
           <Footer />
           <AIHelp />
         </AuthProvider>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "Organization",
+              "name": siteConfig.name,
+              "url": siteConfig.url,
+              "logo": `${siteConfig.url}/logo.png`,
+              "sameAs": [
+                siteConfig.links.twitter,
+                siteConfig.links.instagram
+              ],
+              "contactPoint": {
+                "@type": "ContactPoint",
+                "email": siteConfig.contact.email,
+                "contactType": "customer support"
+              }
+            })
+          }}
+        />
       </body>
     </html>
   );
