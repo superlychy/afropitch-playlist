@@ -881,6 +881,19 @@ export default function AdminDashboard() {
                                 );
                             })}
                         </div>
+                        <Button variant="outline" size="sm" className="hidden md:flex border-green-500/20 text-green-500 hover:bg-green-500/10 mr-2" onClick={async () => {
+                            if (!confirm("Send a test notification to your configured Webhook?")) return;
+                            const { error } = await supabase.functions.invoke('notify-admin', {
+                                body: {
+                                    event_type: 'MANUAL_LOG',
+                                    message: "🔔 Test Notification from Admin Dashboard"
+                                }
+                            });
+                            if (error) alert("Failed: " + error.message);
+                            else alert("Test sent! Check your Discord/Slack.");
+                        }}>
+                            Test Webhook
+                        </Button>
                         <Button variant="outline" size="icon" className="border-white/10 hover:bg-red-500/20 h-10 w-10 group" title="Logout" onClick={logout}>
                             <LogOut className="w-5 h-5 text-gray-400 group-hover:text-red-500" />
                         </Button>
