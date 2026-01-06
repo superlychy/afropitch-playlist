@@ -507,7 +507,9 @@ export default function CuratorDashboard() {
             cover_image: newCoverImage,
             followers: newFollowers,
             type: newPlaylistType,
-            description: `Playlist · ${user.name || 'Curator'} · ${songsCount} items · ${newFollowers.toLocaleString()} saves`,
+            description: songsCount > 0
+                ? `Playlist · ${user.name || 'Curator'} · ${songsCount} items · ${newFollowers.toLocaleString()} saves`
+                : `Playlist · ${user.name || 'Curator'} · ${newFollowers.toLocaleString()} saves`,
             playlist_link: newPlaylistLink
         };
 
@@ -628,7 +630,9 @@ export default function CuratorDashboard() {
                     name: data.name,
                     cover_image: data.cover_image,
                     followers: data.followers,
-                    description: `Playlist · ${user?.name || 'Curator'} · ${data.songsCount} items · ${data.followers.toLocaleString()} saves`
+                    description: data.songsCount > 0
+                        ? `Playlist · ${user?.name || 'Curator'} · ${data.songsCount} items · ${data.followers.toLocaleString()} saves`
+                        : `Playlist · ${user?.name || 'Curator'} · ${data.followers.toLocaleString()} saves`
                 }).eq('id', playlist.id);
 
                 if (error) throw error;
