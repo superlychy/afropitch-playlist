@@ -59,6 +59,12 @@ Deno.serve(async (req) => {
 
         // 2. Curator Verification (Profiles Update)
         else if (table === 'profiles' && type === 'UPDATE') {
+            console.log("Profile Update Debug:", {
+                new_status: record.verification_status,
+                old_status: payload.old_record?.verification_status,
+                role: record.role
+            });
+
             if (record.verification_status === 'verified' && payload.old_record?.verification_status !== 'verified') {
                 message = `✅ **Curator Verified**`;
                 details = `Curator: ${record.full_name}\nEmail: ${record.email}`;
