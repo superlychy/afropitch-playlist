@@ -7,8 +7,8 @@ export const siteConfig = {
   url: "https://afropitchplay.best",
   ogImage: "https://afropitchplay.best/logo.png",
   links: {
-    twitter: "https://twitter.com/afropitch",
-    instagram: "https://instagram.com/afropitch",
+    twitter: "https://twitter.com/afropitchplay",
+    instagram: "https://instagram.com/afropitchplay",
   },
   keywords: [
     "African music", "Afrobeats playlist submission", "promote african music",
@@ -21,9 +21,11 @@ export const siteConfig = {
     "free playlist in nigeria", "afrobeats playlist submission free",
     "free afrobeat playlist submission", "submit afrobeat music free",
     "free music promotion nigeria", "how to promote afrobeat music",
-    "spotify playlist curators free"
+    "spotify playlist curators free",
+    "free spotify playlist submission", "playlist submission free",
+    "submit music to spotify playlists free", "submit music to curators free"
   ],
   contact: {
-    email: "hello@afropitchplaylist.com"
+    email: "admin@afropitchplay.best"
   }
 };
