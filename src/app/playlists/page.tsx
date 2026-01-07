@@ -176,7 +176,7 @@ export default function PlaylistsPage() {
                         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                             {filteredPlaylists.length === 0 && <div className="text-center w-full col-span-full text-gray-500">No playlists found.</div>}
                             {filteredPlaylists.map((playlist) => (
-                                <Card key={playlist.id} className="group bg-white/5 border-white/5 hover:bg-white/[0.07] transition-all overflow-hidden h-full flex flex-col">
+                                <Card key={playlist.id} className="group bg-black/60 backdrop-blur-sm border-white/10 hover:bg-black/80 hover:border-green-500/30 transition-all duration-300 overflow-hidden h-full flex flex-col shadow-lg shadow-black/20">
                                     <CardContent className="p-0 flex flex-col h-full">
                                         {/* Playlist Cover Strip */}
                                         <div className="w-full h-48 relative overflow-hidden bg-zinc-800">
@@ -244,7 +244,7 @@ export default function PlaylistsPage() {
                             {filteredCurators.map((curator) => (
                                 <div key={curator.id} className="space-y-4">
                                     <Card
-                                        className="cursor-pointer transition-all border-white/10 bg-black/40 hover:border-green-500/50 hover:shadow-lg hover:shadow-green-900/10 h-full"
+                                        className="cursor-pointer transition-all duration-300 border-white/10 bg-black/60 backdrop-blur-sm hover:bg-black/80 hover:border-green-500/50 hover:shadow-lg hover:shadow-green-900/10 h-full"
                                     >
                                         <CardHeader className="pb-2">
                                             <div className="flex items-center justify-between">
