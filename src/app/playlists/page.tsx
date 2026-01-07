@@ -34,7 +34,7 @@ export default function PlaylistsPage() {
                 // Fetch Playlists
                 const fetchPlaylistsPromise = supabase
                     .from('playlists')
-                    .select('*')
+                    .select('*, curator:profiles!curator_id(role, verification_status)')
                     .eq('is_active', true)
                     .order('followers', { ascending: false });
 
@@ -56,10 +56,12 @@ export default function PlaylistsPage() {
                 // Handle Playlists
                 if (plResult.status === 'fulfilled' && (plResult.value as any).data) {
                     const plData = (plResult.value as any).data;
-                    const mapped = plData.map((p: any) => {
-                        const match = (p.description || "").match(/(\d+)\s+(songs|items|tracks)/i);
-                        return { ...p, songCount: match ? parseInt(match[1]) : null };
-                    });
+                    const mapped = plData
+                        .filter((p: any) => p.curator?.role === 'admin' || p.curator?.verification_status === 'verified')
+                        .map((p: any) => {
+                            const match = (p.description || "").match(/(\d+)\s+(songs|items|tracks)/i);
+                            return { ...p, songCount: match ? parseInt(match[1]) : null };
+                        });
                     setPlaylists(mapped);
                 } else {
                     console.error("Playlists fetch failed", plResult);
@@ -69,7 +71,8 @@ export default function PlaylistsPage() {
                 // Handle Curators
                 if (curResult.status === 'fulfilled' && (curResult.value as any).data) {
                     const cData = (curResult.value as any).data;
-                    setCurators(cData.map((c: any) => ({
+                    const verifiedCurators = cData.filter((c: any) => c.role === 'admin' || c.verification_status === 'verified');
+                    setCurators(verifiedCurators.map((c: any) => ({
                         ...c,
                         playlistCount: c.playlists?.[0]?.count || 0
                     })));
