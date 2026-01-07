@@ -260,6 +260,23 @@ export default function CuratorDashboard() {
                 console.error("Application error:", error);
                 alert("Error submitting application: " + error.message);
             } else {
+                // Manually trigger Admin Notification (Backup for DB Webhook)
+                supabase.functions.invoke('notify-admin', {
+                    body: {
+                        table: 'profiles',
+                        type: 'UPDATE',
+                        record: {
+                            id: user?.id,
+                            full_name: user?.full_name || 'Curator User',
+                            email: user?.email || 'No Email',
+                            role: 'curator',
+                            verification_status: 'pending',
+                            nin_number: appNin
+                        },
+                        old_record: { verification_status: 'none' }
+                    }
+                }).catch(err => console.error("Manual Notify Failed:", err));
+
                 alert("Application submitted successfully! We will review your ID and details shortly.");
                 setVerificationStatus('pending');
                 setShowApplicationModal(false);
