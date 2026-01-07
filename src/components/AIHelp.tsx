@@ -1,11 +1,10 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { MessageSquare, X, Send, Bot, Sparkles, Loader2, User } from "lucide-react";
+import { MessageSquare, X, Send, Bot, User, Headphones } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import { brandingConfig } from "@/../config/branding"; // Assuming this exists or using generic values
 import { pricingConfig } from "@/../config/pricing";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
@@ -14,33 +13,48 @@ const SUGGESTED_QUESTIONS = [
     "How does pricing work?",
     "Do you offer refunds?",
     "How do I verify my song?",
-    "Are the curators real?"
+    "Speak to a Human"
 ];
 
-// Simple keyword matching for "Mock AI"
-const generateResponse = (input: string): string => {
+interface AIResponse {
+    text: string;
+    shouldEscalate: boolean;
+}
+
+const generateResponse = (input: string): AIResponse => {
     const lower = input.toLowerCase();
 
-    if (lower.includes("price") || lower.includes("cost") || lower.includes("money") || lower.includes("pay")) {
-        return `We have simplified pricing starting at ${pricingConfig.currency}3,000 for Standard review (5 days). Express (48h) is ${pricingConfig.currency}5,000.`;
-    }
-    if (lower.includes("refund") || lower.includes("money back") || lower.includes("scam")) {
-        return "We offer a 100% money-back guarantee. Funds are held in escrow and only released to the curator after they provide a valid review or placement.";
-    }
-    if (lower.includes("curator") || lower.includes("real")) {
-        return "Absolutely. We strictly vet every curator. No bots allowed. You can view their profiles and past playlists before you submit.";
-    }
-    if (lower.includes("verify") || lower.includes("verification")) {
-        return "After your song is added to a playlist, go to your Dashboard and click 'Verify' next to the submission to release the funds.";
-    }
-    if (lower.includes("genre") || lower.includes("style")) {
-        return "We focus on African genres: Afrobeats, Amapiano, Hip Hop, Afro-House, and Francophone African music.";
-    }
-    if (lower.includes("hello") || lower.includes("hi")) {
-        return "Hello there! Ready to get your music heard by real curators?";
+    // Explicit Requests
+    if (lower.includes("human") || lower.includes("person") || lower.includes("agent") || lower.includes("admin")) {
+        return {
+            text: "I've flagged this conversation for a human agent. They will review your request and get back to you shortly.",
+            shouldEscalate: true
+        };
     }
 
-    return "I'm not sure about that specific detail, but I've notified our support team on Discord! They will reach out if you're logged in, or you can email us.";
+    if (lower.includes("price") || lower.includes("cost") || lower.includes("money") || lower.includes("pay")) {
+        return { text: `We have simplified pricing starting at ${pricingConfig.currency}3,000 for Standard review (5 days). Express (48h) is ${pricingConfig.currency}5,000.`, shouldEscalate: false };
+    }
+    if (lower.includes("refund") || lower.includes("money back") || lower.includes("scam")) {
+        return { text: "We offer a 100% money-back guarantee. Funds are held in escrow and only released to the curator after they provide a valid review or placement.", shouldEscalate: false };
+    }
+    if (lower.includes("curator") || lower.includes("real")) {
+        return { text: "Absolutely. We strictly vet every curator. No bots allowed. You can view their profiles and past playlists before you submit.", shouldEscalate: false };
+    }
+    if (lower.includes("verify") || lower.includes("verification")) {
+        return { text: "After your song is added to a playlist, go to your Dashboard and click 'Verify' next to the submission to release the funds.", shouldEscalate: false };
+    }
+    if (lower.includes("genre") || lower.includes("style")) {
+        return { text: "We focus on African genres: Afrobeats, Amapiano, Hip Hop, Afro-House, and Francophone African music.", shouldEscalate: false };
+    }
+    if (lower.includes("hello") || lower.includes("hi")) {
+        return { text: "Hello there! Ready to get your music heard by real curators?", shouldEscalate: false };
+    }
+
+    return {
+        text: "I didn't quite catch that. I've sent a notification to our support team on Discord to help you out!",
+        shouldEscalate: true
+    };
 };
 
 export function AIHelp() {
@@ -71,28 +85,40 @@ export function AIHelp() {
         setInput("");
         setIsTyping(true);
 
-        // Notify Admin via Discord (Fire and Forget)
-        supabase.functions.invoke('notify-admin', {
-            body: {
-                event_type: 'CHAT_MESSAGE',
-                message: textToSend,
-                user_data: {
-                    email: user?.email,
-                    id: user?.id
+        // Generate AI Response
+        // We simulate a delay
+        setTimeout(async () => {
+            const response = generateResponse(textToSend);
+
+            setMessages(prev => [...prev, { role: "assistant", text: response.text }]);
+            setIsTyping(false);
+
+            // Conditionally Notify Admin
+            if (response.shouldEscalate) {
+                try {
+                    await supabase.functions.invoke('notify-admin', {
+                        body: {
+                            event_type: 'CHAT_MESSAGE',
+                            message: textToSend,
+                            user_data: {
+                                email: user?.email,
+                                id: user?.id
+                            }
+                        }
+                    });
+                } catch (err) {
+                    console.error("Failed to notify admin:", err);
                 }
             }
-        }).catch(err => console.error("Failed to sync chat to Discord:", err));
-
-        // Simulate AI thinking time
-        setTimeout(() => {
-            const response = generateResponse(textToSend);
-            setMessages(prev => [...prev, { role: "assistant", text: response }]);
-            setIsTyping(false);
-        }, 1500);
+        }, 1000);
     };
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (e.key === "Enter") handleSend();
+    };
+
+    const requestHuman = () => {
+        handleSend("I would like to speak to a human agent");
     };
 
     return (
@@ -113,9 +139,14 @@ export function AIHelp() {
                                 </div>
                             </div>
                         </div>
-                        <Button size="icon" variant="ghost" className="h-8 w-8 hover:bg-white/10 text-gray-400 hover:text-white rounded-full" onClick={() => setIsOpen(false)}>
-                            <X className="w-4 h-4" />
-                        </Button>
+                        <div className="flex gap-1">
+                            {/* <Button size="icon" variant="ghost" className="h-8 w-8 hover:bg-white/10 text-gray-400 hover:text-white rounded-full" onClick={requestHuman} title="Request Human">
+                                <Headphones className="w-4 h-4" />
+                            </Button> */}
+                            <Button size="icon" variant="ghost" className="h-8 w-8 hover:bg-white/10 text-gray-400 hover:text-white rounded-full" onClick={() => setIsOpen(false)}>
+                                <X className="w-4 h-4" />
+                            </Button>
+                        </div>
                     </div>
 
                     {/* Messages Area */}
