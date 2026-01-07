@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { CheckCircle2 } from "lucide-react";
+import { pricingConfig } from "@/../config/pricing";
+import { CheckCircle2, ArrowRight } from "lucide-react";
 import { RecentApprovals } from "@/components/RecentApprovals";
 
 export default function Home() {
@@ -53,7 +54,11 @@ export default function Home() {
           </h1>
 
           <p className="text-lg md:text-xl text-gray-400 max-w-2xl mx-auto">
-            Afropitch is Africa’s trusted playlist pitching platform for Afrobeats, Amapiano and Francophone African music.
+            The trusted platform for Amapiano, Afrobeats, and Francophone African artists.
+            Real human feedback, free Afrobeat playlist options, and premium paid playlist pitching starting at{" "}
+            <span className="text-white font-semibold">
+              {pricingConfig.currency}{pricingConfig.tiers.standard.price.toLocaleString()}
+            </span>.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mt-8">
@@ -73,13 +78,71 @@ export default function Home() {
         </div>
       </section>
 
-      {/* What Is Afropitch / Trust Section */}
+      {/* Trust/Social Proof Strip */}
+      <section className="w-full border-y border-white/5 bg-white/[0.02] py-8">
+        <div className="max-w-7xl mx-auto px-4 text-center">
+          <p className="text-sm font-medium text-gray-500 uppercase tracking-widest mb-6">
+            Trusted by Artists
+          </p>
+          <div className="flex flex-wrap justify-center gap-8 md:gap-16 opacity-50 grayscale hover:grayscale-0 transition-all duration-500">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="text-green-500" />
+              <span className="text-lg font-bold">No Bots</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="text-green-500" />
+              <span className="text-lg font-bold">48h Turnaround</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="text-green-500" />
+              <span className="text-lg font-bold">Detailed Feedback</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Feature Highlight / Why Section (Restored & Enhanced) */}
+      <section className="py-24 px-4 max-w-7xl mx-auto grid md:grid-cols-2 gap-16 items-center">
+        <div className="space-y-6">
+          <h2 className="text-3xl md:text-4xl font-bold">Why AfroPitch?</h2>
+          <p className="text-gray-400 text-lg leading-relaxed">
+            Most playlist services use bots or leave you ghosted. We built AfroPitch to bring transparency and trust back to music promotion.
+          </p>
+          <ul className="space-y-4">
+            {[
+              "Strictly for Afro genres (Afrobeats, Amapiano, Francophone African)",
+              "Direct feedback from real curators",
+              "Honest pricing - no hidden fees",
+              "Secure platform with refund policy"
+            ].map((item, i) => (
+              <li key={i} className="flex items-start gap-3">
+                <div className="mt-1 min-w-5 min-h-5 rounded-full bg-green-500/20 text-green-500 flex items-center justify-center">
+                  <CheckCircle2 className="w-3 h-3" />
+                </div>
+                <span className="text-gray-300">{item}</span>
+              </li>
+            ))}
+          </ul>
+          <div className="pt-4">
+            <Link href="/how-it-works" className="text-green-500 font-medium hover:text-green-400 inline-flex items-center gap-1 group">
+              Learn more about our review process
+              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+            </Link>
+          </div>
+        </div>
+        <div className="relative">
+          <div className="absolute inset-0 bg-gradient-to-tr from-green-500/20 to-orange-500/20 rounded-2xl blur-2xl -z-10" />
+          <RecentApprovals />
+        </div>
+      </section>
+
+      {/* Ecosystem / Trust Cards */}
       <section className="w-full py-20 px-4 border-y border-white/5 bg-white/[0.02]">
         <div className="max-w-6xl mx-auto">
           <div className="text-center max-w-3xl mx-auto mb-16 space-y-6">
-            <h2 className="text-3xl md:text-4xl font-bold">What Is Afropitch?</h2>
+            <h2 className="text-3xl md:text-4xl font-bold">The Afropitch Promise</h2>
             <p className="text-xl text-gray-300 leading-relaxed">
-              Afropitch was built with one clear mission: to connect artists directly with playlist curators.
+              We connect artists directly with playlist curators.
               <br className="hidden md:block" />
               <span className="text-white font-semibold block mt-4 text-2xl">
                 No bots. No fake streams. No risky promotions.
@@ -111,20 +174,6 @@ export default function Home() {
               <h3 className="text-xl font-bold mb-2">All African Genres</h3>
               <p className="text-gray-400">From Afrobeats & Amapiano to Francophone African music, Afro-house, Alte and more.</p>
             </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Live Activity Section */}
-      <section className="py-24 w-full px-4">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold mb-4">Live Activity</h2>
-            <p className="text-gray-400">Real artists getting approved right now</p>
-          </div>
-          <div className="relative">
-            <div className="absolute inset-0 bg-gradient-to-tr from-green-500/10 to-orange-500/10 rounded-2xl blur-3xl -z-10" />
-            <RecentApprovals />
           </div>
         </div>
       </section>
