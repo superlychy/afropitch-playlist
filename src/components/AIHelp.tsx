@@ -93,9 +93,50 @@ export function AIHelp() {
             setMessages(prev => [...prev, { role: "assistant", text: response.text }]);
             setIsTyping(false);
 
-            // Conditionally Notify Admin
+            // Conditionally Notify Admin & Persist to DB
             if (response.shouldEscalate) {
                 try {
+                    // 1. If User is logged in, save to Support System (Admin Dashboard)
+                    if (user) {
+                        // Check for open ticket
+                        const { data: tickets } = await supabase
+                            .from('support_tickets')
+                            .select('id')
+                            .eq('user_id', user.id)
+                            .eq('status', 'open')
+                            .limit(1);
+
+                        let ticketId = tickets?.[0]?.id;
+
+                        // Create if needed
+                        if (!ticketId) {
+                            const { data: newTicket, error: ticketError } = await supabase
+                                .from('support_tickets')
+                                .insert({
+                                    user_id: user.id,
+                                    subject: `Live Chat Request - ${new Date().toLocaleDateString()}`,
+                                    status: 'open'
+                                })
+                                .select()
+                                .single();
+
+                            if (!ticketError && newTicket) {
+                                ticketId = newTicket.id;
+                            }
+                        }
+
+                        // Insert Message
+                        if (ticketId) {
+                            await supabase.from('support_messages').insert({
+                                ticket_id: ticketId,
+                                sender_id: user.id,
+                                message: textToSend
+                            });
+                        }
+                    }
+
+                    // 2. Send Discord Notification (Fire & Forget)
+                    // We keep this explicit invoke to ensure the admin gets a specific "Live Chat" alert immediately
                     await supabase.functions.invoke('notify-admin', {
                         body: {
                             event_type: 'CHAT_MESSAGE',
@@ -107,7 +148,7 @@ export function AIHelp() {
                         }
                     });
                 } catch (err) {
-                    console.error("Failed to notify admin:", err);
+                    console.error("Failed to notify admin/save ticket:", err);
                 }
             }
         }, 1000);
