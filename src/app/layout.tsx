@@ -7,39 +7,37 @@ import { AIHelp } from "@/components/AIHelp";
 
 export const metadata: Metadata = {
   title: {
-    default: siteConfig.name,
+    default: "Afropitch Playlist | Connect African Artists to Real Curators",
     template: `%s | ${siteConfig.name}`,
   },
-  description: "The #1 African Music Promotion Platform. Free submit your music to top curated Afrobeat, Amapiano, and Francophone African playlists on Spotify, Apple Music, Audiomack, Boomplay, and Deezer.",
+  description: siteConfig.description,
   keywords: siteConfig.keywords,
   openGraph: {
     type: "website",
     locale: "en_US",
     url: siteConfig.url,
-    title: "AfroPitch | Promote Your African Music to Global Playlists",
-    description: "Free submit your songs to top Afrobeat, Amapiano & Francophone African curators on Spotify & Audiomack. Guaranteed reviews and real growth for African artists.",
+    title: "Afropitch Playlist | Connect African Artists to Real Curators",
+    description: siteConfig.description,
     siteName: siteConfig.name,
     images: [
       {
-        url: "/og-image.jpg", // Ensure this exists or use a placeholder
+        url: "/og-image.jpg",
         width: 1200,
         height: 630,
-        alt: "AfroPitch Music Promotion",
+        alt: "Afropitch Playlist - Connect Artists to Curators",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "AfroPitch | #1 African Music Promotion",
-    description: "Get your music heard. Submit to playlists on Spotify, Apple Music, Audiomack & more.",
+    title: "Afropitch Playlist | Connect African Artists to Real Curators",
+    description: siteConfig.description,
     creator: "@afropitch",
   },
   robots: {
     index: true,
     follow: true,
   },
-  // We rely on Next.js file conventions (src/app/icon.png) for favicons
-  // This ensures proper resizing for search engines.
 };
 
 import { AuthProvider } from "@/context/AuthContext";
