@@ -552,7 +552,7 @@ function SubmitForm() {
                             onClick={proceedToDetails}
                             className="bg-green-600 hover:bg-green-700 text-white text-lg px-8 rounded-full shadow-lg shadow-green-900/20"
                         >
-                            Proceed to Details <ArrowRight className="ml-2 w-5 h-5" />
+                            Continue <ArrowRight className="ml-2 w-5 h-5" />
                         </Button>
                     </div>
                 </div>
