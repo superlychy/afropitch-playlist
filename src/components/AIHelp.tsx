@@ -31,7 +31,7 @@ const FAQ_DATA = [
     {
         question: "How do I verify my song?",
         keywords: ["verify", "verification", "check"],
-        answer: "Once your song is placed on a playlist, go to your Dashboard > Submissions and click the 'Verify' button. This confirms the placement and releases funds to the curator."
+        answer: "Once your song is reviewed and placed, you will be notified via email and on your dashboard. You can then view the placement details directly."
     },
     {
         question: "What genres do you accept?",

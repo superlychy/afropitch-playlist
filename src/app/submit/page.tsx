@@ -42,6 +42,7 @@ function SubmitForm() {
     const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
     const [selectedGenre, setSelectedGenre] = useState("All");
+    const [selectedPrice, setSelectedPrice] = useState("all");
     const [error, setError] = useState(false);
 
     // Data State
@@ -316,7 +317,11 @@ function SubmitForm() {
         const matchesSearch = pl.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
             (pl.description || "").toLowerCase().includes(searchTerm.toLowerCase());
         const matchesGenre = selectedGenre === "All" || (pl.genre && pl.genre.toLowerCase() === selectedGenre.toLowerCase());
-        return matchesSearch && matchesGenre;
+        const matchesPrice = selectedPrice === "all" ||
+            (selectedPrice === "standard" && (!pl.type || pl.type === "standard")) ||
+            pl.type === selectedPrice;
+
+        return matchesSearch && matchesGenre && matchesPrice;
     });
 
     const filteredCurators = curators.filter(cur => {
@@ -379,6 +384,21 @@ function SubmitForm() {
                                 {genres.map(g => (
                                     <option key={g} value={g} className="bg-zinc-900 text-white">{g}</option>
                                 ))}
+                            </Select>
+                        </div>
+                    )}
+                    {activeTab === "playlists" && (
+                        <div className="w-full md:w-48">
+                            <Select
+                                className="bg-white/5 border-white/10 text-white"
+                                value={selectedPrice}
+                                onChange={(e) => setSelectedPrice(e.target.value)}
+                            >
+                                <option value="all" className="bg-zinc-900 text-white">All Prices</option>
+                                <option value="free" className="bg-zinc-900 text-white">Free Submission</option>
+                                <option value="standard" className="bg-zinc-900 text-white">Standard ({pricingConfig.currency}{pricingConfig.tiers.standard.price.toLocaleString()})</option>
+                                <option value="express" className="bg-zinc-900 text-white">Express Only ({pricingConfig.currency}{pricingConfig.tiers.express.price.toLocaleString()})</option>
+                                <option value="exclusive" className="bg-zinc-900 text-white">Exclusive ({pricingConfig.currency}{pricingConfig.tiers.exclusive.price.toLocaleString()})</option>
                             </Select>
                         </div>
                     )}
