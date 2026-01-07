@@ -156,6 +156,12 @@ Deno.serve(async (req) => {
             details = `Admin: ${user_data?.email || 'Unknown'}`;
         }
 
+        else if (event_type === 'CHAT_MESSAGE') {
+            message = `💬 **Live Chat Question**`;
+            details = `User: ${user_data?.email || 'Guest'}\nMessage: ${payload.message}`;
+            if (user_data?.id) details += `\nUser ID: ${user_data.id}`;
+        }
+
         // --- SEND TO DISCORD ---
         if (message) {
             console.log("Sending Webhook:", message);

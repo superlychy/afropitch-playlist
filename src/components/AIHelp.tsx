@@ -7,6 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { brandingConfig } from "@/../config/branding"; // Assuming this exists or using generic values
 import { pricingConfig } from "@/../config/pricing";
+import { useAuth } from "@/context/AuthContext";
+import { supabase } from "@/lib/supabase";
 
 const SUGGESTED_QUESTIONS = [
     "How does pricing work?",
@@ -38,10 +40,11 @@ const generateResponse = (input: string): string => {
         return "Hello there! Ready to get your music heard by real curators?";
     }
 
-    return "I'm not sure about that specific detail, but I can help you submit your song! Just click 'Submit Music' to get started.";
+    return "I'm not sure about that specific detail, but I've notified our support team on Discord! They will reach out if you're logged in, or you can email us.";
 };
 
 export function AIHelp() {
+    const { user } = useAuth();
     const [isOpen, setIsOpen] = useState(false);
     const [messages, setMessages] = useState<{ role: "assistant" | "user"; text: string }[]>([
         { role: "assistant", text: "Hi! I'm your AfroPitch assistant. 🎵 How can I help you amplify your music today?" }
@@ -59,14 +62,26 @@ export function AIHelp() {
         scrollToBottom();
     }, [messages, isTyping, isOpen]);
 
-    const handleSend = (textOverride?: string) => {
+    const handleSend = async (textOverride?: string) => {
         const textToSend = textOverride || input;
         if (!textToSend.trim()) return;
 
-        // Add user message
+        // Add user message locally
         setMessages(prev => [...prev, { role: "user", text: textToSend }]);
         setInput("");
         setIsTyping(true);
+
+        // Notify Admin via Discord (Fire and Forget)
+        supabase.functions.invoke('notify-admin', {
+            body: {
+                event_type: 'CHAT_MESSAGE',
+                message: textToSend,
+                user_data: {
+                    email: user?.email,
+                    id: user?.id
+                }
+            }
+        }).catch(err => console.error("Failed to sync chat to Discord:", err));
 
         // Simulate AI thinking time
         setTimeout(() => {
