@@ -17,7 +17,8 @@ export default function CuratorsPage() {
             const { data: realCurators } = await supabase
                 .from('profiles')
                 .select('*, playlists(*)')
-                .eq('role', 'curator');
+                .eq('role', 'curator')
+                .eq('verification_status', 'verified');
 
             // 2. Fetch Admin Playlists Count (for AfroPitch Team)
             const { count } = await supabase

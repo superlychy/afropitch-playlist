@@ -6,11 +6,10 @@ import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Select } from "@/components/ui/select";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from "@/components/ui/card";
 import { pricingConfig } from "@/../config/pricing";
-import { Loader2, Music, CheckCircle, Wallet, CreditCard, User, Search, ExternalLink, Eye, BadgeCheck, ListMusic, Users, ArrowRight, Music2 } from "lucide-react";
+import { Loader2, Music, CheckCircle, Wallet, User, Search, BadgeCheck, ListMusic, Users, ArrowRight, Music2 } from "lucide-react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { supabase } from "@/lib/supabase";
@@ -74,10 +73,10 @@ function SubmitForm() {
         const fetchData = async () => {
             setIsLoading(true);
             try {
-                // Fetch Playlists with Curator Join
+                // Fetch Playlists with Curator Join (include verification_status)
                 const fetchPlaylistsPromise = supabase
                     .from('playlists')
-                    .select('*, curator:profiles!curator_id(role, full_name)')
+                    .select('*, curator:profiles!curator_id(role, full_name, verification_status)')
                     .eq('is_active', true)
                     .order('followers', { ascending: false });
 
@@ -99,26 +98,26 @@ function SubmitForm() {
                 // Handle Playlists
                 if (plResult.status === 'fulfilled' && (plResult.value as any).data) {
                     const plData = (plResult.value as any).data;
-                    const mapped = plData.map((p: any) => {
-                        const match = (p.description || "").match(/(\d+)\s+(songs|items|tracks)/i);
-                        return {
-                            id: p.id,
-                            name: p.name,
-                            genre: p.genre || "Other",
-                            followers: p.followers,
-                            curatorName: p.curator?.full_name || 'Unknown',
-                            description: p.description,
-                            coverImage: p.cover_image,
-                            submissionFee: p.submission_fee,
-                            type: p.type,
-                            playlistLink: p.playlist_link,
-                            isAdmin: p.curator?.role === 'admin',
-                            songCount: match ? parseInt(match[1]) : 0
-                        };
-                    });
+                    const mapped = plData
+                        .filter((p: any) => p.curator?.role === 'admin' || p.curator?.verification_status === 'verified')
+                        .map((p: any) => {
+                            const match = (p.description || "").match(/(\d+)\s+(songs|items|tracks)/i);
+                            return {
+                                id: p.id,
+                                name: p.name,
+                                genre: p.genre || "Other",
+                                followers: p.followers,
+                                curatorName: p.curator?.full_name || 'Unknown',
+                                description: p.description,
+                                coverImage: p.cover_image,
+                                submissionFee: p.submission_fee,
+                                type: p.type,
+                                playlistLink: p.playlist_link,
+                                isAdmin: p.curator?.role === 'admin',
+                                songCount: match ? parseInt(match[1]) : 0
+                            };
+                        });
 
-                    // Sort: Admin first (optional, but requested in previous versions, keeping logic flexible)
-                    // mapped.sort((a: Playlist, b: Playlist) => b.followers - a.followers);
                     setAllPlaylists(mapped);
                 } else {
                     console.error("Playlists fetch failed", plResult);
@@ -128,7 +127,8 @@ function SubmitForm() {
                 // Handle Curators
                 if (curResult.status === 'fulfilled' && (curResult.value as any).data) {
                     const cData = (curResult.value as any).data;
-                    setCurators(cData.map((c: any) => ({
+                    const verifiedCurators = cData.filter((c: any) => c.role === 'admin' || c.verification_status === 'verified');
+                    setCurators(verifiedCurators.map((c: any) => ({
                         ...c,
                         playlistCount: c.playlists?.[0]?.count || 0
                     })));
@@ -164,9 +164,6 @@ function SubmitForm() {
 
         const tierParam = searchParams.get("tier");
         if (tierParam) setTier(tierParam);
-
-        // If we have selections from URL, maybe we assume user wants to start? 
-        // For now, consistent Grid view is safer.
     }, [searchParams]);
 
     const toggleSelection = (id: string, e?: React.MouseEvent) => {
