@@ -6,12 +6,14 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
-import { BadgeCheck, Music2, Users, ArrowRight, ListMusic, User, Search, Filter } from "lucide-react";
+import { BadgeCheck, Music2, Users, ArrowRight, ListMusic, User, Search, Filter, CheckCircle } from "lucide-react";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { pricingConfig } from "@/../config/pricing";
 
 export default function PlaylistsPage() {
+    const router = useRouter();
     const [activeTab, setActiveTab] = useState<"playlists" | "curators">("playlists");
     const [playlists, setPlaylists] = useState<any[]>([]);
     const [curators, setCurators] = useState<any[]>([]);
@@ -20,19 +22,23 @@ export default function PlaylistsPage() {
     const [selectedGenre, setSelectedGenre] = useState("All");
     const [error, setError] = useState(false);
 
-    const genres = ["All", "Afrobeats", "Amapiano", "Hip Hop", "RnB", "Pop", "Alternative"]; // Add more as needed
+    // Selection State
+    const [selectedPlaylistIds, setSelectedPlaylistIds] = useState<string[]>([]);
+
+    const genres = ["All", "Afrobeats", "Amapiano", "Hip Hop", "RnB", "Pop", "Alternative"];
 
     useEffect(() => {
         const fetchData = async () => {
             setIsLoading(true);
             try {
-                // Fetch Playlists with error handling and timeout
+                // Fetch Playlists
                 const fetchPlaylistsPromise = supabase
                     .from('playlists')
                     .select('*')
                     .eq('is_active', true)
                     .order('followers', { ascending: false });
 
+                // Fetch Curators
                 const fetchCuratorsPromise = supabase
                     .from('profiles')
                     .select('*, playlists(count)')
@@ -47,10 +53,7 @@ export default function PlaylistsPage() {
                     Promise.race([fetchCuratorsPromise, timeoutPromise])
                 ]);
 
-                console.log("Playlists Fetch Result:", plResult);
-                console.log("Curators Fetch Result:", curResult);
-
-                // Handle Playlists Result
+                // Handle Playlists
                 if (plResult.status === 'fulfilled' && (plResult.value as any).data) {
                     const plData = (plResult.value as any).data;
                     const mapped = plData.map((p: any) => {
@@ -59,22 +62,20 @@ export default function PlaylistsPage() {
                     });
                     setPlaylists(mapped);
                 } else {
-                    console.error("Playlists fetch failed or timed out", plResult);
+                    console.error("Playlists fetch failed", plResult);
                     setError(true);
                 }
 
-                // Handle Curators Result
+                // Handle Curators
                 if (curResult.status === 'fulfilled' && (curResult.value as any).data) {
                     const cData = (curResult.value as any).data;
                     setCurators(cData.map((c: any) => ({
                         ...c,
-                        playlistCount: c.playlists?.[0]?.count || 0 // Assuming count is returned as array of objects if we used count: 'exact' but select('..., playlists(count)') actually returns playlists: [{count: N}]
+                        playlistCount: c.playlists?.[0]?.count || 0
                     })));
                 } else {
-                    console.error("Curators fetch failed or timed out", curResult);
-                    setCurators([
-                        { id: 'c1', full_name: 'DJ Noni', bio: 'Curator for top hits', avatar_url: null, role: 'curator', playlistCount: 5 }
-                    ]);
+                    console.error("Curators fetch failed", curResult);
+                    setCurators([]);
                 }
 
             } catch (err) {
@@ -87,10 +88,24 @@ export default function PlaylistsPage() {
         fetchData();
     }, []);
 
+    const toggleSelection = (id: string, e?: React.MouseEvent) => {
+        if (e) e.preventDefault();
+        setSelectedPlaylistIds(prev =>
+            prev.includes(id) ? prev.filter(p => p !== id) : [...prev, id]
+        );
+    };
+
+    const proceedToSubmit = () => {
+        if (selectedPlaylistIds.length === 0) return;
+        // Join IDs with commas to pass as query param
+        const idsParam = selectedPlaylistIds.join(",");
+        router.push(`/submit?playlists=${idsParam}`);
+    };
+
     const filteredPlaylists = playlists.filter(pl => {
         const matchesSearch = pl.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
             (pl.description || "").toLowerCase().includes(searchTerm.toLowerCase());
-        const matchesGenre = selectedGenre === "All" || (pl.genre && pl.genre.toLowerCase() === selectedGenre.toLowerCase()); // Simple exact match or loosen it
+        const matchesGenre = selectedGenre === "All" || (pl.genre && pl.genre.toLowerCase() === selectedGenre.toLowerCase());
         return matchesSearch && matchesGenre;
     });
 
@@ -101,7 +116,7 @@ export default function PlaylistsPage() {
 
 
     return (
-        <div className="w-full mx-auto max-w-7xl px-4 py-16 md:py-24 min-h-screen">
+        <div className="w-full mx-auto max-w-7xl px-4 py-16 md:py-24 min-h-screen relative pb-32">
             {error && (
                 <div className="flex flex-col items-center justify-center py-20 text-center space-y-4 min-h-[50vh]">
                     <div className="w-12 h-12 border-4 border-green-500 border-t-transparent rounded-full animate-spin"></div>
@@ -175,66 +190,82 @@ export default function PlaylistsPage() {
                     {!isLoading && activeTab === "playlists" && (
                         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                             {filteredPlaylists.length === 0 && <div className="text-center w-full col-span-full text-gray-500">No playlists found.</div>}
-                            {filteredPlaylists.map((playlist) => (
-                                <Card key={playlist.id} className="group bg-black/60 backdrop-blur-sm border-white/10 hover:bg-black/80 hover:border-green-500/30 transition-all duration-300 overflow-hidden h-full flex flex-col shadow-lg shadow-black/20">
-                                    <CardContent className="p-0 flex flex-col h-full">
-                                        {/* Playlist Cover Strip */}
-                                        <div className="w-full h-48 relative overflow-hidden bg-zinc-800">
-                                            {playlist.cover_image?.startsWith('http') ? (
-                                                <img src={playlist.cover_image} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
-                                            ) : (
-                                                <div className="w-full h-full flex items-center justify-center text-white/20"><Music2 className="w-12 h-12" /></div>
-                                            )}
-                                            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
-                                            <div className="absolute bottom-4 left-4 text-white p-2">
-                                                <p className="font-bold text-lg leading-tight">{playlist.name}</p>
-                                                <p className="text-xs text-green-400 font-medium mt-1 uppercase">{playlist.genre}</p>
-                                            </div>
-                                        </div>
+                            {filteredPlaylists.map((playlist) => {
+                                const isSelected = selectedPlaylistIds.includes(playlist.id);
+                                return (
+                                    <div key={playlist.id} onClick={(e) => toggleSelection(playlist.id, e)} className="cursor-pointer h-full">
+                                        <Card className={`group h-full flex flex-col backdrop-blur-sm transition-all duration-300 overflow-hidden shadow-lg ${isSelected ? 'bg-green-900/10 border-green-500 shadow-green-900/20' : 'bg-black/60 border-white/10 hover:bg-black/80 hover:border-green-500/30'}`}>
+                                            <CardContent className="p-0 flex flex-col h-full">
+                                                {/* Playlist Cover Strip */}
+                                                <div className="w-full h-48 relative overflow-hidden bg-zinc-800">
+                                                    {playlist.cover_image?.startsWith('http') ? (
+                                                        <img src={playlist.cover_image} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
+                                                    ) : (
+                                                        <div className="w-full h-full flex items-center justify-center text-white/20"><Music2 className="w-12 h-12" /></div>
+                                                    )}
+                                                    <div className={`absolute inset-0 transition-opacity duration-300 ${isSelected ? 'bg-green-500/20' : 'bg-gradient-to-t from-black/90 via-black/20 to-transparent'}`} />
 
-                                        <div className="p-5 space-y-4 flex-1 flex flex-col">
-                                            <p className="text-sm text-gray-400 line-clamp-2">
-                                                {(playlist.description && !playlist.description.match(/^0\s+(songs|items)/i)) ? playlist.description : "No description available."}
-                                            </p>
-                                            <div className="flex items-center justify-between text-sm text-gray-400">
-                                                <span className="flex items-center gap-1.5"><Users className="w-4 h-4" /> {playlist.followers.toLocaleString()}</span>
-                                                {(playlist.songCount || 0) > 0 && <span className="text-xs bg-white/10 px-2 py-1 rounded-full">{playlist.songCount} Items</span>}
-                                            </div>
+                                                    {/* Selection Checkmark Overlay */}
+                                                    {isSelected && (
+                                                        <div className="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-[2px]">
+                                                            <div className="bg-green-500 rounded-full p-3 shadow-lg scale-110">
+                                                                <CheckCircle className="w-8 h-8 text-black" />
+                                                            </div>
+                                                        </div>
+                                                    )}
 
-                                            <div className="mt-auto pt-4 border-t border-white/5 flex items-center justify-between gap-3">
-                                                <div className="text-sm">
-                                                    <span className="block text-[10px] text-gray-500 uppercase tracking-wider">Fee</span>
-                                                    <span className="font-bold text-white">
-                                                        {playlist.type === 'exclusive'
-                                                            ? `${pricingConfig.currency}${pricingConfig.tiers.exclusive.price.toLocaleString()}`
-                                                            : playlist.type === 'express'
-                                                                ? `${pricingConfig.currency}${pricingConfig.tiers.express.price.toLocaleString()}`
-                                                                : playlist.type === 'standard'
-                                                                    ? `${pricingConfig.currency}${pricingConfig.tiers.standard.price.toLocaleString()}`
-                                                                    : playlist.submission_fee > 0
-                                                                        ? `${pricingConfig.currency}${playlist.submission_fee.toLocaleString()}`
-                                                                        : <span className="text-green-400">FREE</span>
-                                                        }
-                                                    </span>
+                                                    <div className="absolute bottom-4 left-4 text-white p-2">
+                                                        <p className="font-bold text-lg leading-tight">{playlist.name}</p>
+                                                        <p className="text-xs text-green-400 font-medium mt-1 uppercase">{playlist.genre}</p>
+                                                    </div>
                                                 </div>
-                                                <div className="flex items-center gap-2">
-                                                    <Link href={`/playlist/${playlist.id}`}>
-                                                        <Button size="sm" variant="outline" className="border-white/10 hover:bg-white/10 text-white">
-                                                            View
-                                                        </Button>
-                                                    </Link>
-                                                    <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white shadow-lg shadow-green-900/20 group-hover:scale-105 transition-transform" onClick={(e) => {
-                                                        e.preventDefault();
-                                                        window.location.href = `/submit?playlist=${playlist.id}`;
-                                                    }}>
-                                                        Submit
-                                                    </Button>
+
+                                                <div className="p-5 space-y-4 flex-1 flex flex-col">
+                                                    <p className="text-sm text-gray-400 line-clamp-2">
+                                                        {(playlist.description && !playlist.description.match(/^0\s+(songs|items)/i)) ? playlist.description : "No description available."}
+                                                    </p>
+                                                    <div className="flex items-center justify-between text-sm text-gray-400">
+                                                        <span className="flex items-center gap-1.5"><Users className="w-4 h-4" /> {playlist.followers.toLocaleString()}</span>
+                                                        {(playlist.songCount || 0) > 0 && <span className="text-xs bg-white/10 px-2 py-1 rounded-full">{playlist.songCount} Items</span>}
+                                                    </div>
+
+                                                    <div className="mt-auto pt-4 border-t border-white/5 flex items-center justify-between gap-3">
+                                                        <div className="text-sm">
+                                                            <span className="block text-[10px] text-gray-500 uppercase tracking-wider">Fee</span>
+                                                            <span className="font-bold text-white">
+                                                                {playlist.type === 'exclusive'
+                                                                    ? `${pricingConfig.currency}${pricingConfig.tiers.exclusive.price.toLocaleString()}`
+                                                                    : playlist.type === 'express'
+                                                                        ? `${pricingConfig.currency}${pricingConfig.tiers.express.price.toLocaleString()}`
+                                                                        : playlist.type === 'standard'
+                                                                            ? `${pricingConfig.currency}${pricingConfig.tiers.standard.price.toLocaleString()}`
+                                                                            : playlist.submission_fee > 0
+                                                                                ? `${pricingConfig.currency}${playlist.submission_fee.toLocaleString()}`
+                                                                                : <span className="text-green-400">FREE</span>
+                                                                }
+                                                            </span>
+                                                        </div>
+                                                        <div className="flex items-center gap-2">
+                                                            <Link href={`/playlist/${playlist.id}`} onClick={(e) => e.stopPropagation()}>
+                                                                <Button size="sm" variant="outline" className="border-white/10 hover:bg-white/10 text-white">
+                                                                    View
+                                                                </Button>
+                                                            </Link>
+                                                            <Button
+                                                                size="sm"
+                                                                className={`shadow-lg transition-all ${isSelected ? 'bg-red-500 hover:bg-red-600 text-white' : 'bg-green-600 hover:bg-green-700 text-white'}`}
+                                                                onClick={(e) => toggleSelection(playlist.id, e)}
+                                                            >
+                                                                {isSelected ? "Remove" : "Select"}
+                                                            </Button>
+                                                        </div>
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            ))}
+                                            </CardContent>
+                                        </Card>
+                                    </div>
+                                )
+                            })}
                         </div>
                     )}
 
@@ -282,6 +313,30 @@ export default function PlaylistsPage() {
                     )}
                 </>
             )}
+
+            {/* Floating Selection Bar */}
+            <div className={`fixed bottom-0 left-0 right-0 bg-black/90 border-t border-green-500/30 backdrop-blur-xl p-4 transition-transform duration-300 z-50 ${selectedPlaylistIds.length > 0 ? 'translate-y-0' : 'translate-y-full'}`}>
+                <div className="container mx-auto max-w-6xl flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                        <div className="bg-green-500 text-black font-bold w-10 h-10 rounded-full flex items-center justify-center text-lg animate-bounce">
+                            {selectedPlaylistIds.length}
+                        </div>
+                        <div>
+                            <p className="text-white font-bold text-lg">
+                                {selectedPlaylistIds.length} Playlist{selectedPlaylistIds.length !== 1 ? 's' : ''} Selected
+                            </p>
+                            <p className="text-xs text-gray-400">Ready for submission</p>
+                        </div>
+                    </div>
+                    <Button
+                        size="lg"
+                        onClick={proceedToSubmit}
+                        className="bg-green-600 hover:bg-green-700 text-white text-lg px-8 rounded-full shadow-lg shadow-green-900/20"
+                    >
+                        Proceed to Checkout <ArrowRight className="ml-2 w-5 h-5" />
+                    </Button>
+                </div>
+            </div>
         </div >
     );
 }

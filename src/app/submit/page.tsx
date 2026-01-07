@@ -99,10 +99,35 @@ function SubmitForm() {
     }, []);
 
     useEffect(() => {
+        // Handle single 'playlist' param or comma-separated 'playlists' param
         const playlistParam = searchParams.get("playlist");
-        if (playlistParam && !selectedPlaylistIds.includes(playlistParam)) {
-            setSelectedPlaylistIds([playlistParam]);
+        const playlistsParam = searchParams.get("playlists");
+
+        let idsToSelect: string[] = [];
+
+        if (playlistParam) {
+            idsToSelect.push(playlistParam);
         }
+
+        if (playlistsParam) {
+            const splitIds = playlistsParam.split(',').map(id => id.trim()).filter(id => id);
+            idsToSelect = [...idsToSelect, ...splitIds];
+        }
+
+        // De-duplicate and add only new ones
+        if (idsToSelect.length > 0) {
+            setSelectedPlaylistIds(prev => {
+                const combined = new Set([...prev, ...idsToSelect]);
+                return Array.from(combined);
+            });
+
+            // If playlists are passed, we likely want to move to details step if user is logged in?
+            // Or just stay on selection but show them selected. 
+            // The user flow is Playlists Page -> Submit Page. 
+            // If they come with selections, they probably want to verify and pay.
+            // But we'll leave it as 'selection' step so they can see what they picked in the UI before proceeding.
+        }
+
         const tierParam = searchParams.get("tier");
         if (tierParam) setTier(tierParam);
     }, [searchParams]);
