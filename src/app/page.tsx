@@ -49,13 +49,13 @@ export default function Home() {
           </div>
 
           <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight text-white leading-tight">
-            Get Your <span className="grad-text">Afro Music</span> Reviewed <br className="hidden md:block" />
-            & Pitched
+            Connecting <span className="grad-text">African Artists</span> to <br className="hidden md:block" />
+            Real Curators
           </h1>
 
-          <p className="text-2xl md:text-3xl font-bold text-white/90 mt-4 mb-2">
-            Connecting African Artists to Real Curators
-          </p>
+          <h2 className="text-2xl md:text-4xl font-bold text-white">
+            Get Your Afro Music Reviewed & Pitched
+          </h2>
 
           <p className="text-lg md:text-xl text-gray-400 max-w-2xl mx-auto">
             The trusted platform for Amapiano, Afrobeats, and Francophone African artists.
