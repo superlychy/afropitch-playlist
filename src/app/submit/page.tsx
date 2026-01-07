@@ -380,7 +380,7 @@ function SubmitForm() {
                                                 .map((p) => (
                                                     <div key={p.id}
                                                         onClick={() => togglePlaylist(p.id)}
-                                                        className={`group relative overflow-hidden rounded-xl border transition-all cursor-pointer hover:scale-[1.02] ${selectedPlaylistIds.includes(p.id) ? 'border-green-500 bg-green-900/10' : 'border-white/10 bg-white/5 hover:border-white/30'}`}
+                                                        className={`group relative overflow-hidden rounded-xl border transition-all cursor-pointer hover:scale-[1.02] ${selectedPlaylistIds.includes(p.id) ? 'border-green-500 bg-green-900/40 backdrop-blur-sm' : 'border-white/10 bg-black/60 backdrop-blur-sm hover:border-white/30'}`}
                                                     >
                                                         <div className="aspect-square relative">
                                                             {p.coverImage.startsWith('http') ? (
@@ -391,7 +391,7 @@ function SubmitForm() {
                                                                 </div>
                                                             )}
 
-                                                            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent p-4 flex flex-col justify-end">
+                                                            <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/60 to-transparent p-4 flex flex-col justify-end">
                                                                 <div className="flex justify-between items-end">
                                                                     <div>
                                                                         <h3 className="font-bold text-white text-lg leading-tight">{p.name}</h3>
@@ -471,7 +471,7 @@ function SubmitForm() {
                                                 .map((p) => (
                                                     <div key={p.id}
                                                         onClick={() => togglePlaylist(p.id)}
-                                                        className={`group relative overflow-hidden rounded-xl border transition-all cursor-pointer hover:scale-[1.02] ${selectedPlaylistIds.includes(p.id) ? 'border-green-500 bg-green-900/10' : 'border-white/10 bg-white/5 hover:border-white/30'}`}
+                                                        className={`group relative overflow-hidden rounded-xl border transition-all cursor-pointer hover:scale-[1.02] ${selectedPlaylistIds.includes(p.id) ? 'border-green-500 bg-green-900/40 backdrop-blur-sm' : 'border-white/10 bg-black/60 backdrop-blur-sm hover:border-white/30'}`}
                                                     >
                                                         <div className="aspect-square relative">
                                                             {p.coverImage.startsWith('http') ? (
@@ -482,7 +482,7 @@ function SubmitForm() {
                                                                 </div>
                                                             )}
 
-                                                            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent p-4 flex flex-col justify-end">
+                                                            <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/60 to-transparent p-4 flex flex-col justify-end">
                                                                 <div className="flex justify-between items-end">
                                                                     <div>
                                                                         <h3 className="font-bold text-white text-lg leading-tight">{p.name}</h3>
@@ -587,7 +587,7 @@ function SubmitForm() {
                                                 {allPlaylists
                                                     .filter(p => selectedPlaylistIds.includes(p.id))
                                                     .map((p) => (
-                                                        <div key={p.id} className="flex items-center justify-between p-2 rounded bg-white/5 border border-white/10">
+                                                        <div key={p.id} className="flex items-center justify-between p-2 rounded bg-black/40 border border-white/10">
                                                             <div className="flex items-center gap-2">
                                                                 <div className={`w-8 h-8 rounded shrink-0 flex items-center justify-center overflow-hidden ${p.coverImage.startsWith('http') ? '' : p.coverImage}`}>
                                                                     {p.coverImage.startsWith('http') ? (
@@ -650,7 +650,7 @@ function SubmitForm() {
                                         </div>
                                     </CardContent>
                                     <CardFooter className="flex-col gap-4">
-                                        <div className="w-full bg-white/5 rounded-lg p-4 space-y-2">
+                                        <div className="w-full bg-black/40 rounded-lg p-4 space-y-2">
                                             <div className="flex justify-between text-sm text-gray-400">
                                                 <span>Subtotal ({selectedPlaylistIds.length || 1} items)</span>
                                                 <span>{pricingConfig.currency}{(total + (discountAmount || 0)).toLocaleString()}</span>
@@ -668,7 +668,7 @@ function SubmitForm() {
                                         </div>
 
                                         <div className="w-full space-y-3">
-                                            <div className="bg-white/5 p-4 rounded-lg flex items-center justify-between border border-white/10">
+                                            <div className="bg-black/40 p-4 rounded-lg flex items-center justify-between border border-white/10">
                                                 <div className="flex items-center gap-3">
                                                     <Wallet className="w-5 h-5 text-green-500" />
                                                     <div className="text-left">
