@@ -6,6 +6,7 @@ import { Footer } from "@/components/layout/Footer";
 import { AIHelp } from "@/components/AIHelp";
 
 export const metadata: Metadata = {
+  metadataBase: new URL(siteConfig.url),
   title: {
     default: "Afropitch Playlist | Connect African Artists to Real Curators",
     template: `%s | ${siteConfig.name}`,
@@ -21,10 +22,10 @@ export const metadata: Metadata = {
     siteName: siteConfig.name,
     images: [
       {
-        url: "/og-image.jpg",
-        width: 1200,
-        height: 630,
-        alt: "Afropitch Playlist - Connect Artists to Curators",
+        url: "/logo.png",
+        width: 800,
+        height: 600,
+        alt: "AfroPitch Logo",
       },
     ],
   },
@@ -33,6 +34,12 @@ export const metadata: Metadata = {
     title: "Afropitch Playlist | Connect African Artists to Real Curators",
     description: siteConfig.description,
     creator: "@afropitch",
+    images: ["/logo.png"],
+  },
+  icons: {
+    icon: "/logo.png",
+    shortcut: "/logo.png",
+    apple: "/logo.png",
   },
   robots: {
     index: true,
