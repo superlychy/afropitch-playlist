@@ -37,10 +37,14 @@ Deno.serve(async (req) => {
 
         if (table === 'transactions' && type === 'INSERT') {
             await handleTransaction(record);
-        } else if (table === 'submissions' && type === 'UPDATE') {
-            // Only notify if status changed
-            if (record.status !== payload.old_record?.status) {
-                await handleSubmissionUpdate(record);
+        } else if (table === 'submissions') {
+            if (type === 'UPDATE') {
+                // Only notify if status changed
+                if (record.status !== payload.old_record?.status) {
+                    await handleSubmissionUpdate(record);
+                }
+            } else if (type === 'INSERT') {
+                await handleSubmissionInsert(record);
             }
         } else if (table === 'withdrawals' && type === 'UPDATE') {
             if (record.status !== payload.old_record?.status) {
@@ -117,6 +121,49 @@ async function handleTransaction(record: any) {
     });
 
     await sendEmail(user.email, subject, html);
+}
+
+async function handleSubmissionInsert(record: any) {
+    // 1. Get Playlist & Curator ID
+    const { data: playlist } = await supabase.from('playlists').select('name, curator_id').eq('id', record.playlist_id).single();
+    if (!playlist || !playlist.curator_id) {
+        console.error("Playlist/Curator not found for submission:", record.id);
+        return;
+    }
+
+    // 2. Get Curator Email
+    const curator = await getUserEmail(playlist.curator_id);
+    if (!curator || !curator.email) {
+        console.error("Curator email not found:", playlist.curator_id);
+        return;
+    }
+
+    // 3. Get Artist Name (Optional)
+    const artist = await getUserEmail(record.artist_id); // Returns name too
+    const artistName = artist?.full_name || 'An Artist';
+
+    // 4. Send Email to Curator
+    const subject = `New Submission: ${record.song_title} for ${playlist.name}`;
+    const html = `
+        <div style="font-family: sans-serif; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 8px;">
+            <h2 style="color: #16a34a;">New Song Submission!</h2>
+            <p>Hi ${curator.full_name},</p>
+            <p>You have received a new submission from <strong>${artistName}</strong> for your playlist <strong>${playlist.name}</strong>.</p>
+            <div style="background: #f9f9f9; padding: 15px; border-radius: 5px; margin: 15px 0;">
+                <p style="margin: 5px 0;"><strong>Song:</strong> ${record.song_title}</p>
+                <p style="margin: 5px 0;"><strong>Tier:</strong> ${record.tier ? record.tier.toUpperCase() : 'STANDARD'}</p>
+            </div>
+            <p>Login to your dashboard to review it and earn your fee.</p>
+            <div style="text-align: center; margin-top: 20px;">
+                <a href="${SITE_URL}/dashboard/curator" style="background:#16a34a;color:white;padding:12px 24px;text-decoration:none;border-radius:5px;font-weight:bold;">Review Submission</a>
+            </div>
+             <p style="font-size: 12px; color: #777; text-align: center; margin-top: 30px;">
+                &copy; ${new Date().getFullYear()} AfroPitch Playlist.
+            </p>
+        </div>
+    `;
+
+    await sendEmail(curator.email, subject, html);
 }
 
 async function handleSubmissionUpdate(record: any) {
