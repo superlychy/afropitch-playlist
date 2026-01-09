@@ -77,8 +77,18 @@ export async function POST(req: NextRequest) {
                 p_session_id: sessionId,
                 p_seconds: 30
             });
+
+            // Handle batched clicks if sent with heartbeat
+            const { clickCount } = body;
+            if (clickCount && clickCount > 0) {
+                await supabase.rpc('increment_analytics_clicks_count', {
+                    p_session_id: sessionId,
+                    p_count: clickCount
+                });
+            }
         }
         else if (type === 'click') {
+            // Fallback for immediate clicks if needed (or remove if fully batched)
             await supabase.rpc('increment_analytics_clicks', {
                 p_session_id: sessionId
             });

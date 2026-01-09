@@ -17,6 +17,8 @@ function AnalyticsLogic() {
     const pathname = usePathname();
     const searchParams = useSearchParams();
     const sessionId = useRef<string>("");
+    // Store clicks locally to batch them
+    const clickCountRef = useRef<number>(0);
 
     useEffect(() => {
         let sid = sessionStorage.getItem("afropitch_session_id");
@@ -28,8 +30,17 @@ function AnalyticsLogic() {
 
         sendEvent('init');
 
-        const interval = setInterval(() => sendEvent('heartbeat'), 30000); // 30s
-        const clickHandler = () => sendEvent('click');
+        // Heartbeat every 30s - INCLUDES BATCHED CLICKS
+        const interval = setInterval(() => {
+            sendEvent('heartbeat', clickCountRef.current);
+            clickCountRef.current = 0; // Reset after sending
+        }, 30000);
+
+        // Just increment local counter, DON'T send network request per click
+        const clickHandler = () => {
+            clickCountRef.current += 1;
+        };
+
         document.addEventListener('click', clickHandler);
 
         return () => {
@@ -43,7 +54,7 @@ function AnalyticsLogic() {
         sendEvent('init');
     }, [pathname, searchParams]);
 
-    const sendEvent = async (type: 'init' | 'heartbeat' | 'click') => {
+    const sendEvent = async (type: 'init' | 'heartbeat' | 'click', countPayload?: number) => {
         if (!sessionId.current) return;
 
         try {
@@ -55,7 +66,8 @@ function AnalyticsLogic() {
                     sessionId: sessionId.current,
                     href: window.location.href,
                     referrer: document.referrer,
-                    userAgent: navigator.userAgent
+                    userAgent: navigator.userAgent,
+                    clickCount: countPayload // Send accumulated clicks
                 })
             });
         } catch (e) {
