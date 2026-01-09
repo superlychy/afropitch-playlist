@@ -20,8 +20,24 @@ type Visit = {
     duration_seconds: number;
 };
 
+type GroupedVisit = {
+    ip_address: string;
+    country: string;
+    last_seen_at: string; // Most recent
+    first_seen_at: string; // Earliest
+    is_online: boolean;
+    total_duration_seconds: number;
+    total_page_views: number;
+    total_clicks: number;
+    session_count: number;
+    user_agent: string; // Most recent
+    latest_path: string;
+};
+
 export default function AnalyticsPage() {
-    const [visits, setVisits] = useState<Visit[]>([]);
+    // We fetch raw visits but render grouped visits
+    const [rawVisits, setRawVisits] = useState<Visit[]>([]);
+    const [groupedVisits, setGroupedVisits] = useState<GroupedVisit[]>([]);
     const [loading, setLoading] = useState(true);
     const [activeUsers, setActiveUsers] = useState(0);
 
@@ -31,24 +47,64 @@ export default function AnalyticsPage() {
             .from('analytics_visits')
             .select('*')
             .order('last_seen_at', { ascending: false })
-            .limit(100);
+            .limit(200); // Increased limit for better grouping context
 
         if (data) {
-            setVisits(data as Visit[]);
+            const fetchedVisits = data as Visit[];
+            setRawVisits(fetchedVisits);
 
-            // Calculate Active Users (Unique IPs online in last 5 mins)
+            // GROUPING LOGIC
+            const groups: { [key: string]: GroupedVisit } = {};
             const now = new Date().getTime();
             const fiveMinsAgo = now - 5 * 60 * 1000;
 
-            const onlineVisits = data.filter((v: any) => {
-                const lastSeen = new Date(v.last_seen_at).getTime();
-                return lastSeen > fiveMinsAgo;
+            fetchedVisits.forEach(v => {
+                if (!groups[v.ip_address]) {
+                    groups[v.ip_address] = {
+                        ip_address: v.ip_address,
+                        country: v.country,
+                        last_seen_at: v.last_seen_at,
+                        first_seen_at: v.created_at,
+                        is_online: false, // Calc later
+                        total_duration_seconds: 0,
+                        total_page_views: 0,
+                        total_clicks: 0,
+                        session_count: 0,
+                        user_agent: v.user_agent,
+                        latest_path: v.path
+                    };
+                }
+
+                const g = groups[v.ip_address];
+
+                // Aggregates
+                g.total_duration_seconds += (v.duration_seconds || 0);
+                g.total_page_views += (v.page_views || 0);
+                g.total_clicks += (v.clicks || 0);
+                g.session_count += 1;
+
+                // Time comparisons
+                if (new Date(v.last_seen_at).getTime() > new Date(g.last_seen_at).getTime()) {
+                    g.last_seen_at = v.last_seen_at;
+                    g.user_agent = v.user_agent; // Update to latest UA
+                    g.latest_path = v.path;
+                }
+                if (new Date(v.created_at).getTime() < new Date(g.first_seen_at).getTime()) {
+                    g.first_seen_at = v.created_at;
+                }
             });
 
-            // Count Unique IPs
-            // Use Set to ensure uniqueness of IP addresses
-            const uniqueOnlineIPs = new Set(onlineVisits.map((v: any) => v.ip_address)).size;
-            setActiveUsers(uniqueOnlineIPs);
+            // Final Pass: Determine Online Status & Convert to Array
+            const groupedArray = Object.values(groups).map(g => {
+                const lastSeenTime = new Date(g.last_seen_at).getTime();
+                return {
+                    ...g,
+                    is_online: lastSeenTime > fiveMinsAgo
+                };
+            }).sort((a, b) => new Date(b.last_seen_at).getTime() - new Date(a.last_seen_at).getTime());
+
+            setGroupedVisits(groupedArray);
+            setActiveUsers(groupedArray.filter(g => g.is_online).length);
         }
         setLoading(false);
     };
@@ -80,7 +136,7 @@ export default function AnalyticsPage() {
                 </Button>
             </div>
 
-            {/* KPI Cards */}
+            {/* KPI Cards (Using Raw Visits for totals to be accurate to "visits" vs "users" where needed) */}
             <div className="grid gap-4 md:grid-cols-4">
                 <Card className="bg-zinc-900 border-white/10">
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -94,14 +150,14 @@ export default function AnalyticsPage() {
                 </Card>
                 <Card className="bg-zinc-900 border-white/10">
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
-                        <CardTitle className="text-sm font-medium text-gray-400">Unique Users</CardTitle>
+                        <CardTitle className="text-sm font-medium text-gray-400">Unique Visitors</CardTitle>
                         <Monitor className="h-4 w-4 text-blue-500" />
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold text-white">
-                            {new Set(visits.map(v => v.ip_address)).size}
+                            {groupedVisits.length}
                         </div>
-                        <p className="text-xs text-gray-500">Total Unique IPs</p>
+                        <p className="text-xs text-gray-500">Total Unique IPs Logged</p>
                     </CardContent>
                 </Card>
                 <Card className="bg-zinc-900 border-white/10">
@@ -110,20 +166,21 @@ export default function AnalyticsPage() {
                         <MousePointer className="h-4 w-4 text-orange-500" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold text-white">{visits.reduce((a, v) => a + (v.clicks || 0), 0)}</div>
-                        <p className="text-xs text-gray-500">Across sessions</p>
+                        <div className="text-2xl font-bold text-white">{rawVisits.reduce((a, v) => a + (v.clicks || 0), 0)}</div>
+                        <p className="text-xs text-gray-500">Across {rawVisits.length} sessions</p>
                     </CardContent>
                 </Card>
                 <Card className="bg-zinc-900 border-white/10">
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
-                        <CardTitle className="text-sm font-medium text-gray-400">Highest Duration</CardTitle>
+                        <CardTitle className="text-sm font-medium text-gray-400">Max User Time</CardTitle>
                         <Clock className="h-4 w-4 text-purple-500" />
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold text-white">
-                            {formatDuration(Math.max(...visits.map(v => v.duration_seconds || 0), 0))}
+                            {/* Calculate Max accumulated duration per user instead of per session */}
+                            {formatDuration(Math.max(...groupedVisits.map(g => g.total_duration_seconds || 0), 0))}
                         </div>
-                        <p className="text-xs text-gray-500">Longest session</p>
+                        <p className="text-xs text-gray-500">Highest Cumulative Duration</p>
                     </CardContent>
                 </Card>
             </div>
@@ -131,7 +188,7 @@ export default function AnalyticsPage() {
             {/* Table */}
             <Card className="bg-zinc-900 border-white/10">
                 <CardHeader>
-                    <CardTitle className="text-white">Recent Visitors</CardTitle>
+                    <CardTitle className="text-white">Recent Visitors (Grouped by IP)</CardTitle>
                 </CardHeader>
                 <CardContent>
                     <div className="overflow-x-auto">
@@ -139,21 +196,20 @@ export default function AnalyticsPage() {
                             <thead className="text-xs text-gray-400 uppercase bg-black/20">
                                 <tr>
                                     <th className="px-4 py-3">Status</th>
-                                    <th className="px-4 py-3">Location/IP</th>
-                                    <th className="px-4 py-3">Path</th>
-                                    <th className="px-4 py-3">Duration (Active)</th>
-                                    <th className="px-4 py-3">Views</th>
-                                    <th className="px-4 py-3">Clicks</th>
-                                    <th className="px-4 py-3">User Agent</th>
+                                    <th className="px-4 py-3">Visitor / IP</th>
+                                    <th className="px-4 py-3">Latest Path</th>
+                                    <th className="px-4 py-3">Time on Site</th>
+                                    <th className="px-4 py-3">Sessions</th>
+                                    <th className="px-4 py-3">Total Clicks</th>
+                                    <th className="px-4 py-3">Last Seen</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-white/5">
-                                {visits.map((visit) => {
-                                    const isOnline = (new Date().getTime() - new Date(visit.last_seen_at).getTime()) < 5 * 60 * 1000;
+                                {groupedVisits.map((group) => {
                                     return (
-                                        <tr key={visit.id} className="hover:bg-white/5 transition-colors">
+                                        <tr key={group.ip_address} className="hover:bg-white/5 transition-colors">
                                             <td className="px-4 py-3">
-                                                {isOnline ? (
+                                                {group.is_online ? (
                                                     <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-500/10 text-green-500">
                                                         <span className="w-1.5 h-1.5 rounded-full bg-green-500 mr-1.5 animate-pulse"></span>
                                                         Online
@@ -163,24 +219,28 @@ export default function AnalyticsPage() {
                                                 )}
                                             </td>
                                             <td className="px-4 py-3">
-                                                <div className="text-white font-medium">{visit.country}</div>
-                                                <div className="text-xs text-gray-500">{visit.ip_address}</div>
+                                                <div className="text-white font-medium flex items-center gap-2">
+                                                    {group.country === 'Unknown' ? '🌍' : group.country}
+                                                    <span className="truncate max-w-[120px]">{group.ip_address}</span>
+                                                </div>
                                             </td>
-                                            <td className="px-4 py-3 text-gray-300 max-w-[200px] truncate" title={visit.path}>
-                                                {visit.path.replace(typeof window !== 'undefined' ? window.location.origin : '', '') || '/'}
+                                            <td className="px-4 py-3 text-gray-300 max-w-[200px] truncate" title={group.latest_path}>
+                                                {group.latest_path.replace(typeof window !== 'undefined' ? window.location.origin : '', '') || '/'}
+                                            </td>
+                                            <td className="px-4 py-3 text-gray-300 font-mono">
+                                                {formatDuration(group.total_duration_seconds)}
                                             </td>
                                             <td className="px-4 py-3 text-gray-300">
-                                                {formatDuration(visit.duration_seconds)}
+                                                <span className="bg-white/10 px-2 py-0.5 rounded text-xs">{group.session_count}</span>
                                             </td>
-                                            <td className="px-4 py-3 text-gray-300">{visit.page_views}</td>
-                                            <td className="px-4 py-3 text-gray-300">{visit.clicks}</td>
-                                            <td className="px-4 py-3 max-w-[200px] truncate text-xs text-gray-500" title={visit.user_agent}>
-                                                {visit.user_agent}
+                                            <td className="px-4 py-3 text-gray-300 font-bold">{group.total_clicks}</td>
+                                            <td className="px-4 py-3 text-xs text-gray-500">
+                                                {new Date(group.last_seen_at).toLocaleTimeString()}
                                             </td>
                                         </tr>
                                     );
                                 })}
-                                {visits.length === 0 && (
+                                {groupedVisits.length === 0 && (
                                     <tr>
                                         <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
                                             No data available yet.
