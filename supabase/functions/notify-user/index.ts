@@ -270,14 +270,29 @@ async function handleBroadcast(record: any) {
     for (const u of users) {
         if (!u.email) continue;
 
-        // Optional: Filter by role if metadata present
-        // if (targetRole !== 'all' && u.user_metadata?.role !== targetRole) continue;
+        // Filter by role
+        const userRole = u.user_metadata?.role || (u.email.includes("curator") ? "curator" : "artist");
+        if (targetRole !== 'all' && userRole !== targetRole) {
+            continue;
+        }
 
-        const subject = record.subject;
+        const userName = u.user_metadata?.full_name || u.email.split('@')[0] || 'User';
+        const subject = record.subject.replace(/{{name}}/g, userName).replace(/{{username}}/g, userName);
+
+        // Process message body for placeholders
+        let messageBody = record.message
+            .replace(/{{name}}/g, userName)
+            .replace(/{{username}}/g, userName);
+
+        // Convert newlines to breaks if it looks like plain text
+        if (!messageBody.includes('<p>') && !messageBody.includes('<div>')) {
+            messageBody = messageBody.replace(/\n/g, '<br/>');
+        }
+
         const html = `
             <div style="font-family: sans-serif; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 8px;">
-                <h2 style="color: #16a34a;">${record.subject}</h2>
-                <div style="white-space: pre-wrap; font-size: 16px; line-height: 1.5;">${record.message}</div>
+                <h2 style="color: #16a34a;">${subject}</h2>
+                <div style="font-size: 16px; line-height: 1.5;">${messageBody}</div>
                 <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
                 <p style="font-size: 12px; color: #777; text-align: center;">
                     You received this message from AfroPitch Admin.<br/>
@@ -291,7 +306,7 @@ async function handleBroadcast(record: any) {
         // Rate limit
         await new Promise(r => setTimeout(r, 200));
     }
-    console.log(`✅ Broadcast complete. Sent to ${sentCount} users.`);
+    console.log(`✅ Broadcast complete. Sent to ${sentCount} users (Target: ${targetRole}).`);
 }
 
 async function sendEmail(to: string, subject: string, html: string) {
