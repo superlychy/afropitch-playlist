@@ -108,47 +108,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }
         };
 
-        const initializeAuth = async () => {
-            // 1. Get Session Explicitly (Robust check)
-            const { data: { session } } = await supabase.auth.getSession();
-
-            if (mounted) {
+        // Initialize Auth Listener immediately
+        // We rely on INITIAL_SESSION to trigger the first load.
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+            if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') {
                 if (session) {
                     await syncProfile(session);
                 } else {
-                    setUser(null);
-                    setIsLoading(false);
-                }
-            }
-
-            // 2. Listen for future changes
-            const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-                // console.log("Auth State Change:", event);
-
-                if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-                    if (session) await syncProfile(session);
-                } else if (event === 'SIGNED_OUT') {
+                    // INITIAL_SESSION with null session means user is not logged in / checked out
                     if (mounted) {
                         setUser(null);
                         setIsLoading(false);
-                        localStorage.removeItem('sb-' + process.env.NEXT_PUBLIC_SUPABASE_URL + '-auth-token');
                     }
                 }
-                // We ignore INITIAL_SESSION here as we rely on explicit getSession above
-            });
-
-            return subscription;
-        };
-
-        let subscription: { unsubscribe: () => void } | null = null;
-
-        initializeAuth().then(sub => {
-            subscription = sub;
+            } else if (event === 'SIGNED_OUT') {
+                if (mounted) {
+                    setUser(null);
+                    setIsLoading(false);
+                    localStorage.removeItem('sb-' + process.env.NEXT_PUBLIC_SUPABASE_URL + '-auth-token');
+                }
+            }
         });
 
         return () => {
             mounted = false;
-            if (subscription) subscription.unsubscribe();
+            subscription.unsubscribe();
         };
     }, []);
 
