@@ -38,9 +38,16 @@ interface Submission {
 }
 
 export default function ArtistDashboard() {
-    const { user, loadFunds, isLoading, logout } = useAuth();
+    const { user, loadFunds, isLoading, logout, refreshUser } = useAuth();
     const router = useRouter();
     const [amount, setAmount] = useState("");
+
+    // Force sync on mount
+    useEffect(() => {
+        if (user) {
+            refreshUser();
+        }
+    }, [user]);
 
     // Profile Modal State
     const [showProfile, setShowProfile] = useState(false);

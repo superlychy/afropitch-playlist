@@ -26,12 +26,16 @@ interface Playlist {
 }
 
 export default function CuratorDashboard() {
-    const { user, isLoading, deductFunds, logout } = useAuth();
+    const { user, isLoading, deductFunds, logout, refreshUser } = useAuth();
     const router = useRouter();
 
     useEffect(() => {
         if (!isLoading && (!user || user.role !== 'curator')) {
             router.push("/portal");
+        }
+        // Force refresh user data on dashboard mount to sync balance/status
+        if (user) {
+            refreshUser();
         }
     }, [user, isLoading, router]);
 
