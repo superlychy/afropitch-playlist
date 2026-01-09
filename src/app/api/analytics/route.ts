@@ -73,42 +73,15 @@ export async function POST(req: NextRequest) {
             }
         }
         else if (type === 'heartbeat') {
-            // Increment duration by interval (30s)
-            // Use RPC ideally, but for now fetch-update or SQL raw if possible? 
-            // Supabase JS doesn't support `duration_seconds + 30` easily in .update().
-            // We fetch existing first.
-            const { data: current } = await supabase
-                .from('analytics_visits')
-                .select('duration_seconds')
-                .eq('session_id', sessionId)
-                .single();
-
-            if (current) {
-                await supabase
-                    .from('analytics_visits')
-                    .update({
-                        last_seen_at: new Date().toISOString(),
-                        duration_seconds: (current.duration_seconds || 0) + 30
-                    })
-                    .eq('session_id', sessionId);
-            }
+            await supabase.rpc('increment_analytics_duration', {
+                p_session_id: sessionId,
+                p_seconds: 30
+            });
         }
         else if (type === 'click') {
-            const { data: current } = await supabase
-                .from('analytics_visits')
-                .select('clicks')
-                .eq('session_id', sessionId)
-                .single();
-
-            if (current) {
-                await supabase
-                    .from('analytics_visits')
-                    .update({
-                        clicks: (current.clicks || 0) + 1,
-                        last_seen_at: new Date().toISOString()
-                    })
-                    .eq('session_id', sessionId);
-            }
+            await supabase.rpc('increment_analytics_clicks', {
+                p_session_id: sessionId
+            });
         }
 
         return NextResponse.json({ success: true });

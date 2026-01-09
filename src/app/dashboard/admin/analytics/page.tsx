@@ -94,12 +94,14 @@ export default function AnalyticsPage() {
                 </Card>
                 <Card className="bg-zinc-900 border-white/10">
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
-                        <CardTitle className="text-sm font-medium text-gray-400">Total Visits (Log)</CardTitle>
+                        <CardTitle className="text-sm font-medium text-gray-400">Unique Users</CardTitle>
                         <Monitor className="h-4 w-4 text-blue-500" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold text-white">{visits.length}</div>
-                        <p className="text-xs text-gray-500">Last 100 sessions</p>
+                        <div className="text-2xl font-bold text-white">
+                            {new Set(visits.map(v => v.ip_address)).size}
+                        </div>
+                        <p className="text-xs text-gray-500">Total Unique IPs</p>
                     </CardContent>
                 </Card>
                 <Card className="bg-zinc-900 border-white/10">
