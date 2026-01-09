@@ -17,7 +17,7 @@ type Visit = {
     last_seen_at: string;
     page_views: number;
     clicks: number;
-    durationMinutes?: number;
+    duration_seconds: number;
 };
 
 export default function AnalyticsPage() {
@@ -25,47 +25,47 @@ export default function AnalyticsPage() {
     const [loading, setLoading] = useState(true);
     const [activeUsers, setActiveUsers] = useState(0);
 
-    const fetchAnalytics = async () => {
+    const refreshAnalytics = async () => {
         setLoading(true);
-        try {
-            // Fetch everything (limit 100 for now)
-            const { data, error } = await supabase
-                .from('analytics_visits')
-                .select('*')
-                .order('created_at', { ascending: false })
-                .limit(100);
+        const { data, error } = await supabase
+            .from('analytics_visits')
+            .select('*')
+            .order('last_seen_at', { ascending: false })
+            .limit(100);
 
-            if (error) throw error;
+        if (data) {
+            setVisits(data as Visit[]);
 
-            if (data) {
-                // Process duration
-                const processed = data.map((v: any) => {
-                    const start = new Date(v.created_at).getTime();
-                    const end = new Date(v.last_seen_at).getTime();
-                    const diffMins = Math.round((end - start) / 60000);
-                    return { ...v, durationMinutes: diffMins };
-                });
-                setVisits(processed);
+            // Calculate Active Users (Unique IPs online in last 5 mins)
+            const now = new Date().getTime();
+            const fiveMinsAgo = now - 5 * 60 * 1000;
 
-                // Calculate Active Users (active in last 5 mins)
-                const now = new Date().getTime();
-                const active = processed.filter(v =>
-                    (now - new Date(v.last_seen_at).getTime()) < 5 * 60 * 1000
-                ).length;
-                setActiveUsers(active);
-            }
-        } catch (error) {
-            console.error('Error fetching analytics:', error);
-        } finally {
-            setLoading(false);
+            const onlineVisits = data.filter((v: any) => {
+                const lastSeen = new Date(v.last_seen_at).getTime();
+                return lastSeen > fiveMinsAgo;
+            });
+
+            // Count Unique IPs
+            // Use Set to ensure uniqueness of IP addresses
+            const uniqueOnlineIPs = new Set(onlineVisits.map((v: any) => v.ip_address)).size;
+            setActiveUsers(uniqueOnlineIPs);
         }
+        setLoading(false);
     };
 
     useEffect(() => {
-        fetchAnalytics();
-        const interval = setInterval(fetchAnalytics, 30000); // Poll every 30s
+        refreshAnalytics();
+        const interval = setInterval(refreshAnalytics, 30000); // Poll every 30s
         return () => clearInterval(interval);
     }, []);
+
+    const formatDuration = (seconds: number) => {
+        if (!seconds) return "0s";
+        if (seconds < 60) return `${seconds}s`;
+        const mins = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        return `${mins}m ${secs}s`;
+    };
 
     return (
         <div className="space-y-6">
@@ -74,7 +74,7 @@ export default function AnalyticsPage() {
                     <h1 className="text-3xl font-bold text-white">Live Analytics</h1>
                     <p className="text-sm text-gray-400">Track visitors, active sessions, and engagement.</p>
                 </div>
-                <Button onClick={fetchAnalytics} variant="outline" size="sm" className="gap-2 text-white border-white/20">
+                <Button onClick={refreshAnalytics} variant="outline" size="sm" className="gap-2 text-white border-white/20">
                     <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
                     Refresh
                 </Button>
@@ -89,7 +89,7 @@ export default function AnalyticsPage() {
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold text-white">{activeUsers}</div>
-                        <p className="text-xs text-gray-500">Online now (last 5m)</p>
+                        <p className="text-xs text-gray-500">Unique IPs online now</p>
                     </CardContent>
                 </Card>
                 <Card className="bg-zinc-900 border-white/10">
@@ -108,7 +108,7 @@ export default function AnalyticsPage() {
                         <MousePointer className="h-4 w-4 text-orange-500" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold text-white">{visits.reduce((a, b) => a + (b.clicks || 0), 0)}</div>
+                        <div className="text-2xl font-bold text-white">{visits.reduce((a, v) => a + (v.clicks || 0), 0)}</div>
                         <p className="text-xs text-gray-500">Across sessions</p>
                     </CardContent>
                 </Card>
@@ -119,7 +119,7 @@ export default function AnalyticsPage() {
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold text-white">
-                            {Math.max(...visits.map(v => v.durationMinutes || 0), 0)}m
+                            {formatDuration(Math.max(...visits.map(v => v.duration_seconds || 0), 0))}
                         </div>
                         <p className="text-xs text-gray-500">Longest session</p>
                     </CardContent>
@@ -139,7 +139,7 @@ export default function AnalyticsPage() {
                                     <th className="px-4 py-3">Status</th>
                                     <th className="px-4 py-3">Location/IP</th>
                                     <th className="px-4 py-3">Path</th>
-                                    <th className="px-4 py-3">Duration</th>
+                                    <th className="px-4 py-3">Duration (Active)</th>
                                     <th className="px-4 py-3">Views</th>
                                     <th className="px-4 py-3">Clicks</th>
                                     <th className="px-4 py-3">User Agent</th>
@@ -165,10 +165,10 @@ export default function AnalyticsPage() {
                                                 <div className="text-xs text-gray-500">{visit.ip_address}</div>
                                             </td>
                                             <td className="px-4 py-3 text-gray-300 max-w-[200px] truncate" title={visit.path}>
-                                                {visit.path.replace(window.location.origin, '') || '/'}
+                                                {visit.path.replace(typeof window !== 'undefined' ? window.location.origin : '', '') || '/'}
                                             </td>
                                             <td className="px-4 py-3 text-gray-300">
-                                                {visit.durationMinutes} min
+                                                {formatDuration(visit.duration_seconds)}
                                             </td>
                                             <td className="px-4 py-3 text-gray-300">{visit.page_views}</td>
                                             <td className="px-4 py-3 text-gray-300">{visit.clicks}</td>

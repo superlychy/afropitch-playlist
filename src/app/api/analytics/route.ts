@@ -28,15 +28,30 @@ export async function POST(req: NextRequest) {
 
             if (existing) {
                 // Determine if this is a "new page view" (navigation) or just a reload
+                // We update last_seen and increment page_views
                 await supabase
                     .from('analytics_visits')
                     .update({
-                        page_views: existing.page_views + 1,
+                        page_views: (existing.page_views || 1) + 1,
                         last_seen_at: new Date().toISOString()
                     })
                     .eq('session_id', sessionId);
             } else {
-                // New Visitor!
+                // New Session Created!
+
+                // CHECK VISITOR FREQUENCY FOR NOTIFICATION
+                // Check if this IP has had a session in the last 1 HOUR
+                const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+
+                const { data: recentSessions } = await supabase
+                    .from('analytics_visits')
+                    .select('id')
+                    .eq('ip_address', ip)
+                    .gt('created_at', oneHourAgo)
+                    .limit(1);
+
+                const shouldNotify = !recentSessions || recentSessions.length === 0;
+
                 await supabase.from('analytics_visits').insert({
                     session_id: sessionId,
                     ip_address: ip,
@@ -46,27 +61,39 @@ export async function POST(req: NextRequest) {
                     created_at: new Date().toISOString(),
                     last_seen_at: new Date().toISOString(),
                     page_views: 1,
-                    clicks: 0
+                    clicks: 0,
+                    duration_seconds: 0
                 });
 
-                // Send Discord Notification
-                const msg = `**New Visitor!** 🌍\n**IP:** ${ip} (${country})\n**Path:** ${href}\n**UA:** ${userAgent}`;
-                // Fire and forget (don't await to block response)
-                sendDiscordNotification(msg).catch(err => console.error("Discord Error", err));
+                // ONLY Notify if no recent sessions from this IP
+                if (shouldNotify) {
+                    const msg = `**New Visitor!** 🌍\n**IP:** ${ip} (${country})\n**Path:** ${href}`;
+                    sendDiscordNotification(msg).catch(err => console.error("Discord Error", err));
+                }
             }
         }
         else if (type === 'heartbeat') {
-            await supabase
+            // Increment duration by interval (30s)
+            // Use RPC ideally, but for now fetch-update or SQL raw if possible? 
+            // Supabase JS doesn't support `duration_seconds + 30` easily in .update().
+            // We fetch existing first.
+            const { data: current } = await supabase
                 .from('analytics_visits')
-                .update({ last_seen_at: new Date().toISOString() })
-                .eq('session_id', sessionId);
+                .select('duration_seconds')
+                .eq('session_id', sessionId)
+                .single();
+
+            if (current) {
+                await supabase
+                    .from('analytics_visits')
+                    .update({
+                        last_seen_at: new Date().toISOString(),
+                        duration_seconds: (current.duration_seconds || 0) + 30
+                    })
+                    .eq('session_id', sessionId);
+            }
         }
         else if (type === 'click') {
-            // Increment click count safely
-            // Note: Postgres doesn't have a simple 'increment' in `update` via JS SDK easily without RPC
-            // So we fetch first or use a raw query. For stats, RPC is better, or simple read-write.
-            // Let's use RPC if possible, or just read-write for simplicity (concurrency not huge issue here).
-
             const { data: current } = await supabase
                 .from('analytics_visits')
                 .select('clicks')
@@ -77,8 +104,8 @@ export async function POST(req: NextRequest) {
                 await supabase
                     .from('analytics_visits')
                     .update({
-                        clicks: current.clicks + 1,
-                        last_seen_at: new Date().toISOString() // also update heartbeat
+                        clicks: (current.clicks || 0) + 1,
+                        last_seen_at: new Date().toISOString()
                     })
                     .eq('session_id', sessionId);
             }
