@@ -125,9 +125,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 console.log("Auth State Change:", event);
 
                 if (event === 'SIGNED_OUT') {
+                    // Double Check: Prevents race conditions in multi-tab scenarios where
+                    // one tab refreshing the token might briefly look like a sign-out to others.
+                    const { data: { session: currentSession } } = await supabase.auth.getSession();
+                    if (currentSession) {
+                        // False alarm, we are still logged in (refreshed by another tab)
+                        console.log("Ignored SIGNED_OUT event due to valid active session (Multi-tab race handled).");
+                        await syncProfile(currentSession);
+                        return;
+                    }
+
                     if (mounted) {
                         setUser(null);
                         setIsLoading(false);
+                        // Clear any local storage debris to be safe
+                        localStorage.removeItem('sb-' + process.env.NEXT_PUBLIC_SUPABASE_URL + '-auth-token');
                     }
                 }
                 else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') {
