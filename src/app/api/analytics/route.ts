@@ -73,14 +73,16 @@ export async function POST(req: NextRequest) {
             }
         }
         else if (type === 'heartbeat') {
+            const { duration = 5, clickCount = 0 } = body;
+
+            // Increment Duration
             await supabase.rpc('increment_analytics_duration', {
                 p_session_id: sessionId,
-                p_seconds: 30
+                p_seconds: duration
             });
 
-            // Handle batched clicks if sent with heartbeat
-            const { clickCount } = body;
-            if (clickCount && clickCount > 0) {
+            // Handle Batched Clicks
+            if (clickCount > 0) {
                 await supabase.rpc('increment_analytics_clicks_count', {
                     p_session_id: sessionId,
                     p_count: clickCount
@@ -88,7 +90,6 @@ export async function POST(req: NextRequest) {
             }
         }
         else if (type === 'click') {
-            // Fallback for immediate clicks if needed (or remove if fully batched)
             await supabase.rpc('increment_analytics_clicks', {
                 p_session_id: sessionId
             });

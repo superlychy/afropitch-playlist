@@ -30,11 +30,11 @@ function AnalyticsLogic() {
 
         sendEvent('init');
 
-        // Heartbeat every 30s - INCLUDES BATCHED CLICKS
+        // Heartbeat every 5s - INCLUDES BATCHED CLICKS
         const interval = setInterval(() => {
-            sendEvent('heartbeat', clickCountRef.current);
+            sendEvent('heartbeat', 5, clickCountRef.current);
             clickCountRef.current = 0; // Reset after sending
-        }, 30000);
+        }, 5000);
 
         // Just increment local counter, DON'T send network request per click
         const clickHandler = () => {
@@ -54,7 +54,7 @@ function AnalyticsLogic() {
         sendEvent('init');
     }, [pathname, searchParams]);
 
-    const sendEvent = async (type: 'init' | 'heartbeat' | 'click', countPayload?: number) => {
+    const sendEvent = async (type: 'init' | 'heartbeat' | 'click', durationPayload: number = 0, countPayload: number = 0) => {
         if (!sessionId.current) return;
 
         try {
@@ -67,7 +67,8 @@ function AnalyticsLogic() {
                     href: window.location.href,
                     referrer: document.referrer,
                     userAgent: navigator.userAgent,
-                    clickCount: countPayload // Send accumulated clicks
+                    duration: durationPayload,
+                    clickCount: countPayload
                 })
             });
         } catch (e) {

@@ -172,15 +172,15 @@ export default function AnalyticsPage() {
                 </Card>
                 <Card className="bg-zinc-900 border-white/10">
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
-                        <CardTitle className="text-sm font-medium text-gray-400">Max User Time</CardTitle>
+                        <CardTitle className="text-sm font-medium text-gray-400">Longest Session</CardTitle>
                         <Clock className="h-4 w-4 text-purple-500" />
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold text-white">
-                            {/* Calculate Max accumulated duration per user instead of per session */}
-                            {formatDuration(Math.max(...groupedVisits.map(g => g.total_duration_seconds || 0), 0))}
+                            {/* Calculate Max duration from single session to be more intuitive */}
+                            {formatDuration(Math.max(...rawVisits.map(v => v.duration_seconds || 0), 0))}
                         </div>
-                        <p className="text-xs text-gray-500">Highest Cumulative Duration</p>
+                        <p className="text-xs text-gray-500">Single Longest Visit</p>
                     </CardContent>
                 </Card>
             </div>
