@@ -4,6 +4,7 @@ import { siteConfig } from "@/../config/site";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { AIHelp } from "@/components/AIHelp";
+import { AnalyticsTracker } from "@/components/AnalyticsTracker";
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteConfig.url),
@@ -64,6 +65,7 @@ export default function RootLayout({
           </main>
           <Footer />
           <AIHelp />
+          <AnalyticsTracker />
         </AuthProvider>
         <script
           type="application/ld+json"

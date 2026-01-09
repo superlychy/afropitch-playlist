@@ -10,6 +10,7 @@ import { BarChart3, TrendingUp, Music, Users, Trophy, DollarSign, ShieldAlert, C
 import { supabase } from "@/lib/supabase";
 import { TransactionsList } from "@/components/TransactionsList";
 import { pricingConfig } from "@/../config/pricing";
+import AnalyticsPage from "./analytics/page";
 
 // ----------------------------------------------------------------------
 // TYPES & MOCK DATA (Ideally move to types file)
@@ -74,7 +75,7 @@ interface TopPlaylist {
 export default function AdminDashboard() {
     const { user, isLoading, logout } = useAuth();
     const router = useRouter();
-    const [activeTab, setActiveTab] = useState<"overview" | "users" | "withdrawals" | "transactions" | "support" | "playlists" | "applications" | "broadcast">("overview");
+    const [activeTab, setActiveTab] = useState<"overview" | "users" | "withdrawals" | "transactions" | "support" | "playlists" | "applications" | "broadcast" | "analytics">("overview");
 
     // DATA STATE
     const [usersList, setUsersList] = useState<AdminUser[]>([]);
@@ -858,7 +859,7 @@ export default function AdminDashboard() {
                     </div>
                     <div className="flex items-center gap-4">
                         <div className="flex bg-white/5 p-1 rounded-lg border border-white/10 hidden md:flex">
-                            {["overview", "users", "withdrawals", "transactions", "support", "playlists", "applications", "broadcast"].map((tab) => {
+                            {["overview", "analytics", "users", "withdrawals", "transactions", "support", "playlists", "applications", "broadcast"].map((tab) => {
                                 let count = 0;
                                 if (tab === 'withdrawals') count = pendingWithdrawalsCount;
                                 if (tab === 'support') count = openTicketsCount;
@@ -1021,6 +1022,13 @@ export default function AdminDashboard() {
                                 </CardContent>
                             </Card>
                         </div>
+                    </div>
+                )}
+
+                {/* ANALYTICS VIEW */}
+                {activeTab === "analytics" && (
+                    <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                        <AnalyticsPage />
                     </div>
                 )}
 

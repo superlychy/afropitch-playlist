@@ -27,7 +27,7 @@ export default function TrustPage() {
                     },
                     {
                         title: "Data Driven",
-                        desc: "We use AntiGravity's trusted platform to ensure secure handling of your submission data.",
+                        desc: "We use industry-standard encryption to ensure secure handling of your submission data.",
                         icon: BarChart
                     }
                 ].map((item, i) => (

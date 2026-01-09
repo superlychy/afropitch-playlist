@@ -15,12 +15,14 @@ create table if not exists public.curator_applications (
 alter table public.curator_applications enable row level security;
 
 -- Policy: Allow anyone (even anon) to submit an application
+drop policy if exists "Allow public insert application" on public.curator_applications;
 create policy "Allow public insert application"
   on public.curator_applications
   for insert
   with check (true);
 
 -- Policy: Only admins can view applications (or self if user_id is set)
+drop policy if exists "Admins view all applications" on public.curator_applications;
 create policy "Admins view all applications"
   on public.curator_applications
   for select

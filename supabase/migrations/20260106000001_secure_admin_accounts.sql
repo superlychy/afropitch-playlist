@@ -6,6 +6,7 @@ alter table public.admin_accounts enable row level security;
 -- and only allow specific service-role or admin access if needed.
 
 -- POLICY 1: DENY ALL (SAFE DEFAULT for internal tables)
+drop policy if exists "No public access" on public.admin_accounts;
 create policy "No public access"
   on public.admin_accounts
   for all
