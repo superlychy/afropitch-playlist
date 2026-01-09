@@ -44,14 +44,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         let mounted = true;
 
-        // Safety timeout to prevent infinite loading (User requested 6s)
-        const loadingTimeout = setTimeout(() => {
-            if (mounted && isLoading) {
-                console.warn("Auth check timed out (6s), forcing load completion.");
-                setIsLoading(false);
-            }
-        }, 6000);
-
         const syncProfile = async (session: any) => {
             if (!session?.user) {
                 if (mounted) setUser(null);
@@ -65,11 +57,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     .select('*')
                     .eq('id', session.user.id)
                     .single();
-
-                if (error && error.code !== 'PGRST116') {
-                    console.error("Profile fetch error:", error);
-                    // Do NOT logout here, just try to survive
-                }
 
                 if (profile && mounted) {
                     setUser({
@@ -87,37 +74,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     return;
                 }
 
-                // 2. If no profile or fetch failed, create/fallback
+                // 2. If fetch failed (network or missing), fallback to Session Data immediately
+                // This ensures they stay logged in even if DB is unreachable.
                 const role = session.user.user_metadata?.role || (session.user.email?.includes("curator") ? "curator" : "artist");
                 const name = session.user.user_metadata?.full_name || session.user.email?.split("@")[0] || "User";
 
-                // Only attempt insert if we really think it's missing (PGRST116) or just try blindly (upsert might be better but let's stick to logic)
-                // If it was a connection error, insert might also fail.
-                const newProfile = {
-                    id: session.user.id,
-                    email: session.user.email,
-                    full_name: name,
-                    role: role,
-                    balance: 0,
-                    verified: false
-                };
-
-                const { error: insertError } = await supabase
-                    .from('profiles')
-                    .insert([newProfile]);
-
-                if (!insertError && mounted) {
-                    setUser({
-                        id: newProfile.id,
-                        name: newProfile.full_name,
-                        email: newProfile.email || "",
-                        role: newProfile.role as UserRole,
-                        balance: newProfile.balance,
-                        earnings: 0
-                    });
-                } else if (mounted) {
-                    // Fallback to session data so user is technically "logged in" even if DB is flaky
-                    console.warn("Using session fallback due to DB error:", insertError || error);
+                if (mounted) {
+                    console.warn("Profile fetch failed or missing, using session fallback:", error);
                     setUser({
                         id: session.user.id,
                         name: name,
@@ -127,16 +90,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                         earnings: 0
                     });
                 }
-
             } catch (e) {
-                console.error("Profile sync truly unexpected error", e);
-                // Even here, keep them logged in if we have session
+                console.error("Profile sync exception:", e);
+                // Emergency Fallback
                 if (session?.user && mounted) {
                     setUser({
                         id: session.user.id,
                         name: session.user.email?.split("@")[0] || "User",
                         email: session.user.email || "",
-                        role: "artist", // Default to safe role
+                        role: "artist",
                         balance: 0,
                         earnings: 0
                     });
@@ -144,62 +106,49 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }
         };
 
-        const getSession = async () => {
-            let attempts = 0;
-            const maxAttempts = 3;
-
-            while (attempts < maxAttempts) {
-                try {
-                    const { data: { session }, error } = await supabase.auth.getSession();
-
-                    if (!error) {
-                        if (mounted) await syncProfile(session);
-                        break; // Success
-                    }
-
-                    console.warn(`getSession attempt ${attempts + 1} failed:`, error);
-                    attempts++;
-
-                    if (attempts < maxAttempts) {
-                        // Wait 1s before auto-retry (User requested "refresh automatically")
-                        await new Promise(r => setTimeout(r, 1000));
-                    } else {
-                        // Final failure after retries
-                        console.error("All auth attempts failed.");
-                        // We DO NOT signOut. We just let it be.
-                    }
-                } catch (err) {
-                    console.error("Auth Exception:", err);
-                    attempts++;
-                    if (attempts < maxAttempts) await new Promise(r => setTimeout(r, 1000));
-                }
-            }
-
+        // Initialize Auth State Logic
+        const initializeAuth = async () => {
+            // Check initial session
+            const { data: { session } } = await supabase.auth.getSession();
             if (mounted) {
-                clearTimeout(loadingTimeout);
+                if (session) {
+                    await syncProfile(session);
+                } else {
+                    setUser(null);
+                }
                 setIsLoading(false);
             }
+
+            // Listen for changes
+            const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+                console.log("Auth State Change:", event);
+
+                if (event === 'SIGNED_OUT') {
+                    if (mounted) {
+                        setUser(null);
+                        setIsLoading(false);
+                    }
+                }
+                else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') {
+                    if (session) {
+                        await syncProfile(session);
+                    }
+                    if (mounted) setIsLoading(false);
+                }
+            });
+
+            return subscription;
         };
 
-        getSession();
+        let subscription: { unsubscribe: () => void } | null = null;
 
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-            console.log("Auth State Change:", event);
-            if (event === 'SIGNED_OUT') {
-                if (mounted) {
-                    setUser(null);
-                    setIsLoading(false);
-                }
-            } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-                await syncProfile(session);
-                if (mounted) setIsLoading(false);
-            }
+        initializeAuth().then(sub => {
+            subscription = sub;
         });
 
         return () => {
             mounted = false;
-            clearTimeout(loadingTimeout);
-            subscription.unsubscribe();
+            if (subscription) subscription.unsubscribe();
         };
     }, []);
 

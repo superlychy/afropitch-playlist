@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -49,11 +49,18 @@ export default function PortalPage() {
     // Note: We use useEffect or router replacement usually, but doing it in render is okay for simple apps if guarded.
     // However, to avoid "Cannot update during render" warnings, let's use a small effect or just keep it simple.
     // The previous code had it in render. I'll stick to that but maybe safer.
-    if (user) {
-        if (user.role === 'admin') router.push("/dashboard/admin");
-        else if (user.role === 'curator') router.push("/dashboard/curator");
-        else router.push("/dashboard/artist");
-    }
+    // Redirect after login via Effect (Better for browser password saving)
+    useEffect(() => {
+        if (user) {
+            // Small delay to ensure browser acknowledges the "success" state for password saving
+            const timeout = setTimeout(() => {
+                if (user.role === 'admin') router.push("/dashboard/admin");
+                else if (user.role === 'curator') router.push("/dashboard/curator");
+                else router.push("/dashboard/artist");
+            }, 100);
+            return () => clearTimeout(timeout);
+        }
+    }, [user, router]);
 
     // If user is already logged in, show welcome (as fallback if redirect is slow)
     if (user) {
