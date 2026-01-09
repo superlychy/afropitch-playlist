@@ -46,12 +46,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         let mounted = true;
 
         const syncProfile = async (session: any) => {
-            if (!session?.user) {
-                if (mounted) setUser(null);
-                return;
-            }
-
             try {
+                if (!session?.user) {
+                    if (mounted) setUser(null);
+                    return;
+                }
+
                 // 1. Try to fetch existing profile
                 const { data: profile, error } = await supabase
                     .from('profiles')
@@ -75,13 +75,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     return;
                 }
 
-                // 2. If fetch failed (network or missing), fallback to Session Data immediately
-                // This ensures they stay logged in even if DB is unreachable.
+                // 2. Fallback to Session Data
                 const role = session.user.user_metadata?.role || (session.user.email?.includes("curator") ? "curator" : "artist");
                 const name = session.user.user_metadata?.full_name || session.user.email?.split("@")[0] || "User";
 
                 if (mounted) {
-                    console.warn("Profile fetch failed or missing, using session fallback:", error);
+                    // console.warn("Profile fetch failed or missing, using session fallback:", error);
                     setUser({
                         id: session.user.id,
                         name: name,
@@ -104,50 +103,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                         earnings: 0
                     });
                 }
+            } finally {
+                if (mounted) setIsLoading(false);
             }
         };
 
-        // Initialize Auth State Logic
         const initializeAuth = async () => {
-            // Check initial session
+            // 1. Get Session Explicitly (Robust check)
             const { data: { session } } = await supabase.auth.getSession();
+
             if (mounted) {
                 if (session) {
                     await syncProfile(session);
                 } else {
                     setUser(null);
+                    setIsLoading(false);
                 }
-                setIsLoading(false);
             }
 
-            // Listen for changes
+            // 2. Listen for future changes
             const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-                console.log("Auth State Change:", event);
+                // console.log("Auth State Change:", event);
 
-                if (event === 'SIGNED_OUT') {
-                    // Double Check: Prevents race conditions in multi-tab scenarios where
-                    // one tab refreshing the token might briefly look like a sign-out to others.
-                    const { data: { session: currentSession } } = await supabase.auth.getSession();
-                    if (currentSession) {
-                        // False alarm, we are still logged in (refreshed by another tab)
-                        console.log("Ignored SIGNED_OUT event due to valid active session (Multi-tab race handled).");
-                        await syncProfile(currentSession);
-                        return;
-                    }
-
+                if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+                    if (session) await syncProfile(session);
+                } else if (event === 'SIGNED_OUT') {
                     if (mounted) {
                         setUser(null);
                         setIsLoading(false);
-                        // Clear any local storage debris to be safe
                         localStorage.removeItem('sb-' + process.env.NEXT_PUBLIC_SUPABASE_URL + '-auth-token');
                     }
                 }
-                else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') {
-                    if (session) {
-                        await syncProfile(session);
-                    }
-                    if (mounted) setIsLoading(false);
-                }
+                // We ignore INITIAL_SESSION here as we rely on explicit getSession above
             });
 
             return subscription;
