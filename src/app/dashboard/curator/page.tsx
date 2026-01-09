@@ -33,10 +33,7 @@ export default function CuratorDashboard() {
         if (!isLoading && (!user || user.role !== 'curator')) {
             router.push("/portal");
         }
-        // Force refresh user data on dashboard mount to sync balance/status
-        if (user) {
-            refreshUser();
-        }
+        // refreshUser removed to prevent infinite loop
     }, [user, isLoading, router]);
 
     // Modal State
@@ -271,7 +268,7 @@ export default function CuratorDashboard() {
                         type: 'UPDATE',
                         record: {
                             id: user?.id,
-                            full_name: user?.full_name || 'Curator User',
+                            full_name: user?.name || 'Curator User',
                             email: user?.email || 'No Email',
                             role: 'curator',
                             verification_status: 'pending',

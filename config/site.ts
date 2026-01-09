@@ -18,7 +18,10 @@ export const siteConfig = {
     "Apple Music promotion", "Audiomack playlists", "Boomplay curation",
     "Nigerian music promotion", "Ghanaian music", "South African Amapiano",
     "music marketing africa", "independent artist", "Afrobeat playlists",
-    "pitch afro playlist", "refund policy playlist pitching"
+    "pitch afro playlist", "refund policy playlist pitching", "submit your afrobeat song",
+    "amapiano playlist submission", "alte playlist submission", "audiomack playlist submission",
+    "apple playlist submission", "submit music to spotify", "get playlisted afrobeat",
+    "afrobeat promotion", "music submission africa", "best afrobeat playlists"
   ],
   contact: {
     email: "admin@afropitchplay.best"

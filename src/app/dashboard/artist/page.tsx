@@ -42,12 +42,12 @@ export default function ArtistDashboard() {
     const router = useRouter();
     const [amount, setAmount] = useState("");
 
-    // Force sync on mount
-    useEffect(() => {
+    // Force sync on mount - removed to prevent infinite loop
+    /* useEffect(() => {
         if (user) {
             refreshUser();
         }
-    }, [user]);
+    }, [user]); */
 
     // Profile Modal State
     const [showProfile, setShowProfile] = useState(false);

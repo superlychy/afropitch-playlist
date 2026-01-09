@@ -70,7 +70,7 @@ export default function Home() {
               href="/submit"
               className="px-8 py-4 rounded-full bg-green-600 hover:bg-green-700 text-white font-bold text-lg flex items-center gap-2 transition-all shadow-[0_0_20px_rgba(22,163,74,0.3)] hover:shadow-[0_0_30px_rgba(22,163,74,0.5)]"
             >
-              Pitch Your Music
+              Submit Your Music
             </Link>
             <Link
               href="/portal?role=curator"
