@@ -30,6 +30,7 @@ interface AuthContextType {
     loadFunds: (amount: number) => void;
     deductFunds: (amount: number) => boolean;
     addEarnings: (amount: number) => void;
+    refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -221,8 +222,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser({ ...user, earnings: user.earnings + amount });
     }
 
+    const refreshUser = async () => {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+            // Re-fetch profile
+            const { data: profile } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', session.user.id)
+                .single();
+
+            if (profile) {
+                setUser(prev => prev ? ({ ...prev, balance: profile.balance, role: profile.role }) : null);
+            }
+        }
+    };
+
     return (
-        <AuthContext.Provider value={{ user, isLoading, login, signup, logout, loadFunds, deductFunds, addEarnings }}>
+        <AuthContext.Provider value={{ user, isLoading, login, signup, logout, loadFunds, deductFunds, addEarnings, refreshUser }}>
             {children}
         </AuthContext.Provider>
     );
