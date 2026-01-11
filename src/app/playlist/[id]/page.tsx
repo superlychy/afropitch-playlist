@@ -100,10 +100,12 @@ export default function PlaylistDetail() {
                         </div>
 
                         <div className="flex flex-wrap gap-6 text-sm text-gray-400 border-y border-white/10 py-6">
-                            <div className="flex flex-col">
-                                <span className="text-white font-bold text-lg">{playlist.followers.toLocaleString()}</span>
-                                <span>Followers</span>
-                            </div>
+                            {(playlist.followers > 0) && (
+                                <div className="flex flex-col">
+                                    <span className="text-white font-bold text-lg">{playlist.followers.toLocaleString()}</span>
+                                    <span>Followers</span>
+                                </div>
+                            )}
                             {songCount > 0 && (
                                 <div className="flex flex-col">
                                     <span className="text-white font-bold text-lg">{songCount}</span>
