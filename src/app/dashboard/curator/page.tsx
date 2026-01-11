@@ -131,7 +131,11 @@ export default function CuratorDashboard() {
 
     const fetchCuratorData = async () => {
         if (!user) return;
-        setLoadingReviews(true);
+
+        // Only show loading state if we don't have data yet
+        if (reviews.length === 0) {
+            setLoadingReviews(true);
+        }
 
         // 1. Fetch Playlists with submission counts
         const { data: playlists, error: plError } = await supabase

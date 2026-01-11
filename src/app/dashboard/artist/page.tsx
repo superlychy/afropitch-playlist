@@ -111,7 +111,12 @@ export default function ArtistDashboard() {
 
     const fetchSubmissions = async () => {
         if (!user) return;
-        setLoadingSubmissions(true);
+
+        // Only show loading spinner on initial load (if we have no data yet)
+        if (submissions.length === 0) {
+            setLoadingSubmissions(true);
+        }
+
         // Fetch submissions with playlist details
         const { data, error } = await supabase
             .from('submissions')
@@ -130,8 +135,9 @@ export default function ArtistDashboard() {
         if (error) {
             console.error("Error fetching submissions:", error);
         } else {
-            setSubmissions(data as any); // Cast to any because the join structure might be tricky for TS inference without generated types
+            setSubmissions(data as any);
         }
+
         setLoadingSubmissions(false);
     };
 

@@ -587,8 +587,16 @@ export default function AdminDashboard() {
                 }).eq('id', playlist.id);
 
                 if (error) throw error;
+
+                // Update local state without reload
+                setAllPlaylists(prev => prev.map(p => p.id === playlist.id ? {
+                    ...p,
+                    name: data.name,
+                    followers: data.followers,
+                    // Optional: update cover_image and description in local state if we tracked it fully
+                } : p));
+
                 alert(`Playlist "${data.name}" updated successfully!`);
-                window.location.reload();
             } else {
                 throw new Error(data.error || "Unknown validation error");
             }
