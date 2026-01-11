@@ -2,7 +2,7 @@
 
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { DollarSign, CheckCircle, XCircle, Clock, Settings, User, Plus, ListMusic, MoreVertical, Star, Zap, HelpCircle, Send, LogOut, Trash2, Edit, MessageSquare, ChevronLeft, AlertCircle, Bell, RefreshCw } from "lucide-react";
@@ -126,14 +126,13 @@ export default function CuratorDashboard() {
     const [reviews, setReviews] = useState<any[]>([]);
     const [loadingReviews, setLoadingReviews] = useState(true);
     const [isRefreshing, setIsRefreshing] = useState<string | null>(null);
+    const hasFetched = useRef(false);
 
-
-
-    const fetchCuratorData = async (isRefetch = false) => {
+    const fetchCuratorData = useCallback(async (isRefetch = false) => {
         if (!user) return;
 
-        // Only show loading state if we don't have data yet and it's not a background refetch
-        if (reviews.length === 0 && !isRefetch) {
+        // Only show loading state on very first fetch for this session
+        if (!hasFetched.current && !isRefetch) {
             setLoadingReviews(true);
         }
 
@@ -196,15 +195,16 @@ export default function CuratorDashboard() {
                     });
                 }
             } else {
-                // reset if no playlists
+                // reset if no playlists found
                 setReviews([]);
             }
         } catch (error) {
             console.error("Error fetching curator data:", error);
         } finally {
             setLoadingReviews(false);
+            hasFetched.current = true;
         }
-    };
+    }, [user]);
 
     const [verificationStatus, setVerificationStatus] = useState<"none" | "pending" | "verified" | "rejected">("none");
 
@@ -310,7 +310,7 @@ export default function CuratorDashboard() {
     };
 
     useEffect(() => {
-        if (user) {
+        if (user?.id) {
             // ... existing profile setters
             setProfileBio(user.bio || "");
             setProfileIg(user.instagram || "");
@@ -350,7 +350,7 @@ export default function CuratorDashboard() {
                 supabase.removeChannel(channel);
             };
         }
-    }, [user]);
+    }, [user?.id, fetchCuratorData]);
 
     const handleWithdraw = async () => {
         if (!user) return;

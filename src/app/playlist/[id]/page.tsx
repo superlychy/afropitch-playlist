@@ -53,6 +53,17 @@ export default function PlaylistDetail() {
     const songCountMatch = (playlist.description || "").match(/(\d+)\s+(songs|items|tracks)/i);
     const songCount = songCountMatch ? parseInt(songCountMatch[1]) : 0;
 
+    const getPlatformName = (link: string) => {
+        if (!link) return 'Playlist';
+        if (link.includes('spotify.com')) return 'Spotify';
+        if (link.includes('audiomack.com')) return 'Audiomack';
+        if (link.includes('apple.com')) return 'Apple Music';
+        if (link.includes('deezer.com')) return 'Deezer';
+        if (link.includes('soundcloud.com')) return 'SoundCloud';
+        if (link.includes('youtube.com') || link.includes('youtu.be')) return 'YouTube';
+        return 'Playlist';
+    };
+
     return (
         <div className="min-h-screen bg-black text-white pb-20">
             {/* Nav Back */}
@@ -123,7 +134,7 @@ export default function PlaylistDetail() {
                             {playlist.playlist_link && (
                                 <a href={playlist.playlist_link} target="_blank" rel="noreferrer">
                                     <Button variant="outline" className="h-12 border-white/20 hover:bg-white/10 gap-2">
-                                        Open in Spotify <ExternalLink className="w-4 h-4" />
+                                        Open in {getPlatformName(playlist.playlist_link)} <ExternalLink className="w-4 h-4" />
                                     </Button>
                                 </a>
                             )}
@@ -148,3 +159,4 @@ export default function PlaylistDetail() {
         </div>
     )
 }
+
