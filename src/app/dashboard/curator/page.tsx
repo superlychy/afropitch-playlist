@@ -129,88 +129,81 @@ export default function CuratorDashboard() {
 
 
 
-    const fetchCuratorData = async () => {
+    const fetchCuratorData = async (isRefetch = false) => {
         if (!user) return;
 
-        // Only show loading state if we don't have data yet
-        if (reviews.length === 0) {
+        // Only show loading state if we don't have data yet and it's not a background refetch
+        if (reviews.length === 0 && !isRefetch) {
             setLoadingReviews(true);
         }
 
-        // 1. Fetch Playlists with submission counts
-        const { data: playlists, error: plError } = await supabase
-            .from('playlists')
-            .select(`
-    *,
-    playlist_link,
-    submissions: submissions(count)
-        `)
-            .eq('curator_id', user.id);
-
-        if (playlists) {
-            // Map to include count. Note: supabase .select(..., submissions(count)) returns an array of objects for count if using exact count, or we need to parse it.
-            // Actually 'submissions(count)' with head:false etc returns array. 
-            // Simplified: we can just fetch and map.
-            const mapped = playlists.map((p: any) => ({
-                ...p,
-                submissions: p.submissions?.[0]?.count || 0 // If using count aggregating, or just length if fetching all.
-                // Wait, select count needs careful syntax. 
-                // Alternative: just fetch all playlists, then fetch logic. 
-                // For now, let's assume 'submissions' is a count or we just set 0 if complex.
-                // Let's rely on a separate query or loose approximation if simplicity is key.
-                // Actually, let's just use 0 or 'active' count.
-            }));
-
-            // Re-fetch accurate counts
-            const { data: counts } = await supabase.from('submissions').select('playlist_id, status');
-            // Client side aggregate for simplicity with small data
-            const plCounts: Record<string, number> = {};
-            counts?.forEach((c: any) => {
-                if (c.status === 'pending') {
-                    plCounts[c.playlist_id] = (plCounts[c.playlist_id] || 0) + 1;
-                }
-            });
-
-            setMyPlaylists(playlists.map((p: any) => ({
-                ...p,
-                submissions: plCounts[p.id] || 0
-            })) as any);
-        }
-
-        // 2. Fetch Submissions (Reviews) for my playlists
-        // We find submissions where playlist_id is in my playlists
-        // Re-fetch simpler playlist list for IDs if needed, or use the one above.
-        const playlistIds = playlists?.map((p: any) => p.id) || [];
-
-        if (playlistIds.length > 0) {
-            const { data: subs, error } = await supabase
-                .from('submissions')
+        try {
+            // 1. Fetch Playlists with submission counts
+            const { data: playlists, error: plError } = await supabase
+                .from('playlists')
                 .select(`
-        *,
-        artist: profiles(full_name, bio, instagram, twitter, website),
-            playlist: playlists(name)
-            `)
-                .in('playlist_id', playlistIds)
-                .order('created_at', { ascending: false });
+                    *,
+                    playlist_link,
+                    submissions: submissions(count)
+                `)
+                .eq('curator_id', user.id);
 
-            if (subs) {
-                // Filter only relevant ones for "Incoming" if desired, or show all. 
-                // Usually dashboard shows Pending primarily or Recent.
-                setReviews(subs);
+            if (playlists) {
+                // Re-fetch accurate counts
+                const { data: counts } = await supabase.from('submissions').select('playlist_id, status');
+                // Client side aggregate for simplicity with small data
+                const plCounts: Record<string, number> = {};
+                if (counts) {
+                    counts.forEach((c: any) => {
+                        if (c.status === 'pending') {
+                            plCounts[c.playlist_id] = (plCounts[c.playlist_id] || 0) + 1;
+                        }
+                    });
+                }
 
-                // Calculate Stats
-                const revenue = subs.filter(s => s.status === 'accepted' || s.status === 'declined').reduce((acc, curr) => acc + curr.amount_paid, 0);
-                const pending = subs.filter(s => s.status === 'pending').length;
-                const total = subs.length;
-
-                setStats({
-                    revenue,
-                    pending,
-                    total_reviews: total
-                });
+                setMyPlaylists(playlists.map((p: any) => ({
+                    ...p,
+                    submissions: plCounts[p.id] || 0
+                })) as any);
             }
+
+            // 2. Fetch Submissions (Reviews) for my playlists
+            const playlistIds = playlists?.map((p: any) => p.id) || [];
+
+            if (playlistIds.length > 0) {
+                const { data: subs, error } = await supabase
+                    .from('submissions')
+                    .select(`
+                        *,
+                        artist: profiles(full_name, bio, instagram, twitter, website),
+                        playlist: playlists(name)
+                    `)
+                    .in('playlist_id', playlistIds)
+                    .order('created_at', { ascending: false });
+
+                if (subs) {
+                    setReviews(subs);
+
+                    // Calculate Stats
+                    const revenue = subs.filter(s => s.status === 'accepted' || s.status === 'declined').reduce((acc, curr) => acc + curr.amount_paid, 0);
+                    const pending = subs.filter(s => s.status === 'pending').length;
+                    const total = subs.length;
+
+                    setStats({
+                        revenue,
+                        pending,
+                        total_reviews: total
+                    });
+                }
+            } else {
+                // reset if no playlists
+                setReviews([]);
+            }
+        } catch (error) {
+            console.error("Error fetching curator data:", error);
+        } finally {
+            setLoadingReviews(false);
         }
-        setLoadingReviews(false);
     };
 
     const [verificationStatus, setVerificationStatus] = useState<"none" | "pending" | "verified" | "rejected">("none");
@@ -339,6 +332,23 @@ export default function CuratorDashboard() {
 
             fetchCuratorData();
             fetchNotifications(); // Add this
+
+            // Realtime Subscription
+            const channel = supabase
+                .channel('curator-dashboard-updates')
+                .on(
+                    'postgres_changes',
+                    { event: '*', schema: 'public', table: 'submissions' },
+                    (payload) => {
+                        // Refetch nicely without UI toggle flicker
+                        fetchCuratorData(true);
+                    }
+                )
+                .subscribe();
+
+            return () => {
+                supabase.removeChannel(channel);
+            };
         }
     }, [user]);
 
