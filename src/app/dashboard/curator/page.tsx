@@ -684,7 +684,7 @@ export default function CuratorDashboard() {
 
     // Auto-fetch info using our internal API
     useEffect(() => {
-        if (newPlaylistLink.includes("spotify.com") && !newName) {
+        if (newPlaylistLink && !newName) {
             const fetchInfo = async () => {
                 setIsFetchingInfo(true);
                 try {
@@ -715,7 +715,8 @@ export default function CuratorDashboard() {
 
             // Debounce slightly to avoid rapid requests
             const timeoutId = setTimeout(() => {
-                fetchInfo();
+                // strict check for url validity optionally
+                if (newPlaylistLink.includes("http")) fetchInfo();
             }, 500);
 
             return () => clearTimeout(timeoutId);

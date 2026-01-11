@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
         let followers = 0;
         let songsCount = 0;
 
-        // METHOD 1: Direct HTML Scraping (Fastest, avoids some rate limits)
+        // METHOD 1: Direct HTML Scraping (Works for Spotify, Audiomack, Apple Music, etc.)
         try {
             const response = await fetch(url, {
                 headers: {
@@ -27,46 +27,62 @@ export async function POST(req: NextRequest) {
             });
             const htmlText = await response.text();
 
-            // Meta Tags
-            const titleMatch = htmlText.match(/<meta property="og:title" content="([^"]*)"/);
-            const descMatch = htmlText.match(/<meta property="og:description" content="([^"]*)"/);
-            const imageMatch = htmlText.match(/<meta property="og:image" content="([^"]*)"/);
+            // 1. Generic Open Graph Parsing (Fallback for all)
+            const getMeta = (prop: string) => {
+                const match = htmlText.match(new RegExp(`<meta property="${prop}" content="([^"]*)"`, 'i')) ||
+                    htmlText.match(new RegExp(`<meta name="${prop}" content="([^"]*)"`, 'i'));
+                return match ? match[1] : "";
+            };
 
-            name = titleMatch ? titleMatch[1].replace(/ \| Spotify Playlist$/i, '').trim() : "";
-            description = descMatch ? descMatch[1] : "";
-            coverImage = imageMatch ? imageMatch[1] : "";
+            name = getMeta("og:title");
+            description = getMeta("og:description");
+            coverImage = getMeta("og:image");
 
-            // Parse Description: "Listen on Spotify: ... · 123,456 likes · 50 songs"
-            if (description) {
-                // Likes/Followers
-                const followersMatch = description.match(/([\d,.]+[KMB]?)\s+(likes|followers|saves)/i);
-                if (followersMatch) {
-                    let valStr = followersMatch[1].replace(/,/g, '');
-                    if (valStr.toUpperCase().includes('K')) followers = parseFloat(valStr) * 1000;
-                    else if (valStr.toUpperCase().includes('M')) followers = parseFloat(valStr) * 1000000;
-                    else followers = parseInt(valStr, 10);
-                }
+            // Clean up Name
+            name = name.replace(/ \| Spotify Playlist$/i, '')
+                .replace(/ \| Audiomack$/i, '')
+                .replace(/ on Audiomack$/i, '')
+                .trim();
 
-                // Songs/Tracks
-                const songsMatch = description.match(/([\d,]+)\s+(songs|tracks)/i);
-                if (songsMatch) {
-                    songsCount = parseInt(songsMatch[1].replace(/,/g, ''), 10);
+            // 2. Platform Specific Stats Parsing
+            if (url.includes("spotify.com")) {
+                if (description) {
+                    // Spotify: "Listen on Spotify: ... · 123,456 likes · 50 songs"
+                    const followersMatch = description.match(/([\d,.]+[KMB]?)\s+(likes|followers|saves)/i);
+                    if (followersMatch) followers = parseCount(followersMatch[1]);
+
+                    const songsMatch = description.match(/([\d,]+)\s+(songs|tracks)/i);
+                    if (songsMatch) songsCount = parseInt(songsMatch[1].replace(/,/g, ''), 10);
                 }
             }
+            else if (url.includes("audiomack.com")) {
+                // Audiomack usually has stats in description or specific schema
+                // Description often: "Stream ... by ... on desktop and mobile. Play over 265 million tracks..." - generic
+                // We might need to look for specific patterns in HTML body if OG tags don't have stats.
+                // Audiomack often puts stats in title or description isn't reliable for stats on OG.
+                // Let's try to find stats in the raw HTML if possible, or default to 0.
+
+                // Audiomack specific scraping often requires looking for specific JSON blobs or counting elements which is flaky on simple scrape.
+                // However, sometimes description contains "X plays, Y favorites".
+                // Let's attempt generic parse from description just in case.
+                const favoritesMatch = description.match(/([\d,.]+[KMB]?)\s+(favorites|likes)/i);
+                if (favoritesMatch) followers = parseCount(favoritesMatch[1]);
+
+                // If name is still empty, fallback
+                if (!name) name = "Audiomack Playlist";
+            }
+
         } catch (err) {
-            console.warn("Direct scrape failed, trying library fallback...", err);
+            console.warn("Direct scrape failed:", err);
         }
 
-        // METHOD 2: spotify-url-info Fallback (If Method 1 failed or returned incomplete data)
-        if (!name || songsCount === 0) {
+        // METHOD 2: Library Fallback (Spotify Only)
+        if ((!name || songsCount === 0) && url.includes("spotify.com")) {
             try {
-                // Note: getDetails often fails in serverless if not polyfilled correctly, but worth a try as fallback
                 const data = await getDetails(url);
                 if (data) {
                     if (!name) name = data.preview?.title || data.title || "";
                     if (!coverImage) coverImage = data.preview?.image || data.image || "";
-
-                    // Library might return 'tracks' array or count
                     // @ts-ignore
                     if (songsCount === 0 && data.tracks) {
                         // @ts-ignore
@@ -74,14 +90,13 @@ export async function POST(req: NextRequest) {
                     }
                 }
             } catch (libErr) {
-                console.warn("Library fallback also failed:", libErr);
+                console.warn("Library fallback failed:", libErr);
             }
         }
 
-        // Final sanity check defaults
+        // Final Defaults
         if (!name) name = "Imported Playlist";
-
-        console.log("Result:", { name, followers, songsCount });
+        if (!coverImage) coverImage = "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=300&h=300&fit=crop";
 
         return NextResponse.json({
             name,
@@ -96,4 +111,13 @@ export async function POST(req: NextRequest) {
         console.error("API Error:", error);
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
+}
+
+function parseCount(str: string): number {
+    if (!str) return 0;
+    const valStr = str.replace(/,/g, '').trim().toUpperCase();
+    if (valStr.endsWith('K')) return parseFloat(valStr) * 1000;
+    if (valStr.endsWith('M')) return parseFloat(valStr) * 1000000;
+    if (valStr.endsWith('B')) return parseFloat(valStr) * 1000000000;
+    return parseFloat(valStr) || 0;
 }
