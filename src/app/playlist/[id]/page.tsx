@@ -96,7 +96,7 @@ export default function PlaylistDetail() {
                         <div>
                             <span className="text-green-500 font-bold tracking-wider text-sm uppercase mb-2 block">{playlist.genre}</span>
                             <h1 className="text-4xl md:text-5xl font-bold mb-4">{playlist.name}</h1>
-                            <p className="text-xl text-gray-300 max-w-2xl">{playlist.description}</p>
+                            <p className="text-xl text-gray-300 max-w-2xl">{playlist.description?.replace(/\s*·\s*0\s+saves/gi, '')}</p>
                         </div>
 
                         <div className="flex flex-wrap gap-6 text-sm text-gray-400 border-y border-white/10 py-6">

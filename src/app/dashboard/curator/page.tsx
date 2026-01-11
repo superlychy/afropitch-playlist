@@ -539,13 +539,15 @@ export default function CuratorDashboard() {
             cover_image: newCoverImage,
             followers: newFollowers,
             type: newPlaylistType,
-            description: songsCount > 0
-                ? `Playlist · ${user.name || 'Curator'} · ${songsCount} items · ${newFollowers.toLocaleString()} saves`
-                : `Playlist · ${user.name || 'Curator'} · ${newFollowers.toLocaleString()} saves`,
+            description: (() => {
+                let desc = `Playlist · ${user.name || 'Curator'}`;
+                if (songsCount > 0) desc += ` · ${songsCount} items`;
+                if (newFollowers > 0) desc += ` · ${newFollowers.toLocaleString()} saves`;
+                return desc;
+            })(),
             playlist_link: newPlaylistLink
         };
 
-        let error;
         if (editingPlaylist) {
             // Update
             const { error: updateError } = await supabase.from('playlists').update(payload).eq('id', editingPlaylist.id);
@@ -574,15 +576,10 @@ export default function CuratorDashboard() {
         setEditingPlaylist(playlist);
         setNewName(playlist.name);
         setNewPlaylistLink(playlist.playlist_link || "");
-        setNewGenre(""); // We don't fetch genre in list currently, might need update 'fetchCuratorData' or assume empty
-        // Actually interface Playlist doesn't show genre. We should update Playlist interface soon but for now let's hope it's not essential or user re-enters it.
-        // Or better, let's fetch it or update interface.
-        // Interface update: added 'genre' to line 16? No, let's check.
-        // For now, allow edit name/type mainly.
+        setNewGenre("");
         setNewFollowers(playlist.followers);
         setNewPlaylistType(playlist.type);
         setNewCoverImage(playlist.cover_image);
-        // We need to parse songs count from description if possible, or just leave 0
         setSongsCount(0);
         setShowAddPlaylist(true);
     };
@@ -595,13 +592,11 @@ export default function CuratorDashboard() {
         if (error) {
             alert("Error deleting playlist: " + error.message);
         } else {
-            // Optimistic remove
             setMyPlaylists(prev => prev.filter(p => p.id !== id));
         }
     };
 
     const toggleRankingBoost = async (submissionId: string) => {
-        // Toggle boost
         const sub = playlistSongs.find(s => s.id === submissionId);
         if (!sub) return;
 
@@ -615,7 +610,6 @@ export default function CuratorDashboard() {
         if (error) {
             alert("Error updating ranking: " + error.message);
         } else {
-            // Optimistic update
             setPlaylistSongs(prev => prev.map(s => s.id === submissionId ? { ...s, ranking_boosted_at: newVal } : s));
             if (newVal) alert("Artist notified of ranking boost!");
         }
@@ -629,7 +623,6 @@ export default function CuratorDashboard() {
         setExpandedPlaylistId(playlistId);
         setIsLoadingSongs(true);
 
-        // Fetch accepted songs for this playlist
         const { data } = await supabase
             .from('submissions')
             .select('*')
@@ -662,9 +655,12 @@ export default function CuratorDashboard() {
                     name: data.name,
                     cover_image: data.cover_image,
                     followers: data.followers,
-                    description: data.songsCount > 0
-                        ? `Playlist · ${user?.name || 'Curator'} · ${data.songsCount} items · ${data.followers.toLocaleString()} saves`
-                        : `Playlist · ${user?.name || 'Curator'} · ${data.followers.toLocaleString()} saves`
+                    description: (() => {
+                        let desc = `Playlist · ${user?.name || 'Curator'}`;
+                        if (data.songsCount > 0) desc += ` · ${data.songsCount} items`;
+                        if (data.followers > 0) desc += ` · ${data.followers.toLocaleString()} saves`;
+                        return desc;
+                    })()
                 }).eq('id', playlist.id);
 
                 if (error) throw error;

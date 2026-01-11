@@ -244,7 +244,7 @@ export default function PlaylistsPage() {
 
                                                 <div className="p-5 space-y-4 flex-1 flex flex-col">
                                                     <p className="text-sm text-gray-400 line-clamp-2">
-                                                        {(playlist.description && !playlist.description.match(/^0\s+(songs|items)/i)) ? playlist.description : "No description available."}
+                                                        {(playlist.description && !playlist.description.match(/^0\s+(songs|items)/i)) ? playlist.description.replace(/\s*·\s*0\s+saves/gi, '') : "No description available."}
                                                     </p>
                                                     <div className="flex items-center justify-between text-sm text-gray-400">
                                                         {(playlist.followers > 0) && (
