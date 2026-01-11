@@ -247,7 +247,9 @@ export default function PlaylistsPage() {
                                                         {(playlist.description && !playlist.description.match(/^0\s+(songs|items)/i)) ? playlist.description : "No description available."}
                                                     </p>
                                                     <div className="flex items-center justify-between text-sm text-gray-400">
-                                                        <span className="flex items-center gap-1.5"><Users className="w-4 h-4" /> {playlist.followers.toLocaleString()}</span>
+                                                        {(playlist.followers > 0) && (
+                                                            <span className="flex items-center gap-1.5"><Users className="w-4 h-4" /> {playlist.followers.toLocaleString()}</span>
+                                                        )}
                                                         {(playlist.songCount || 0) > 0 && <span className="text-xs bg-white/10 px-2 py-1 rounded-full">{playlist.songCount} Items</span>}
                                                     </div>
 
