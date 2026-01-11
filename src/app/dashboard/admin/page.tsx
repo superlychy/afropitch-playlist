@@ -277,6 +277,7 @@ export default function AdminDashboard() {
             const { data: topClicks } = await supabase
                 .from('submissions')
                 .select('*, artist:profiles!artist_id(full_name), playlist:playlists(name)')
+                .neq('status', 'declined') // Exclude declined songs
                 .order('clicks', { ascending: false })
                 .limit(5);
 

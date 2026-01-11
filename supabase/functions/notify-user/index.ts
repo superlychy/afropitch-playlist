@@ -184,13 +184,16 @@ async function handleSubmissionUpdate(record: any) {
 
     if (record.status === 'accepted') {
         const subject = `Congratulations! Your song was approved for ${playlistName}`;
+        const trackingLink = record.tracking_slug ? `${SITE_URL}/track/${record.tracking_slug}` : `${SITE_URL}/dashboard/artist`;
+
         const html = getSongApprovedTemplate({
             name: user.full_name || 'Artist',
             songTitle: record.song_title,
             playlistName: playlistName,
             curatorName: curatorName,
             playlistLink: playlistLink,
-            dashboardLink: `${SITE_URL}/dashboard/artist`
+            dashboardLink: `${SITE_URL}/dashboard/artist`,
+            trackingLink: trackingLink
         });
         await sendEmail(user.email, subject, html);
     }

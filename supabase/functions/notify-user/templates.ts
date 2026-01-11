@@ -63,6 +63,7 @@ export const getSongApprovedTemplate = (data: {
     curatorName: string;
     playlistLink: string;
     dashboardLink: string;
+    trackingLink: string;
 }) => `
 <!DOCTYPE html>
 <html>
@@ -76,6 +77,7 @@ export const getSongApprovedTemplate = (data: {
         .tip-box { background-color: #2a2a2a; border-left: 4px solid #f59e0b; padding: 15px; margin-top: 20px; font-size: 14px; }
         .button { display: inline-block; padding: 12px 24px; background-color: #22c55e; color: #000; text-decoration: none; border-radius: 5px; font-weight: bold; margin-top: 20px; }
         .footer { padding: 20px; text-align: center; font-size: 12px; color: #666; background-color: #111; border-top: 1px solid #333; }
+        .share-link { background: #000; color: #22c55e; padding: 10px; border: 1px solid #333; border-radius: 4px; font-family: monospace; word-break: break-all; margin: 10px 0; display: block; text-decoration: none; text-align: center;}
     </style>
 </head>
 <body>
@@ -95,15 +97,19 @@ export const getSongApprovedTemplate = (data: {
 
             <div class="tip-box">
                 <strong>📈 HOW TO RANK HIGHER (IMPORTANT):</strong>
+                <p style="margin-top: 10px;">To grow and get ranked higher on the playlist, you <strong>must copy and share your unique tracking link</strong> below.</p>
+                
+                <a href="${data.trackingLink}" class="share-link">${data.trackingLink}</a>
+                <p style="font-size: 12px; text-align: center; color: #777;">(Copy this link to share)</p>
+
                 <ul style="margin: 10px 0; padding-left: 20px;">
                     <li><strong>Share the Link:</strong> We track traffic! Post the playlist link on your Instagram Stories, Twitter, and TikTok. Tag us @AfroPitch!</li>
                     <li><strong>Encourage Saves:</strong> Ask your fans to "Like" the playlist and "Save" your song. This signals our algorithm to boost your track to higher positions.</li>
-                    <li><strong>Stay Active:</strong> Curators love active community members. Stream the playlist to support other artists.</li>
                 </ul>
             </div>
 
             <center>
-                <a href="${data.playlistLink}" class="button">Listen to Playlist</a>
+                <a href="${data.dashboardLink}" class="button">View Dashboard</a>
             </center>
         </div>
         <div class="footer">&copy; 2026 AfroPitch. Keep soaring.<br><a href="${data.dashboardLink}" style="color: #666;">View Dashboard</a></div>
