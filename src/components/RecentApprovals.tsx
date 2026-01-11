@@ -74,7 +74,7 @@ export function RecentApprovals() {
                     </div>
                 </div>
                 <div className="space-y-3">
-                    <p className="text-gray-400 text-sm">Waiting for the first approval...</p>
+                    <p className="text-gray-400 text-sm">Waiting for the next approval...</p>
                 </div>
             </div>
         );

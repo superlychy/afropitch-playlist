@@ -109,13 +109,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         };
 
         // Initialize Auth Listener immediately
-        // We rely on INITIAL_SESSION to trigger the first load.
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
             if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') {
                 if (session) {
                     await syncProfile(session);
                 } else {
-                    // INITIAL_SESSION with null session means user is not logged in / checked out
                     if (mounted) {
                         setUser(null);
                         setIsLoading(false);
@@ -125,16 +123,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 if (mounted) {
                     setUser(null);
                     setIsLoading(false);
-                    localStorage.removeItem('sb-' + process.env.NEXT_PUBLIC_SUPABASE_URL + '-auth-token');
+                    // Clear any manual tokens if we set them
+                    // localStorage.removeItem(...) - supabase client handles its own usually
                 }
             }
         });
 
+        // 3. Re-check on Focus (Fix for multi-tab sync)
+        const handleFocus = async () => {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session?.user) {
+                // If we are currently null or different user, sync
+                if (!user || user.id !== session.user.id) {
+                    await syncProfile(session);
+                }
+            } else {
+                // If we think we are logged in, but session is gone, logout
+                if (user) {
+                    setUser(null);
+                    router.push("/portal");
+                }
+            }
+        };
+
+        window.addEventListener('focus', handleFocus);
+
         return () => {
             mounted = false;
             subscription.unsubscribe();
+            window.removeEventListener('focus', handleFocus);
         };
-    }, []);
+    }, [user, router]); // Added dependencies for handleFocus closure capturing
 
     const login = async (email: string, password: string) => {
         setIsLoading(true);

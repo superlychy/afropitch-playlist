@@ -579,10 +579,11 @@ export default function AdminDashboard() {
                 // Update Supabase
                 const { error } = await supabase.from('playlists').update({
                     name: data.name,
-                    cover_image: data.coverImage, // Note camelCase from API return in Step 451? No wait.
-                    // Step 451: return NextResponse.json({ name, followers, songsCount, coverImage, description })
-                    // Supabase: cover_image
-                    followers: data.followers
+                    cover_image: data.coverImage,
+                    followers: data.followers,
+                    description: data.songsCount > 0
+                        ? `Playlist · Afropitch Play · ${data.songsCount} items · ${data.followers.toLocaleString()} saves`
+                        : `Playlist · Afropitch Play · ${data.followers.toLocaleString()} saves`
                 }).eq('id', playlist.id);
 
                 if (error) throw error;
