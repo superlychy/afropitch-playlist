@@ -86,7 +86,7 @@ export function RecentApprovals() {
         <div className="relative group">
             <div className="absolute inset-0 bg-green-500/5 rounded-2xl blur-xl group-hover:bg-green-500/10 transition-all duration-500" />
             <div className="border border-white/10 bg-black/50 backdrop-blur-sm rounded-2xl p-8 shadow-2xl relative transition-all duration-500">
-                <div key={current.id} className="animate-in fade-in slide-in-from-right-4 duration-500">
+                <div className="transition-all duration-500">
                     <div className="flex items-center gap-4 mb-6">
                         <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center shadow-lg shadow-green-500/20">
                             <Music className="w-6 h-6 text-white" />
