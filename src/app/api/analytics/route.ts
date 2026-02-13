@@ -94,6 +94,11 @@ export async function POST(req: NextRequest) {
                 p_session_id: sessionId
             });
         }
+        else if (type === 'login') {
+            const { email, role } = body;
+            const msg = `**User Login** 🔐\n**Email:** ${email}\n**Role:** ${role || 'Unknown'}\n**IP:** ${ip} (${country})`;
+            sendDiscordNotification(msg).catch(err => console.error("Discord Error", err));
+        }
 
         return NextResponse.json({ success: true });
     } catch (error) {

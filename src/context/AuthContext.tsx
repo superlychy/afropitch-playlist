@@ -166,6 +166,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (error) {
                 console.error("Login error:", error.message);
                 throw error; // Re-throw to let component handle UI feedback
+            } else {
+                fetch("/api/analytics", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        type: "login",
+                        email,
+                        role: "user" // We might not have full user object yet, or could fetch it.
+                    }),
+                });
             }
         } catch (error) {
             throw error;
