@@ -160,27 +160,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const login = async (email: string, password: string) => {
         setIsLoading(true);
+        console.log("Attempting login for:", email);
         try {
-            const { error } = await supabase.auth.signInWithPassword({
-                email,
-                password
-            });
+            // Create a timeout promise to prevent hanging
+            const timeout = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error("Login request timed out. Please check your internet connection.")), 15000)
+            );
+
+            // Race the login request against the timeout
+            const result = await Promise.race([
+                supabase.auth.signInWithPassword({
+                    email,
+                    password
+                }),
+                timeout
+            ]) as any;
+
+            const { error } = result;
 
             if (error) {
-                console.error("Login error:", error.message);
+                console.error("Login error via Supabase:", error.message);
                 throw error; // Re-throw to let component handle UI feedback
             } else {
+                console.log("Login successful via Supabase");
+                // Fire and forget analytics
                 fetch("/api/analytics", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
                         type: "login",
                         email,
-                        role: "user" // We might not have full user object yet, or could fetch it.
+                        role: "user"
                     }),
-                });
+                }).catch(err => console.error("Analytics tracking failed (non-blocking):", err));
             }
         } catch (error) {
+            console.error("Login flow exception:", error);
             throw error;
         } finally {
             setIsLoading(false);
