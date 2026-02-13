@@ -16,12 +16,9 @@ AS $$
   );
 $$;
 
--- Add explicit admin SELECT policy for profiles (in addition to public viewable)
-DROP POLICY IF EXISTS "Admins can view all profiles" ON public.profiles;
-CREATE POLICY "Admins can view all profiles"
-ON public.profiles
-FOR SELECT
-USING ( is_admin() );
+-- (Removed recursive policy: "Admins can view all profiles" on profiles)
+-- The existing policy "Public profiles are viewable by everyone" (true) is sufficient
+-- and safer to avoid recursion loops.
 
 -- Also ensure admins can view all withdrawals
 DROP POLICY IF EXISTS "Admins can view all withdrawals" ON public.withdrawals;
