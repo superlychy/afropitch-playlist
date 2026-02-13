@@ -44,6 +44,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Load session from Supabase on mount
     useEffect(() => {
         let mounted = true;
+        const userRef = { current: user };
+
+        // Update ref when user changes
+        userRef.current = user;
 
         const syncProfile = async (session: any) => {
             try {
@@ -123,23 +127,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 if (mounted) {
                     setUser(null);
                     setIsLoading(false);
-                    // Clear any manual tokens if we set them
-                    // localStorage.removeItem(...) - supabase client handles its own usually
                 }
             }
         });
 
-        // 3. Re-check on Focus (Fix for multi-tab sync)
+        // 3. Re-check on Focus (Fix for multi-tab sync) - using ref to avoid dependency issues
         const handleFocus = async () => {
             const { data: { session } } = await supabase.auth.getSession();
             if (session?.user) {
                 // If we are currently null or different user, sync
-                if (!user || user.id !== session.user.id) {
+                const currentUser = userRef.current;
+                if (!currentUser || currentUser.id !== session.user.id) {
                     await syncProfile(session);
                 }
             } else {
                 // If we think we are logged in, but session is gone, logout
-                if (user) {
+                if (userRef.current) {
                     setUser(null);
                     router.push("/portal");
                 }
@@ -153,7 +156,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             subscription.unsubscribe();
             window.removeEventListener('focus', handleFocus);
         };
-    }, [user, router]); // Added dependencies for handleFocus closure capturing
+    }, []); // Empty deps - only run once on mount
 
     const login = async (email: string, password: string) => {
         setIsLoading(true);

@@ -182,7 +182,10 @@ export default function AdminDashboard() {
     useEffect(() => {
         if (!isLoading && (!user || user.role !== "admin")) {
             router.push("/portal");
+            return;
         }
+
+        if (!user) return;
 
         const fetchData = async () => {
             // 1. Fetch Users
@@ -354,6 +357,48 @@ export default function AdminDashboard() {
 
         fetchData();
 
+        // Set up real-time subscriptions for automatic updates
+        const profilesSubscription = supabase
+            .channel('admin-profiles-changes')
+            .on('postgres_changes',
+                { event: '*', schema: 'public', table: 'profiles' },
+                (payload) => {
+                    console.log('Profile change detected:', payload);
+                    // Refetch users when any profile changes
+                    fetchData();
+                }
+            )
+            .subscribe();
+
+        const withdrawalsSubscription = supabase
+            .channel('admin-withdrawals-changes')
+            .on('postgres_changes',
+                { event: '*', schema: 'public', table: 'withdrawals' },
+                (payload) => {
+                    console.log('Withdrawal change detected:', payload);
+                    fetchData();
+                }
+            )
+            .subscribe();
+
+        const ticketsSubscription = supabase
+            .channel('admin-tickets-changes')
+            .on('postgres_changes',
+                { event: '*', schema: 'public', table: 'support_tickets' },
+                (payload) => {
+                    console.log('Ticket change detected:', payload);
+                    fetchData();
+                }
+            )
+            .subscribe();
+
+        // Cleanup subscriptions on unmount
+        return () => {
+            profilesSubscription.unsubscribe();
+            withdrawalsSubscription.unsubscribe();
+            ticketsSubscription.unsubscribe();
+        };
+
     }, [user, isLoading, router]);
 
     // ACTIONS
@@ -409,36 +454,56 @@ export default function AdminDashboard() {
 
     const handleWithdrawal = async (id: string, action: 'approve' | 'reject') => {
         const withdrawal = withdrawals.find(w => w.id === id);
-        if (!withdrawal) return;
+        if (!withdrawal) {
+            alert("Withdrawal not found.");
+            return;
+        }
 
-        if (action === 'reject') {
-            const { error } = await supabase.rpc('reject_withdrawal', {
-                p_withdrawal_id: id,
-                p_reason: 'Rejected by Admin'
-            });
+        // Confirm action
+        const confirmMsg = action === 'approve'
+            ? `Approve withdrawal of ${withdrawal.amount} for ${withdrawal.user_name}?`
+            : `Reject withdrawal of ${withdrawal.amount} for ${withdrawal.user_name}? Funds will be refunded to their wallet.`;
 
-            if (error) {
-                console.error(error);
-                alert("Error rejecting withdrawal: " + error.message);
-                return;
+        if (!confirm(confirmMsg)) return;
+
+        // Store original status for rollback
+        const originalStatus = withdrawal.status;
+
+        try {
+            if (action === 'reject') {
+                // Optimistic update
+                setWithdrawals(prev => prev.map(w => w.id === id ? { ...w, status: 'rejected' } : w));
+
+                const { error } = await supabase.rpc('reject_withdrawal', {
+                    p_withdrawal_id: id,
+                    p_reason: 'Rejected by Admin'
+                });
+
+                if (error) {
+                    throw error;
+                }
+
+                alert("Withdrawal rejected and funds refunded to user's wallet.");
+
+            } else {
+                // Approve Logic
+                // Optimistic update
+                setWithdrawals(prev => prev.map(w => w.id === id ? { ...w, status: 'approved' } : w));
+
+                const { error } = await supabase.from('withdrawals').update({ status: 'approved' }).eq('id', id);
+
+                if (error) {
+                    throw error;
+                }
+
+                alert("Withdrawal approved. Please process the bank transfer manually.");
             }
+        } catch (error: any) {
+            console.error(`Error ${action}ing withdrawal:`, error);
+            alert(`Error ${action}ing withdrawal: ${error.message || 'Unknown error'}`);
 
-            // Update Local State
-            setWithdrawals(prev => prev.map(w => w.id === id ? { ...w, status: 'rejected' } : w));
-            alert("Withdrawal rejected and funds refunded.");
-
-        } else {
-            // Approve Logic
-            const { error } = await supabase.from('withdrawals').update({ status: 'approved' }).eq('id', id);
-
-            if (error) {
-                console.error(error);
-                alert("Error approving withdrawal: " + error.message);
-                return;
-            }
-
-            setWithdrawals(prev => prev.map(w => w.id === id ? { ...w, status: 'approved' } : w));
-            alert("Withdrawal approved.");
+            // Revert optimistic update on error
+            setWithdrawals(prev => prev.map(w => w.id === id ? { ...w, status: originalStatus } : w));
         }
     };
 
