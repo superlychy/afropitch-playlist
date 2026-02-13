@@ -130,7 +130,28 @@ export default function AdminDashboard() {
     const [newUserPass, setNewUserPass] = useState("");
     const [newName, setNewName] = useState("");
     const [newRole, setNewRole] = useState<"artist" | "curator" | "admin">("curator");
+    const [isRefreshingUsers, setIsRefreshingUsers] = useState(false);
     const [isAddingUser, setIsAddingUser] = useState(false);
+
+    const refreshUsers = async () => {
+        setIsRefreshingUsers(true);
+        const { data: users, error: userError } = await supabase
+            .from('profiles')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+        if (users) {
+            setUsersList(users as AdminUser[]);
+            // Also refresh pending counts
+            const { data: pending } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('role', 'curator')
+                .eq('verification_status', 'pending');
+            if (pending) setPendingCurators(pending);
+        }
+        setIsRefreshingUsers(false);
+    };
 
     // Edit Playlist State
     const [showEditPlaylist, setShowEditPlaylist] = useState(false);
@@ -1121,7 +1142,12 @@ export default function AdminDashboard() {
                 {activeTab === "users" && (
                     <Card className="bg-black/40 border-white/10">
                         <CardHeader className="flex flex-row items-center justify-between">
-                            <CardTitle className="text-white">User Management</CardTitle>
+                            <CardTitle className="text-white flex items-center gap-3">
+                                User Management
+                                <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-gray-500 hover:text-white" onClick={refreshUsers} title="Refresh List">
+                                    <RefreshCw className={`w-4 h-4 ${isRefreshingUsers ? 'animate-spin' : ''}`} />
+                                </Button>
+                            </CardTitle>
                             <Button size="sm" className="bg-white text-black hover:bg-gray-200" onClick={() => setShowAddUser(true)}>
                                 <Users className="w-4 h-4 mr-2" /> Add User
                             </Button>
