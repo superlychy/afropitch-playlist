@@ -12,6 +12,7 @@ import { TransactionsList } from "@/components/TransactionsList";
 import { pricingConfig } from "@/../config/pricing";
 import AnalyticsPage from "./analytics/page";
 import { AdminActivityFeed } from "@/components/AdminActivityFeed";
+import { AdminMessageForm } from "@/components/AdminMessageForm";
 
 // ----------------------------------------------------------------------
 // TYPES & MOCK DATA (Ideally move to types file)
@@ -25,6 +26,8 @@ interface AdminUser {
     balance: number;
     is_blocked: boolean;
     created_at: string;
+    is_online?: boolean;
+    last_activity_at?: string;
 }
 
 interface WithdrawalRequest {
@@ -80,6 +83,7 @@ export default function AdminDashboard() {
 
     // DATA STATE
     const [usersList, setUsersList] = useState<AdminUser[]>([]);
+    const [messageUser, setMessageUser] = useState<AdminUser | null>(null);
     const [pendingCurators, setPendingCurators] = useState<any[]>([]); // New state
     const [pendingSubmissionsCount, setPendingSubmissionsCount] = useState(0); // New State
     const [withdrawals, setWithdrawals] = useState<WithdrawalRequest[]>([]);
@@ -133,6 +137,11 @@ export default function AdminDashboard() {
     const [newRole, setNewRole] = useState<"artist" | "curator" | "admin">("curator");
     const [isRefreshingUsers, setIsRefreshingUsers] = useState(false);
     const [isAddingUser, setIsAddingUser] = useState(false);
+
+    // Top Up State
+    const [showTopUp, setShowTopUp] = useState<AdminUser | null>(null);
+    const [fundingAmount, setFundingAmount] = useState<string>("");
+    const [adminIsProcessing, setAdminIsProcessing] = useState(false);
 
     const refreshUsers = async () => {
         setIsRefreshingUsers(true);
@@ -387,7 +396,7 @@ export default function AdminDashboard() {
                 (payload) => {
                     console.log('Profile change detected:', payload);
                     // Refetch users when any profile changes
-                    fetchData();
+                    refreshUsers();
                 }
             )
             .subscribe();
@@ -459,6 +468,33 @@ export default function AdminDashboard() {
                 alert("User deleted from public profiles. Auth account may still exist.");
             }
         }
+    };
+
+    const handleTopUp = async () => {
+        if (!showTopUp || !fundingAmount) return;
+
+        const amount = parseFloat(fundingAmount);
+        if (isNaN(amount) || amount <= 0) {
+            alert("Please enter a valid amount > 0");
+            return;
+        }
+
+        setAdminIsProcessing(true);
+        const { error } = await supabase.rpc('admin_top_up_user', {
+            p_user_id: showTopUp.id,
+            p_amount: amount,
+            p_description: `Admin Top Up by ${user?.email}`
+        });
+
+        if (error) {
+            alert("Top Up Failed: " + error.message);
+        } else {
+            alert("Successfully added funds!");
+            setShowTopUp(null);
+            setFundingAmount("");
+            refreshUsers();
+        }
+        setAdminIsProcessing(false);
     };
 
     const deletePlaylist = async (id: string) => {
@@ -1161,8 +1197,11 @@ export default function AdminDashboard() {
                                 {usersList.map(u => (
                                     <div key={u.id} className="flex items-center justify-between p-4 bg-white/5 rounded-lg border border-white/5">
                                         <div className="flex items-center gap-4">
-                                            <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${u.role === 'artist' ? 'bg-purple-500/20 text-purple-500' : 'bg-green-500/20 text-green-500'}`}>
+                                            <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold relative ${u.role === 'artist' ? 'bg-purple-500/20 text-purple-500' : 'bg-green-500/20 text-green-500'}`}>
                                                 {u.full_name[0]}
+                                                {u.is_online && (
+                                                    <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-zinc-900 rounded-full" title="Online"></span>
+                                                )}
                                             </div>
                                             <div>
                                                 <p className="font-bold text-white flex items-center gap-2">
@@ -1178,6 +1217,12 @@ export default function AdminDashboard() {
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-2">
+                                            <Button size="icon" variant="ghost" className="h-8 w-8 hover:bg-white/10" onClick={() => setShowTopUp(u)} title="Top Up Balance">
+                                                <DollarSign className="w-4 h-4 text-green-400" />
+                                            </Button>
+                                            <Button size="icon" variant="ghost" className="h-8 w-8 hover:bg-white/10" onClick={() => setMessageUser(u)} title="Send Message">
+                                                <MessageSquare className="w-4 h-4 text-blue-400" />
+                                            </Button>
                                             <Button size="sm" variant="outline" className={`border-red-500/20 ${u.is_blocked ? 'text-green-500 hover:text-green-400' : 'text-red-500 hover:text-red-400'}`} onClick={() => toggleUserBlock(u.id)}>
                                                 {u.is_blocked ? "Unblock" : "Block"}
                                             </Button>
@@ -1956,6 +2001,53 @@ export default function AdminDashboard() {
                 )
             }
 
+            {/* TOP UP MODAL */}
+            {
+                showTopUp && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in">
+                        <div className="bg-zinc-900 border border-white/10 w-full max-w-sm p-6 rounded-lg space-y-4">
+                            <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                                <DollarSign className="w-6 h-6 text-green-500" /> Top Up Wallet
+                            </h3>
+                            <p className="text-sm text-gray-400">Add funds to <strong>{showTopUp.full_name}</strong>'s wallet.</p>
+
+                            <div>
+                                <label className="text-xs text-gray-400 mb-1 block">Amount ({pricingConfig.currency})</label>
+                                <Input
+                                    type="number"
+                                    value={fundingAmount}
+                                    onChange={e => setFundingAmount(e.target.value)}
+                                    placeholder="0.00"
+                                    className="bg-zinc-800 border-zinc-700 text-lg font-bold text-green-400"
+                                />
+                            </div>
+
+                            <div className="flex justify-end gap-2 pt-2">
+                                <Button variant="ghost" onClick={() => { setShowTopUp(null); setFundingAmount(""); }}>Cancel</Button>
+                                <Button className="bg-green-600 hover:bg-green-700" onClick={handleTopUp} disabled={adminIsProcessing}>
+                                    {adminIsProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : "Confirm Top Up"}
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+                )
+            }
+
+            {/* MESSAGE USER MODAL */}
+            {
+                messageUser && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in">
+                        <div className="w-full max-w-md p-4">
+                            <AdminMessageForm
+                                userId={messageUser.id}
+                                userEmail={messageUser.email}
+                                userName={messageUser.full_name}
+                                onClose={() => setMessageUser(null)}
+                            />
+                        </div>
+                    </div>
+                )
+            }
         </>
     );
 }

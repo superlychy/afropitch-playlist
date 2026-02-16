@@ -49,6 +49,7 @@ export const metadata: Metadata = {
 };
 
 import { AuthProvider } from "@/context/AuthContext";
+import { UserActivityTracker } from "@/components/UserActivityTracker";
 
 export default function RootLayout({
   children,
@@ -66,6 +67,7 @@ export default function RootLayout({
           <Footer />
           <AIHelp />
           <AnalyticsTracker />
+          <UserActivityTracker />
         </AuthProvider>
         <script
           type="application/ld+json"

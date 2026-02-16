@@ -6,7 +6,7 @@ import { createClient } from '@supabase/supabase-js';
 const resend = new Resend(process.env.RESEND_API_KEY);
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'superlychy@gmail.com';
 const DISCORD_WEBHOOK = process.env.ADMIN_WEBHOOK_URL;
-const SENDER_EMAIL = 'contact@eihioclara.resend.app'; // Verified Sender Domain
+const SENDER_EMAIL = 'contact@afropitchplay.best'; // Verified Sender Domain
 
 // Initialize Supabase Admin Client for logging
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
@@ -17,11 +17,26 @@ export async function POST(request: Request) {
     try {
         const { email, subject, message } = await request.json();
 
+        console.log('Contact form submission:', { email, subject, hasMessage: !!message });
+
         if (!email || !subject || !message) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
         }
 
+        // Validate email format
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            return NextResponse.json({ error: 'Invalid email format' }, { status: 400 });
+        }
+
+        // Check if Resend API key is configured
+        if (!process.env.RESEND_API_KEY) {
+            console.error('RESEND_API_KEY not configured');
+            return NextResponse.json({ error: 'Email service not configured' }, { status: 500 });
+        }
+
         // 1. Send email to Admin via Resend
+        console.log('Attempting to send email via Resend...');
         const { data, error } = await resend.emails.send({
             from: `AfroPitch Contact <${SENDER_EMAIL}>`,
             to: [ADMIN_EMAIL],
@@ -53,9 +68,10 @@ export async function POST(request: Request) {
                     sender: email,
                     subject: subject,
                     message_preview: message.substring(0, 100),
-                    status: error ? 'failed' : 'sent'
+                    status: error ? 'failed' : 'sent',
+                    error_details: error ? JSON.stringify(error) : null
                 },
-                user_id: null // Public form, no user user_id unless we parse it, but keep it simple
+                user_id: null
             });
         } catch (logError) {
             console.error("Failed to log contact message:", logError);
@@ -96,8 +112,10 @@ export async function POST(request: Request) {
         }
 
         return NextResponse.json({ success: true, data });
-    } catch (error) {
+    } catch (error: any) {
         console.error('Contact form error:', error);
-        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+        return NextResponse.json({
+            error: error.message || 'Internal Server Error. Please try again later.'
+        }, { status: 500 });
     }
 }
