@@ -53,34 +53,51 @@ export function CustomEmailForm({ onClose }: CustomEmailFormProps) {
                 return;
             }
 
-            const response = await fetch('/api/admin/send-custom-email', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${session.access_token}`
-                },
-                body: JSON.stringify({
-                    to: toEmail,
-                    from: fromEmail,
-                    subject: subject,
-                    message: message
-                })
-            });
+            // 20s Timeout
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 20000);
 
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || 'Failed to send email');
+            try {
+                const response = await fetch('/api/admin/send-custom-email', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${session.access_token}`
+                    },
+                    body: JSON.stringify({
+                        to: toEmail,
+                        from: fromEmail,
+                        subject: subject,
+                        message: message
+                    }),
+                    signal: controller.signal
+                });
+
+                clearTimeout(timeoutId);
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Failed to send email');
+                }
+
+                setSent(true);
+                setTimeout(() => {
+                    if (onClose) onClose();
+                    // Reset form
+                    setToEmail("");
+                    setSubject("");
+                    setMessage("");
+                    setSent(false);
+                }, 2000);
+
+            } catch (error: any) {
+                if (error.name === 'AbortError') {
+                    throw new Error('Request timed out. Please check your connection or try again.');
+                }
+                throw error;
+            } finally {
+                clearTimeout(timeoutId);
             }
-
-            setSent(true);
-            setTimeout(() => {
-                if (onClose) onClose();
-                // Reset form
-                setToEmail("");
-                setSubject("");
-                setMessage("");
-                setSent(false);
-            }, 2000);
 
         } catch (error: any) {
             console.error('Error sending email:', error);
