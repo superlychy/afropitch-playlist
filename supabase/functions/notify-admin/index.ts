@@ -162,6 +162,13 @@ Deno.serve(async (req) => {
             if (user_data?.id) details += `\nUser ID: ${user_data.id}`;
         }
 
+        else if (event_type === 'USER_LOGIN') {
+            const isNewUser = user_data?.is_new_user || false;
+            message = isNewUser ? `🎉 **First Login - New User!**` : `🔐 **User Login**`;
+            details = `User: ${user_data?.full_name || 'Unknown'}\nEmail: ${user_data?.email || 'N/A'}\nRole: ${user_data?.role || 'artist'}`;
+            if (isNewUser) details += `\n✨ This is their first login!`;
+        }
+
         // --- SEND TO DISCORD ---
         if (message) {
             console.log("Sending Webhook:", message);
