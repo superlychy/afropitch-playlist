@@ -37,6 +37,17 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Forbidden: Admins only' }, { status: 403 });
         }
 
+        // Log attempt
+        const { data: logEntry, error: logError } = await supabase.from('system_logs').insert({
+            event_type: 'admin_message_sent',
+            event_data: {
+                to: to,
+                subject: subject,
+                message_preview: message.substring(0, 100),
+                status: 'pending'
+            }
+        }).select().single();
+
         // Send email via Resend
         const { data, error } = await resend.emails.send({
             from: `AfroPitch Admin <${SENDER_EMAIL}>`,
@@ -69,18 +80,21 @@ export async function POST(request: Request) {
 
         if (error) {
             console.error('Resend API Error:', error);
+            // Update log to failed
+            if (logEntry) {
+                await supabase.from('system_logs').update({
+                    event_data: { ...logEntry.event_data, status: 'failed', error: error.message }
+                }).eq('id', logEntry.id);
+            }
             return NextResponse.json({ error: error.message }, { status: 500 });
         }
 
-        // Log the message
-        await supabase.from('system_logs').insert({
-            event_type: 'admin_message_sent',
-            event_data: {
-                to: to,
-                subject: subject,
-                message_preview: message.substring(0, 100)
-            }
-        });
+        // Update log to success
+        if (logEntry) {
+            await supabase.from('system_logs').update({
+                event_data: { ...logEntry.event_data, status: 'sent', resend_id: data?.id }
+            }).eq('id', logEntry.id);
+        }
 
         return NextResponse.json({ success: true, data });
     } catch (error: any) {
