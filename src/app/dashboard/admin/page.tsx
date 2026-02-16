@@ -13,6 +13,7 @@ import { pricingConfig } from "@/../config/pricing";
 import AnalyticsPage from "./analytics/page";
 import { AdminActivityFeed } from "@/components/AdminActivityFeed";
 import { AdminMessageForm } from "@/components/AdminMessageForm";
+import { CustomEmailForm } from "@/components/CustomEmailForm";
 
 // ----------------------------------------------------------------------
 // TYPES & MOCK DATA (Ideally move to types file)
@@ -142,6 +143,9 @@ export default function AdminDashboard() {
     const [showTopUp, setShowTopUp] = useState<AdminUser | null>(null);
     const [fundingAmount, setFundingAmount] = useState<string>("");
     const [adminIsProcessing, setAdminIsProcessing] = useState(false);
+
+    // Custom Email State
+    const [showCustomEmail, setShowCustomEmail] = useState(false);
 
     const refreshUsers = async () => {
         setIsRefreshingUsers(true);
@@ -1188,9 +1192,14 @@ export default function AdminDashboard() {
                                     <RefreshCw className={`w-4 h-4 ${isRefreshingUsers ? 'animate-spin' : ''}`} />
                                 </Button>
                             </CardTitle>
-                            <Button size="sm" className="bg-white text-black hover:bg-gray-200" onClick={() => setShowAddUser(true)}>
-                                <Users className="w-4 h-4 mr-2" /> Add User
-                            </Button>
+                            <div className="flex gap-2">
+                                <Button size="sm" className="bg-blue-600 text-white hover:bg-blue-700" onClick={() => setShowCustomEmail(true)}>
+                                    <Send className="w-4 h-4 mr-2" /> Send Email
+                                </Button>
+                                <Button size="sm" className="bg-white text-black hover:bg-gray-200" onClick={() => setShowAddUser(true)}>
+                                    <Users className="w-4 h-4 mr-2" /> Add User
+                                </Button>
+                            </div>
                         </CardHeader>
                         <CardContent>
                             <div className="space-y-4">
@@ -2044,6 +2053,17 @@ export default function AdminDashboard() {
                                 userName={messageUser.full_name}
                                 onClose={() => setMessageUser(null)}
                             />
+                        </div>
+                    </div>
+                )
+            }
+
+            {/* CUSTOM EMAIL MODAL */}
+            {
+                showCustomEmail && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in">
+                        <div className="w-full max-w-2xl p-4">
+                            <CustomEmailForm onClose={() => setShowCustomEmail(false)} />
                         </div>
                     </div>
                 )
