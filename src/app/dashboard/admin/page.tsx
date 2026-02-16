@@ -11,6 +11,7 @@ import { supabase } from "@/lib/supabase";
 import { TransactionsList } from "@/components/TransactionsList";
 import { pricingConfig } from "@/../config/pricing";
 import AnalyticsPage from "./analytics/page";
+import { AdminActivityFeed } from "@/components/AdminActivityFeed";
 
 // ----------------------------------------------------------------------
 // TYPES & MOCK DATA (Ideally move to types file)
@@ -1074,7 +1075,10 @@ export default function AdminDashboard() {
                             </Card>
                         </div>
 
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                            {/* LIVE ACTIVITY */}
+                            <AdminActivityFeed />
+
                             {/* TOP SONGS */}
                             <Card className="bg-black/40 border-white/10">
                                 <CardHeader>
