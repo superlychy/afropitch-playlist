@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,6 +20,14 @@ export function AdminMessageForm({ userId, userEmail, userName, onClose }: Admin
     const [message, setMessage] = useState("");
     const [sending, setSending] = useState(false);
     const [sent, setSent] = useState(false);
+
+    // Reset form when userId changes (new user selected)
+    useEffect(() => {
+        setSubject("");
+        setMessage("");
+        setSent(false);
+        setSending(false);
+    }, [userId]);
 
     const handleSend = async () => {
         if (!subject || !message) {
