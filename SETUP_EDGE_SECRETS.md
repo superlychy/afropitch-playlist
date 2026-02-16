@@ -9,26 +9,26 @@
 
 ### Step 2: Add the following secrets
 
-Copy and paste each of these EXACTLY as shown:
+You need to configure these 5 environment variables. Get the values from your `.env.local` file:
 
 ```
 Name: ADMIN_WEBHOOK_URL
-Value: https://discord.com/api/webhooks/1459125838363754497/dXQejdouq2mKIzuFgC1V7UB8nxgbnacQiFijiN_A90hdUZ0MF_RaPeBFWJxY2zjsEhq5
+Value: [Get from .env.local - ADMIN_WEBHOOK_URL]
 ```
 
 ```
 Name: RESEND_API_KEY
-Value: re_6vSRLRMH_GcESY6iM7u9UNk2WZ4Y6fW12
+Value: [Get from .env.local - RESEND_API_KEY]
 ```
 
 ```
 Name: SUPABASE_URL
-Value: https://gildytqinnntmtvbagxm.supabase.co
+Value: [Get from .env.local - NEXT_PUBLIC_SUPABASE_URL]
 ```
 
 ```
 Name: SUPABASE_SERVICE_ROLE_KEY
-Value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdpbGR5dHFpbm5udG10dmJhZ3htIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NjcwMjM5MSwiZXhwIjoyMDgyMjc4MzkxfQ.L37HsKmzmvxUh1r8r5dYrRuy8i50akMfd5hpWOcv5ms
+Value: [Get from .env.local - SUPABASE_SERVICE_ROLE_KEY]
 ```
 
 ```
@@ -54,10 +54,10 @@ Value: https://afropitchplay.best
 1. Double-check all secrets are entered correctly (no extra spaces)
 2. Make sure you clicked "Save" after adding each secret
 3. Check Edge Function logs in Supabase dashboard
-4. Contact support with the SYSTEM_AUDIT_REPORT.md file
+4. Verify the values match exactly what's in your .env.local file
 
 ---
 
 **Estimated time:** 5 minutes  
-**Difficulty:** Easy (copy/paste)  
+**Difficulty:** Easy (copy/paste from .env.local)  
 **Impact:** Critical - enables all business notifications

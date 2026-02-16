@@ -53,7 +53,7 @@ The following triggers exist and are configured correctly:
 #### ROOT CAUSE (❌ CRITICAL)
 **Edge Function environment variables are NOT configured in Supabase.**
 
-The functions expect these secrets:
+The functions expect these secrets (get values from .env.local):
 - `ADMIN_WEBHOOK_URL` - Discord webhook URL
 - `RESEND_API_KEY` - Email service API key
 - `SUPABASE_URL` - Project URL
@@ -61,35 +61,6 @@ The functions expect these secrets:
 - `SITE_URL` - Production site URL
 
 **Impact:** All Discord notifications have been silently failing since deployment.
-
----
-
-### 2. DATA ANALYSIS
-
-#### Recent Submissions
-```
-Last 4 submissions (all from January 2026):
-1. Jan 11 - "Robcop" by wizkid (DECLINED)
-2. Jan 10 - "Nkoyo" by L3UNAMME (DECLINED)
-3. Jan 07 - "Round" by wizkid (DECLINED)
-4. Jan 06 - "ONE TIE" by Freshmill (ACCEPTED)
-```
-
-**Note:** If you received a submission recently that's not showing here, there may be a submission flow issue that needs investigation.
-
-#### Recent User Logins
-```
-Most recent logins:
-1. copyright@azurevoice.com - Feb 15, 2026 06:49 AM
-2. superlychy@gmail.com - Feb 14, 2026 03:14 PM
-3. everlastinglifey@gmail.com - Feb 14, 2026 03:12 PM
-```
-
-#### Transaction Summary
-- **Total Transactions:** 25
-- **Types:** Earnings, Withdrawals, Refunds, Payments
-- **Latest:** Jan 09, 2026
-- **Status:** All calculations correct
 
 ---
 
@@ -127,33 +98,7 @@ Most recent logins:
 
 ### ⚠️ CRITICAL: Configure Edge Function Secrets
 
-You need to set the following environment variables in Supabase:
-
-**Option 1: Via Supabase Dashboard (RECOMMENDED)**
-1. Go to https://supabase.com/dashboard/project/gildytqinnntmtvbagxm
-2. Navigate to **Edge Functions** → **Settings**
-3. Add the following secrets:
-
-```
-ADMIN_WEBHOOK_URL=https://discord.com/api/webhooks/1459125838363754497/dXQejdouq2mKIzuFgC1V7UB8nxgbnacQiFijiN_A90hdUZ0MF_RaPeBFWJxY2zjsEhq5
-
-RESEND_API_KEY=re_6vSRLRMH_GcESY6iM7u9UNk2WZ4Y6fW12
-
-SUPABASE_URL=https://gildytqinnntmtvbagxm.supabase.co
-
-SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdpbGR5dHFpbm5udG10dmJhZ3htIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NjcwMjM5MSwiZXhwIjoyMDgyMjc4MzkxfQ.L37HsKmzmvxUh1r8r5dYrRuy8i50akMfd5hpWOcv5ms
-
-SITE_URL=https://afropitchplay.best
-```
-
-**Option 2: Via Supabase CLI**
-```bash
-npx supabase secrets set ADMIN_WEBHOOK_URL="https://discord.com/api/webhooks/..." --project-ref gildytqinnntmtvbagxm
-npx supabase secrets set RESEND_API_KEY="re_..." --project-ref gildytqinnntmtvbagxm
-npx supabase secrets set SUPABASE_URL="https://gildytqinnntmtvbagxm.supabase.co" --project-ref gildytqinnntmtvbagxm
-npx supabase secrets set SUPABASE_SERVICE_ROLE_KEY="eyJ..." --project-ref gildytqinnntmtvbagxm
-npx supabase secrets set SITE_URL="https://afropitchplay.best" --project-ref gildytqinnntmtvbagxm
-```
+See `SETUP_EDGE_SECRETS.md` for detailed instructions on configuring the required environment variables in Supabase.
 
 ---
 
@@ -186,92 +131,6 @@ npx supabase secrets set SITE_URL="https://afropitchplay.best" --project-ref gil
 
 ---
 
-## TESTING CHECKLIST
-
-After configuring the Edge Function secrets, test the following:
-
-### Test 1: Login Notification
-1. ✅ Log out of the application
-2. ✅ Log back in
-3. ✅ Check Discord for login notification
-
-### Test 2: Submission Notification
-1. ✅ Create a test playlist submission
-2. ✅ Check Discord for submission notification
-3. ✅ Verify email sent to curator
-
-### Test 3: Withdrawal Notification
-1. ✅ Request a withdrawal
-2. ✅ Check Discord for withdrawal notification
-
-### Test 4: Online User Count
-1. ✅ Open admin dashboard
-2. ✅ Verify online user count displays
-3. ✅ Check that it updates in real-time
-
----
-
-## ADMIN DASHBOARD ENHANCEMENTS NEEDED
-
-The following queries can be used to enhance the admin dashboard:
-
-### Get Online Users
-```sql
-SELECT 
-  id,
-  email,
-  full_name,
-  role,
-  last_seen_at,
-  EXTRACT(EPOCH FROM (NOW() - last_seen_at)) as seconds_since_last_seen
-FROM profiles
-WHERE last_seen_at > NOW() - INTERVAL '5 minutes'
-ORDER BY last_seen_at DESC;
-```
-
-### Get Recent Activity
-```sql
-SELECT 
-  'submission' as activity_type,
-  s.id,
-  s.created_at,
-  s.status,
-  p.email as user_email,
-  p.full_name as user_name,
-  s.song_title as description,
-  s.amount_paid as amount
-FROM submissions s
-LEFT JOIN profiles p ON s.artist_id = p.id
-ORDER BY s.created_at DESC
-LIMIT 20;
-```
-
-### Get User Statistics
-```sql
-SELECT 
-  role,
-  COUNT(*) as total_users,
-  COUNT(CASE WHEN last_seen_at > NOW() - INTERVAL '5 minutes' THEN 1 END) as online_now,
-  COUNT(CASE WHEN last_seen_at > NOW() - INTERVAL '24 hours' THEN 1 END) as active_today,
-  COUNT(CASE WHEN created_at > NOW() - INTERVAL '7 days' THEN 1 END) as new_this_week
-FROM profiles
-GROUP BY role;
-```
-
-### Get System Logs
-```sql
-SELECT 
-  created_at,
-  event_type,
-  event_data,
-  user_id
-FROM system_logs
-ORDER BY created_at DESC
-LIMIT 50;
-```
-
----
-
 ## TRANSACTION LOGIC VERIFICATION
 
 ### Submission Flow (✅ CORRECT)
@@ -294,8 +153,8 @@ LIMIT 50;
 ## RECOMMENDATIONS
 
 ### Immediate Actions
-1. ⚠️ **Configure Edge Function secrets** (see Manual Steps above)
-2. ⚠️ **Test all notification flows** (see Testing Checklist)
+1. ⚠️ **Configure Edge Function secrets** (see SETUP_EDGE_SECRETS.md)
+2. ⚠️ **Test all notification flows**
 3. ⚠️ **Investigate missing recent submission** (if applicable)
 
 ### Short-term Improvements
@@ -320,57 +179,19 @@ LIMIT 50;
 
 ---
 
-## SUPPORT & TROUBLESHOOTING
-
-### If notifications still don't work after configuring secrets:
-
-1. **Check Edge Function Logs:**
-   ```bash
-   npx supabase functions logs notify-admin --project-ref gildytqinnntmtvbagxm
-   ```
-
-2. **Test Discord Webhook Manually:**
-   ```bash
-   curl -X POST "YOUR_DISCORD_WEBHOOK_URL" \
-     -H "Content-Type: application/json" \
-     -d '{"content": "Test notification from AfroPitch"}'
-   ```
-
-3. **Verify Database Triggers:**
-   ```sql
-   SELECT trigger_name, event_object_table, action_statement
-   FROM information_schema.triggers
-   WHERE trigger_schema = 'public'
-   ORDER BY event_object_table;
-   ```
-
-4. **Check System Logs:**
-   ```sql
-   SELECT * FROM system_logs ORDER BY created_at DESC LIMIT 10;
-   ```
-
----
-
 ## CONCLUSION
 
 All critical business logic (transactions, refunds, balance calculations) is working correctly. The primary issue was missing Edge Function environment variables, which has now been identified and documented with clear resolution steps.
 
-Once the Edge Function secrets are configured, all notifications will work as expected, and you'll receive real-time alerts for:
-- New user registrations
-- User logins (including first-time logins)
-- Playlist submissions
-- Withdrawal requests
-- Support tickets
-- All transaction events
+Once the Edge Function secrets are configured, all notifications will work as expected, and you'll receive real-time alerts for all critical events.
 
 The system is now enhanced with comprehensive logging and tracking capabilities for better visibility and accountability.
 
 ---
 
 **Next Steps:**
-1. Configure Edge Function secrets (5 minutes)
+1. Configure Edge Function secrets (5 minutes) - See SETUP_EDGE_SECRETS.md
 2. Test notification flows (10 minutes)
 3. Verify admin dashboard displays correctly (5 minutes)
-4. Push changes to GitHub and Supabase (see deployment guide)
 
 **Estimated Time to Full Resolution:** 20-30 minutes
