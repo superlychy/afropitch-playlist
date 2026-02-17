@@ -52,21 +52,29 @@ export default function ResetPasswordPage() {
         }
 
         try {
-            const { error } = await supabase.auth.updateUser({
-                password: newPassword
-            });
+            // Create a timeout promise to prevent hanging (Same logic as valid login flow)
+            const timeout = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error("Request timed out. Please check your internet connection.")), 15000)
+            );
+
+            // Race the update request against the timeout
+            const { data, error } = await Promise.race([
+                supabase.auth.updateUser({ password: newPassword }),
+                timeout
+            ]) as any;
 
             if (error) throw error;
 
             setSuccess(true);
+            setIsLoading(false); // Ensure loading stops immediately
 
-            // Redirect to portal after 3 seconds
+            // Redirect to portal after 2 seconds
             setTimeout(() => {
                 router.push("/portal");
-            }, 3000);
+            }, 2000);
         } catch (err: any) {
+            console.error("Reset password error:", err);
             setError(err.message || "Failed to reset password");
-        } finally {
             setIsLoading(false);
         }
     };
