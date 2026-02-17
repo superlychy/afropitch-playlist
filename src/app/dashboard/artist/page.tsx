@@ -714,7 +714,9 @@ export default function ArtistDashboard() {
                             {notifications.map((n, i) => (
                                 <div key={n.id || i} className="bg-white/5 p-4 rounded border border-white/5">
                                     <h4 className="font-bold text-white mb-1">{n.subject}</h4>
-                                    <div className="text-sm text-gray-400 whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: n.message }} />
+                                    <div className="text-sm text-gray-400 whitespace-pre-wrap line-clamp-4">
+                                        {n.message ? n.message.replace(/<[^>]*>?/gm, ' ').replace(/\s+/g, ' ').trim() : ''}
+                                    </div>
                                     <p className="text-[10px] text-gray-600 mt-2">{new Date(n.created_at).toLocaleDateString()}</p>
                                 </div>
                             ))}
