@@ -1,6 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-
-const DISCORD_WEBHOOK_URL = "https://discordapp.com/api/webhooks/1472981564798271498/zg5haArHXWiZafcVWDiJ4ofx_RPIk8IKvjYTwbQPFLiq9xh9GYiYe9Iium28hEb9P6fb";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 serve(async (req) => {
     // Basic Request Handling
@@ -8,9 +7,24 @@ serve(async (req) => {
         return new Response("Method Not Allowed", { status: 405 });
     }
 
+    // 1. Initialize Supabase Client (Service Role)
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // 2. Fetch the Secret from Database Vault via RPC
+    const { data: webhookUrl, error: secretError } = await supabase.rpc('get_discord_webhook');
+
+    if (secretError || !webhookUrl) {
+        console.error("Failed to retrieve secret from DB Vault:", secretError);
+        return new Response("Configuration Error: Missing Secret in Vault", { status: 500 });
+    }
+
+    const DISCORD_WEBHOOK_URL = webhookUrl as string;
+
     try {
         const payload = await req.json();
-        const type = payload.type; // Resend usually sends 'type' like 'email.sent', 'email.delivered', etc.
+        const type = payload.type;
         const data = payload.data || {};
 
         let title = "Using Resend Webhook";
@@ -18,54 +32,28 @@ serve(async (req) => {
         let description = "";
         const fields = [];
 
-        // 1. Handle Inbound Email (Received)
+        // Handle Resend Events
         if (type === 'email.delivered' || type === 'email.sent' || type === 'email.opened' || type === 'email.clicked' || type === 'email.bounced' || type === 'email.complained') {
             title = `Update: ${type.toUpperCase()}`;
-
             if (type === 'email.delivered' || type === 'email.sent') color = 5763719; // Green
             if (type === 'email.bounced' || type === 'email.complained') color = 15548997; // Red
 
+            fields.push({ name: "To", value: Array.isArray(data.to) ? data.to.join(", ") : (data.to || 'Unknown'), inline: true });
+            fields.push({ name: "Subject", value: data.subject || "No Subject", inline: true });
             description = `Email ID: ${data.email_id || 'N/A'}`;
-            fields.push({
-                name: "To",
-                value: Array.isArray(data.to) ? data.to.join(", ") : (data.to || 'Unknown'),
-                inline: true
-            });
-            fields.push({
-                name: "Subject",
-                value: data.subject || "No Subject",
-                inline: true
-            });
-            if (data.from) {
-                fields.push({ name: "From", value: data.from, inline: true });
-            }
-        } else if (payload.id && payload.from && payload.subject) {
-            // Likely an Inbound Email Structure (received)
+        }
+        // Handle Inbound
+        else if (payload.from && payload.subject) {
             title = "New Email Received 📬";
-            color = 5763719; // Green
+            color = 5763719;
 
-            fields.push({
-                name: "From",
-                value: `${payload.from} <${payload.original_sender || ''}>`,
-                inline: true
-            });
-            fields.push({
-                name: "To",
-                value: Array.isArray(payload.to) ? payload.to.join(", ") : (payload.to || 'Unknown'),
-                inline: true
-            });
-            fields.push({
-                name: "Subject",
-                value: payload.subject || "No Subject",
-                inline: false
-            });
+            fields.push({ name: "From", value: payload.from, inline: true });
+            fields.push({ name: "Subject", value: payload.subject, inline: false });
 
-            // Getting a snippet of the body
             let bodySnippet = payload.text || payload.html || "No Content";
             if (bodySnippet.length > 200) bodySnippet = bodySnippet.substring(0, 200) + "...";
             description = bodySnippet;
         } else {
-            // Unknown type
             title = "Unknown Resend Event";
             description = `Start of payload: ${JSON.stringify(payload).substring(0, 500)}`;
         }
@@ -79,9 +67,7 @@ serve(async (req) => {
                     color: color,
                     fields: fields,
                     timestamp: new Date().toISOString(),
-                    footer: {
-                        text: "AfroPitch Notifier • Powered by Resend"
-                    }
+                    footer: { text: "AfroPitch Notifier • Powered by Resend" }
                 }
             ]
         };
