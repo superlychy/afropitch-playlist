@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
-import { ShieldCheck, Search, CheckCircle, AlertCircle, Lock, User, LogOut, Mail, ArrowRight } from "lucide-react";
+import { ShieldCheck, Search, CheckCircle, AlertCircle, Lock, User, LogOut, Mail, ArrowRight, Eye, EyeOff } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
 export default function PortalPage() {
@@ -23,6 +23,14 @@ export default function PortalPage() {
     const [error, setError] = useState("");
     const [isLoading, setIsLoading] = useState(false);
     const [successMessage, setSuccessMessage] = useState("");
+
+    // Password visibility
+    const [showPassword, setShowPassword] = useState(false);
+
+    // Forgot Password Modal
+    const [showForgotPassword, setShowForgotPassword] = useState(false);
+    const [resetEmail, setResetEmail] = useState("");
+    const [resetSuccess, setResetSuccess] = useState(false);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -76,6 +84,27 @@ export default function PortalPage() {
         } catch (e) {
             console.error(e);
             setError("Error checking status. Please try refreshing the page.");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    // Forgot Password Handler
+    const handleForgotPassword = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setIsLoading(true);
+        setError("");
+
+        try {
+            const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
+                redirectTo: `${window.location.origin}/reset-password`,
+            });
+
+            if (error) throw error;
+
+            setResetSuccess(true);
+        } catch (err: any) {
+            setError(err.message || "Failed to send reset email");
         } finally {
             setIsLoading(false);
         }
@@ -225,15 +254,36 @@ export default function PortalPage() {
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <Label>Password</Label>
-                                        <Input
-                                            type="password"
-                                            placeholder="••••••••"
-                                            value={password}
-                                            onChange={e => setPassword(e.target.value)}
-                                            required
-                                            autoComplete="current-password"
-                                        />
+                                        <div className="flex justify-between items-center">
+                                            <Label>Password</Label>
+                                            {!isSignup && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setShowForgotPassword(true)}
+                                                    className="text-xs text-gray-400 hover:text-green-500 transition-colors"
+                                                >
+                                                    Forgot Password?
+                                                </button>
+                                            )}
+                                        </div>
+                                        <div className="relative">
+                                            <Input
+                                                type={showPassword ? "text" : "password"}
+                                                placeholder="••••••••"
+                                                value={password}
+                                                onChange={e => setPassword(e.target.value)}
+                                                required
+                                                autoComplete="current-password"
+                                                className="pr-10"
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowPassword(!showPassword)}
+                                                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
+                                            >
+                                                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                            </button>
+                                        </div>
                                     </div>
                                     <Button
                                         disabled={isLoading}
@@ -259,6 +309,103 @@ export default function PortalPage() {
                     )}
                 </Card>
             </div>
+
+            {/* Forgot Password Modal */}
+            {showForgotPassword && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in">
+                    <div className="bg-zinc-900 border border-white/10 w-full max-w-md p-6 rounded-lg space-y-6">
+                        <div className="flex justify-between items-center pb-4 border-b border-white/10">
+                            <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                                <Lock className="w-5 h-5 text-green-500" /> Reset Password
+                            </h3>
+                            <button
+                                onClick={() => {
+                                    setShowForgotPassword(false);
+                                    setResetSuccess(false);
+                                    setResetEmail("");
+                                    setError("");
+                                }}
+                                className="text-gray-400 hover:text-white"
+                            >
+                                <AlertCircle className="w-6 h-6" />
+                            </button>
+                        </div>
+
+                        {resetSuccess ? (
+                            <div className="text-center space-y-4 py-4">
+                                <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto border border-green-500/30">
+                                    <Mail className="w-8 h-8 text-green-500" />
+                                </div>
+                                <div className="space-y-2">
+                                    <h4 className="text-lg font-bold text-white">Check Your Email</h4>
+                                    <p className="text-sm text-gray-400">
+                                        We've sent a password reset link to <strong className="text-white">{resetEmail}</strong>.
+                                    </p>
+                                    <p className="text-xs text-gray-500">
+                                        Click the link in the email to reset your password. The link will expire in 1 hour.
+                                    </p>
+                                </div>
+                                <Button
+                                    onClick={() => {
+                                        setShowForgotPassword(false);
+                                        setResetSuccess(false);
+                                        setResetEmail("");
+                                    }}
+                                    className="w-full bg-green-600 hover:bg-green-700"
+                                >
+                                    Done
+                                </Button>
+                            </div>
+                        ) : (
+                            <form onSubmit={handleForgotPassword} className="space-y-4">
+                                <div className="space-y-2">
+                                    <Label>Email Address</Label>
+                                    <Input
+                                        type="email"
+                                        placeholder="you@example.com"
+                                        value={resetEmail}
+                                        onChange={e => setResetEmail(e.target.value)}
+                                        required
+                                        autoFocus
+                                    />
+                                    <p className="text-xs text-gray-500">
+                                        Enter your email address and we'll send you a link to reset your password.
+                                    </p>
+                                </div>
+
+                                {error && (
+                                    <div className="p-3 rounded bg-red-500/10 border border-red-500/20 text-red-500 text-sm flex items-center gap-2">
+                                        <AlertCircle className="w-4 h-4" />
+                                        {error}
+                                    </div>
+                                )}
+
+                                <div className="flex gap-2">
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        onClick={() => {
+                                            setShowForgotPassword(false);
+                                            setResetEmail("");
+                                            setError("");
+                                        }}
+                                        className="flex-1"
+                                    >
+                                        Cancel
+                                    </Button>
+                                    <Button
+                                        type="submit"
+                                        disabled={isLoading}
+                                        className="flex-1 bg-green-600 hover:bg-green-700"
+                                    >
+                                        {isLoading ? "Sending..." : "Send Reset Link"}
+                                    </Button>
+                                </div>
+                            </form>
+                        )}
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
