@@ -37,7 +37,10 @@ export default function PortalPage() {
                 // Clear password for security
                 setPassword("");
             } else {
-                await login(email, password);
+                const loggedInRole = await login(email, password);
+                if (loggedInRole === 'admin') router.push("/dashboard/admin");
+                else if (loggedInRole === 'curator') router.push("/dashboard/curator");
+                else router.push("/dashboard/artist");
             }
         } catch (err: any) {
             console.error(err);

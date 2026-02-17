@@ -24,7 +24,7 @@ export interface User {
 interface AuthContextType {
     user: User | null;
     isLoading: boolean;
-    login: (email: string, password: string) => Promise<void>;
+    login: (email: string, password: string) => Promise<UserRole>;
     signup: (email: string, password: string, role: UserRole, name: string) => Promise<void>;
     logout: () => void;
     loadFunds: (amount: number) => void;
@@ -158,7 +158,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         };
     }, []); // Empty deps - only run once on mount
 
-    const login = async (email: string, password: string) => {
+    const login = async (email: string, password: string): Promise<UserRole> => {
         setIsLoading(true);
         console.log("Attempting login for:", email);
         try {
@@ -176,24 +176,56 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 timeout
             ]) as any;
 
-            const { error } = result;
+            const { data, error } = result;
 
             if (error) {
                 console.error("Login error via Supabase:", error.message);
                 throw error; // Re-throw to let component handle UI feedback
-            } else {
-                console.log("Login successful via Supabase");
-                // Fire and forget analytics
-                fetch("/api/analytics", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        type: "login",
-                        email,
-                        role: "user"
-                    }),
-                }).catch(err => console.error("Analytics tracking failed (non-blocking):", err));
             }
+
+            console.log("Login successful via Supabase");
+
+            // IMMEDIATE: Fetch Profile to get Role for redirection
+            let role: UserRole = "artist"; // Default
+            let name = "User";
+
+            if (data?.user) {
+                const { data: profile } = await supabase
+                    .from('profiles')
+                    .select('role, full_name')
+                    .eq('id', data.user.id)
+                    .single();
+
+                if (profile) {
+                    role = profile.role as UserRole;
+                    name = profile.full_name || name;
+                } else {
+                    // Fallback to metadata if profile missing
+                    role = (data.user.user_metadata?.role as UserRole) || "artist";
+                    name = data.user.user_metadata?.full_name || name;
+                }
+            }
+
+            // Sync Context State Manually to speed up UI
+            /* 
+                We don't strictly set 'user' here to avoid race conditions with standard sync,
+                but we RETURN the role so the calling component can redirect immediately.
+            */
+
+            // Fire analytics with CORRECT role and name
+            fetch("/api/analytics", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    type: "login",
+                    email,
+                    role: role,
+                    name: name // Pass name if backend supports it
+                }),
+            }).catch(err => console.error("Analytics tracking failed (non-blocking):", err));
+
+            return role;
+
         } catch (error) {
             console.error("Login flow exception:", error);
             throw error;
