@@ -297,12 +297,26 @@ export default function CuratorDashboard() {
     // Notifications
     const [showNotifications, setShowNotifications] = useState(false);
     const [notifications, setNotifications] = useState<any[]>([]);
+    const [expandedNotificationId, setExpandedNotificationId] = useState<string | null>(null);
+
+    const toggleNotification = (id: string) => {
+        setExpandedNotificationId(prev => prev === id ? null : id);
+    };
 
     const fetchNotifications = async () => {
-        const { data } = await supabase
+        if (!user) return;
+
+        let query = supabase
             .from('broadcasts')
             .select('*')
-            .or('target_role.eq.all,target_role.is.null,target_role.eq.curator')
+            .or('target_role.eq.all,target_role.is.null,target_role.eq.curator');
+
+        // Filter by user creation date if available (don't show old news)
+        if (user.created_at) {
+            query = query.gt('created_at', user.created_at);
+        }
+
+        const { data } = await query
             .order('created_at', { ascending: false })
             .limit(20);
 
@@ -826,16 +840,35 @@ export default function CuratorDashboard() {
                             <Button variant="ghost" size="icon" onClick={() => setShowNotifications(false)}><XCircle className="w-6 h-6" /></Button>
                         </div>
                         <div className="space-y-4">
-                            {notifications.map((n, i) => (
-                                <div key={n.id || i} className="bg-white/5 p-4 rounded border border-white/5">
-                                    <h4 className="font-bold text-white mb-1">{n.subject}</h4>
-                                    <div className="text-sm text-gray-400 whitespace-pre-wrap line-clamp-4">
-                                        {n.message ? n.message.replace(/<[^>]*>?/gm, ' ').replace(/\s+/g, ' ').trim() : ''}
-                                    </div>
-                                    <p className="text-[10px] text-gray-600 mt-2">{new Date(n.created_at).toLocaleDateString()}</p>
+                            {notifications.length === 0 && (
+                                <div className="bg-white/5 p-4 rounded border border-white/5">
+                                    <h4 className="font-bold text-white mb-1">👋 Welcome to AfroPitch!</h4>
+                                    <p className="text-sm text-gray-400 mb-2">
+                                        We're excited to have you as a curator. Add your playlists and start reviewing submissions to earn.
+                                    </p>
+                                    <p className="text-[10px] text-gray-600">Just now</p>
                                 </div>
-                            ))}
-                            {notifications.length === 0 && <p className="text-gray-500 text-center">No new updates.</p>}
+                            )}
+
+                            {notifications.map((n, i) => {
+                                const isExpanded = expandedNotificationId === n.id;
+                                return (
+                                    <div
+                                        key={n.id || i}
+                                        className="bg-white/5 p-4 rounded border border-white/5 cursor-pointer hover:bg-white/10 transition-colors"
+                                        onClick={() => toggleNotification(n.id)}
+                                    >
+                                        <h4 className="font-bold text-white mb-1 flex justify-between items-start">
+                                            <span>{n.subject}</span>
+                                            <span className="text-[10px] text-gray-500 font-normal ml-2 shrink-0 border border-white/10 px-1.5 py-0.5 rounded uppercase tracking-wider">{isExpanded ? 'Collapse' : 'Read'}</span>
+                                        </h4>
+                                        <div className={`text-sm text-gray-400 whitespace-pre-wrap ${isExpanded ? '' : 'line-clamp-2'}`}>
+                                            {n.message ? n.message.replace(/<[^>]*>?/gm, ' ').replace(/\s+/g, ' ').trim() : ''}
+                                        </div>
+                                        <p className="text-[10px] text-gray-600 mt-2">{new Date(n.created_at).toLocaleDateString()}</p>
+                                    </div>
+                                )
+                            })}
                         </div>
                     </div>
                 </div>

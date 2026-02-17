@@ -19,6 +19,7 @@ export interface User {
     instagram?: string;
     twitter?: string;
     website?: string;
+    created_at?: string;
 }
 
 interface AuthContextType {
@@ -74,7 +75,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                         bio: profile.bio,
                         instagram: profile.instagram,
                         twitter: profile.twitter,
-                        website: profile.website
+                        website: profile.website,
+                        created_at: profile.created_at || session.user.created_at
                     });
                     return;
                 }
@@ -91,7 +93,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                         email: session.user.email || "",
                         role: role as UserRole,
                         balance: 0,
-                        earnings: 0
+                        earnings: 0,
+                        created_at: session.user.created_at
                     });
                 }
             } catch (e) {
@@ -104,7 +107,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                         email: session.user.email || "",
                         role: "artist",
                         balance: 0,
-                        earnings: 0
+                        earnings: 0,
+                        created_at: session.user.created_at
                     });
                 }
             } finally {
