@@ -57,6 +57,9 @@ export default function PortalPage() {
                 setError("Please confirm your email address before logging in.");
             } else if (err.message.includes("Invalid login credentials")) {
                 setError("Invalid email or password.");
+            } else if (err.message.toLowerCase().includes("time") && err.message.toLowerCase().includes("out")) {
+                setError(err.message + " Auto-refreshing...");
+                setTimeout(() => window.location.reload(), 2000);
             } else {
                 setError(err.message || "An error occurred");
             }
