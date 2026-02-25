@@ -306,9 +306,7 @@ export default function ArtistDashboard() {
         });
     };
 
-    if (isLoading) return <div className="p-8 text-center text-gray-500">Loading dashboard...</div>;
-    if (!user) return null;
-
+    // ✅ MUST be defined before any early returns — Rules of Hooks
     const handlePaymentSuccess = useCallback(async (reference: any) => {
         // Read from refs — always has the latest values, never stale
         const currentUser = userRef.current;
@@ -351,11 +349,13 @@ export default function ArtistDashboard() {
             alert(`✅ ₦${val.toLocaleString()} successfully loaded to your wallet!`);
         }
 
-        // Always sync balance from DB — most reliable source
         await refreshUser();
         setAmount("");
         setLockedAmount(0);
     }, [refreshUser]);
+
+    if (isLoading) return <div className="p-8 text-center text-gray-500">Loading dashboard...</div>;
+    if (!user) return null;
 
 
     return (

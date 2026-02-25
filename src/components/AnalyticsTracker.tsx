@@ -2,10 +2,10 @@
 
 import { Suspense, useEffect, useRef } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
+import { useAuth } from "@/context/AuthContext";
 // @ts-ignore
 import { v4 as uuidv4 } from "uuid";
 
-// Wrapper to satisfy Suspense requirement for useSearchParams
 export function AnalyticsTracker() {
     return (
         <Suspense fallback={null}>
@@ -17,10 +17,12 @@ export function AnalyticsTracker() {
 function AnalyticsLogic() {
     const pathname = usePathname();
     const searchParams = useSearchParams();
+    const { user } = useAuth();
     const sessionId = useRef<string>("");
-    // Store clicks locally to batch them
     const clickCountRef = useRef<number>(0);
-    const isSendingRef = useRef<boolean>(false); // Semaphore to prevent overlapping requests
+    const isSendingRef = useRef<boolean>(false);
+    // Track last sent user id to re-send when user logs in
+    const lastUserIdRef = useRef<string | null>(null);
 
     useEffect(() => {
         let sid = sessionStorage.getItem("afropitch_session_id");
@@ -32,23 +34,14 @@ function AnalyticsLogic() {
 
         sendEvent('init');
 
-        // Heartbeat every 10s (Reduced frequency from 5s) - INCLUDES BATCHED CLICKS
         const interval = setInterval(() => {
             if (!isSendingRef.current) {
                 sendEvent('heartbeat', 10, clickCountRef.current);
-                clickCountRef.current = 0; // Reset after sending
-            } else {
-                // If busy, skip this heartbeat but keep accumulating clicks
-                // Optionally accumulate duration? For now just skip to prevent congestion.
+                clickCountRef.current = 0;
             }
         }, 10000);
 
-        // ... clickHandler ...
-
-        const clickHandler = () => {
-            clickCountRef.current += 1;
-        };
-
+        const clickHandler = () => { clickCountRef.current += 1; };
         document.addEventListener('click', clickHandler);
 
         return () => {
@@ -57,10 +50,21 @@ function AnalyticsLogic() {
         };
     }, []);
 
+    // Re-fire init on page change
     useEffect(() => {
         if (!sessionId.current) return;
         sendEvent('init');
     }, [pathname, searchParams]);
+
+    // Re-fire when user logs in so their ID gets attached to the session
+    useEffect(() => {
+        if (!sessionId.current) return;
+        const uid = user?.id || null;
+        if (uid !== lastUserIdRef.current) {
+            lastUserIdRef.current = uid;
+            sendEvent('init'); // update session record with user_id
+        }
+    }, [user?.id]);
 
     const sendEvent = async (type: 'init' | 'heartbeat' | 'click', durationPayload: number = 0, countPayload: number = 0) => {
         if (!sessionId.current) return;
@@ -78,7 +82,8 @@ function AnalyticsLogic() {
                     referrer: document.referrer,
                     userAgent: navigator.userAgent,
                     duration: durationPayload,
-                    clickCount: countPayload
+                    clickCount: countPayload,
+                    userId: user?.id || null  // pass user id if logged in
                 })
             });
         } catch (e) {

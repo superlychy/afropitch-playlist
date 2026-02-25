@@ -77,10 +77,25 @@ interface TopPlaylist {
     total_clicks: number;
 }
 
+const VALID_TABS = ["overview", "analytics", "users", "withdrawals", "transactions", "support", "playlists", "applications", "broadcast"] as const;
+type AdminTab = typeof VALID_TABS[number];
+
 export default function AdminDashboard() {
     const { user, isLoading, logout } = useAuth();
     const router = useRouter();
-    const [activeTab, setActiveTab] = useState<"overview" | "users" | "withdrawals" | "transactions" | "support" | "playlists" | "applications" | "broadcast" | "analytics">("overview");
+
+    // Persist active tab across refreshes
+    const [activeTab, setActiveTabState] = useState<AdminTab>(() => {
+        if (typeof window !== 'undefined') {
+            const saved = localStorage.getItem('admin_active_tab');
+            if (saved && VALID_TABS.includes(saved as AdminTab)) return saved as AdminTab;
+        }
+        return 'overview';
+    });
+    const setActiveTab = (tab: AdminTab) => {
+        setActiveTabState(tab);
+        if (typeof window !== 'undefined') localStorage.setItem('admin_active_tab', tab);
+    };
 
     // DATA STATE
     const [usersList, setUsersList] = useState<AdminUser[]>([]);
@@ -109,15 +124,18 @@ export default function AdminDashboard() {
     const [playlistSongs, setPlaylistSongs] = useState<any[]>([]);
     const [isLoadingSongs, setIsLoadingSongs] = useState(false);
 
-    // Financial Stats
+    // Financial Stats — sourced from real DB data
     const [finStats, setFinStats] = useState({
-        totalRevenue: 0,
-        afropitchProfit: 0,
-        curatorHoldings: 0,
-        totalWithdrawn: 0,
-        totalPending: 0,
-        artistHoldings: 0,
-        totalHoldings: 0
+        totalDeposits: 0,       // Total ₦ deposited by artists (transactions.type='deposit')
+        totalSubmissionFees: 0, // Total ₦ paid as submission fees (non-declined submissions)
+        platformRevenue: 0,     // AfroPitch's cut (100% own playlists + 30% 3rd-party)
+        curatorEarnings: 0,     // Total curator cuts (70% of 3rd-party submissions)
+        artistHoldings: 0,      // Sum of all artist wallet balances
+        curatorHoldings: 0,     // Sum of all curator wallet balances
+        adminHoldings: 0,       // Sum of admin wallet balances
+        totalEcosystem: 0,      // Total money across ALL wallets
+        pendingWithdrawals: 0,  // Pending payout requests
+        approvedWithdrawals: 0, // Completed payouts
     });
 
     const pendingWithdrawalsCount = withdrawals.filter(w => w.status === 'pending').length;
@@ -329,65 +347,60 @@ export default function AdminDashboard() {
                 setTopPlaylists(topPl);
             }
 
-            // 7. Finance Stats (Detailed)
-            const { data: financeSubs } = await supabase
-                .from('submissions')
-                .select('amount_paid, status, playlist:playlists(curator_id)')
-                .gt('amount_paid', 0);
+            // 7. Finance Stats — sourced from real DB tables
+            const [{ data: depositTxns }, { data: financeWithdrawals }, { data: financeSubs }] = await Promise.all([
+                supabase.from('transactions').select('amount').eq('type', 'deposit'),
+                supabase.from('withdrawals').select('amount, status'),
+                supabase.from('submissions').select('amount_paid, status, playlist:playlists(curator_id)').gt('amount_paid', 0),
+            ]);
 
-            const { data: financeWithdrawals } = await supabase
-                .from('withdrawals')
-                .select('amount, status');
+            // Wallet balances by role (from already-fetched users list)
+            const artistHoldings = users?.filter((u: any) => u.role === 'artist')
+                .reduce((acc: number, curr: any) => acc + Number(curr.balance || 0), 0) || 0;
+            const curatorHoldings = users?.filter((u: any) => u.role === 'curator')
+                .reduce((acc: number, curr: any) => acc + Number(curr.balance || 0), 0) || 0;
+            const adminHoldings = users?.filter((u: any) => u.role === 'admin')
+                .reduce((acc: number, curr: any) => acc + Number(curr.balance || 0), 0) || 0;
 
-            if (financeSubs && financeWithdrawals) {
-                let totalRev = 0;
-                let profit = 0;
-                let curatorShareTotal = 0;
+            // Total deposits ever made
+            const totalDeposits = depositTxns?.reduce((acc, t) => acc + Number(t.amount), 0) || 0;
 
-                financeSubs.forEach((s: any) => {
-                    // Skip refunded/rejected transactions from Volume and Profit
-                    if (s.status === 'declined' || s.status === 'rejected') return;
+            // Submission fees (only non-declined ones count as real revenue)
+            let totalSubmissionFees = 0;
+            let platformRevenue = 0;
+            let curatorEarnings = 0;
+            financeSubs?.forEach((s: any) => {
+                if (s.status === 'declined' || s.status === 'rejected') return;
+                const amt = Number(s.amount_paid || 0);
+                totalSubmissionFees += amt;
+                const isAdminPlaylist = s.playlist?.curator_id === user?.id;
+                if (isAdminPlaylist) {
+                    platformRevenue += amt; // Admin keeps 100%
+                } else {
+                    platformRevenue += amt * 0.30;
+                    curatorEarnings += amt * 0.70;
+                }
+            });
 
-                    const amount = s.amount_paid || 0;
-                    totalRev += amount;
+            const approvedWithdrawals = financeWithdrawals
+                ?.filter((w: any) => w.status === 'approved')
+                .reduce((acc, curr) => acc + Number(curr.amount), 0) || 0;
+            const pendingWithdrawalAmt = financeWithdrawals
+                ?.filter((w: any) => w.status === 'pending')
+                .reduce((acc, curr) => acc + Number(curr.amount), 0) || 0;
 
-                    const isAdminPlaylist = s.playlist?.curator_id === user?.id;
-
-                    if (isAdminPlaylist) {
-                        profit += amount;
-                    } else {
-                        profit += (amount * 0.30);
-                        curatorShareTotal += (amount * 0.70);
-                    }
-                });
-
-                const withdrawn = financeWithdrawals
-                    .filter((w: any) => w.status === 'approved')
-                    .reduce((acc: number, curr: any) => acc + curr.amount, 0);
-
-                const pendingWithdrawals = financeWithdrawals
-                    .filter((w: any) => w.status === 'pending')
-                    .reduce((acc: number, curr: any) => acc + curr.amount, 0);
-
-                // Curator Holdings: Sum of wallet balances of all curators (Source of Truth)
-                const holdings = users?.filter((u: any) => u.role === 'curator')
-                    .reduce((acc: number, curr: any) => acc + (curr.balance || 0), 0) || 0;
-
-                // Calculate Artist Holdings (Sum of balances of all artists)
-                // We reuse 'users' from Step 1 if available, otherwise 0.
-                const artistHoldings = users?.filter((u: any) => u.role === 'artist')
-                    .reduce((acc: number, curr: any) => acc + (curr.balance || 0), 0) || 0;
-
-                setFinStats({
-                    totalRevenue: totalRev,
-                    afropitchProfit: profit,
-                    curatorHoldings: holdings,
-                    totalWithdrawn: withdrawn,
-                    totalPending: pendingWithdrawals,
-                    artistHoldings: artistHoldings,
-                    totalHoldings: holdings + artistHoldings
-                });
-            }
+            setFinStats({
+                totalDeposits,
+                totalSubmissionFees,
+                platformRevenue,
+                curatorEarnings,
+                artistHoldings,
+                curatorHoldings,
+                adminHoldings,
+                totalEcosystem: artistHoldings + curatorHoldings + adminHoldings,
+                pendingWithdrawals: pendingWithdrawalAmt,
+                approvedWithdrawals,
+            });
         };
 
         fetchData();
@@ -1077,43 +1090,97 @@ export default function AdminDashboard() {
                 {/* OVERVIEW CONTENT */}
                 {activeTab === "overview" && (
                     <div className="space-y-8">
-                        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
-                            <Card className="bg-blue-600/10 border-blue-500/20 lg:col-span-2">
-                                <CardHeader className="pb-2"><CardTitle className="text-sm text-gray-400">Total Volume</CardTitle></CardHeader>
-                                <CardContent><div className="text-2xl font-bold text-white">{pricingConfig.currency}{finStats.totalRevenue.toLocaleString()}</div></CardContent>
-                            </Card>
-                            <Card className="bg-purple-600/10 border-purple-500/20 lg:col-span-2">
-                                <CardHeader className="pb-2"><CardTitle className="text-sm text-gray-400">Total Holdings (Net)</CardTitle></CardHeader>
-                                <CardContent>
-                                    <div className="text-2xl font-bold text-white">{pricingConfig.currency}{finStats.totalHoldings.toLocaleString()}</div>
-                                    <p className="text-xs text-gray-400">Curator + Artist Funds</p>
-                                </CardContent>
-                            </Card>
-                            <Card className="bg-yellow-600/10 border-yellow-500/20 lg:col-span-2">
-                                <CardHeader className="pb-2"><CardTitle className="text-sm text-gray-400">Total Withdrawn</CardTitle></CardHeader>
-                                <CardContent><div className="text-2xl font-bold text-white">{pricingConfig.currency}{finStats.totalWithdrawn.toLocaleString()}</div></CardContent>
-                            </Card>
+                        {/* Financial Overview — Real Data from DB */}
+                        <div className="space-y-3">
+                            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                                <DollarSign className="w-5 h-5 text-green-500" /> Financial Overview
+                                <span className="text-xs text-gray-500 font-normal ml-1">All figures from live database</span>
+                            </h2>
 
-                            <Card className="bg-green-600/10 border-green-500/20 lg:col-span-2">
-                                <CardHeader className="pb-2"><CardTitle className="text-sm text-gray-400">Curator Holdings</CardTitle></CardHeader>
-                                <CardContent>
-                                    <div className="text-xl font-bold text-white">{pricingConfig.currency}{finStats.curatorHoldings.toLocaleString()}</div>
-                                </CardContent>
-                            </Card>
-                            <Card className="bg-pink-600/10 border-pink-500/20 lg:col-span-2">
-                                <CardHeader className="pb-2"><CardTitle className="text-sm text-gray-400">Artist Holdings</CardTitle></CardHeader>
-                                <CardContent>
-                                    <div className="text-xl font-bold text-white">{pricingConfig.currency}{finStats.artistHoldings.toLocaleString()}</div>
-                                </CardContent>
-                            </Card>
-                            <Card className="bg-orange-600/10 border-orange-500/20 lg:col-span-2">
-                                <CardHeader className="pb-2"><CardTitle className="text-sm text-gray-400">Pending Payouts</CardTitle></CardHeader>
-                                <CardContent>
-                                    <div className="text-xl font-bold text-white">{pricingConfig.currency}{finStats.totalPending.toLocaleString()}</div>
-                                    <p className="text-xs text-gray-400">{pendingWithdrawalsCount} requests</p>
-                                </CardContent>
-                            </Card>
+                            {/* Row 1 — Money Flow */}
+                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                                <Card className="bg-blue-600/10 border-blue-500/20">
+                                    <CardHeader className="pb-1 pt-3 px-4">
+                                        <CardTitle className="text-xs text-blue-400 uppercase tracking-wider">Total Deposits</CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="px-4 pb-3">
+                                        <div className="text-xl font-bold text-white">{pricingConfig.currency}{finStats.totalDeposits.toLocaleString()}</div>
+                                        <p className="text-[10px] text-gray-500 mt-0.5">Money loaded by artists via Paystack</p>
+                                    </CardContent>
+                                </Card>
+                                <Card className="bg-purple-600/10 border-purple-500/20">
+                                    <CardHeader className="pb-1 pt-3 px-4">
+                                        <CardTitle className="text-xs text-purple-400 uppercase tracking-wider">Submission Volume</CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="px-4 pb-3">
+                                        <div className="text-xl font-bold text-white">{pricingConfig.currency}{finStats.totalSubmissionFees.toLocaleString()}</div>
+                                        <p className="text-[10px] text-gray-500 mt-0.5">Total fees paid across all accepted pitches</p>
+                                    </CardContent>
+                                </Card>
+                                <Card className="bg-green-600/10 border-green-500/20">
+                                    <CardHeader className="pb-1 pt-3 px-4">
+                                        <CardTitle className="text-xs text-green-400 uppercase tracking-wider">Platform Revenue</CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="px-4 pb-3">
+                                        <div className="text-xl font-bold text-white">{pricingConfig.currency}{finStats.platformRevenue.toLocaleString()}</div>
+                                        <p className="text-[10px] text-gray-500 mt-0.5">AfroPitch's net cut (100% own / 30% others)</p>
+                                    </CardContent>
+                                </Card>
+                                <Card className="bg-orange-600/10 border-orange-500/20">
+                                    <CardHeader className="pb-1 pt-3 px-4">
+                                        <CardTitle className="text-xs text-orange-400 uppercase tracking-wider">Curator Earnings</CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="px-4 pb-3">
+                                        <div className="text-xl font-bold text-white">{pricingConfig.currency}{finStats.curatorEarnings.toLocaleString()}</div>
+                                        <p className="text-[10px] text-gray-500 mt-0.5">70% of 3rd-party playlist fees earned by curators</p>
+                                    </CardContent>
+                                </Card>
+                            </div>
+
+                            {/* Row 2 — Wallet Holdings */}
+                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                                <Card className="bg-white/5 border-white/10">
+                                    <CardHeader className="pb-1 pt-3 px-4">
+                                        <CardTitle className="text-xs text-gray-400 uppercase tracking-wider">Artist Wallets</CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="px-4 pb-3">
+                                        <div className="text-xl font-bold text-pink-400">{pricingConfig.currency}{finStats.artistHoldings.toLocaleString()}</div>
+                                        <p className="text-[10px] text-gray-500 mt-0.5">Sum of all artist balances</p>
+                                    </CardContent>
+                                </Card>
+                                <Card className="bg-white/5 border-white/10">
+                                    <CardHeader className="pb-1 pt-3 px-4">
+                                        <CardTitle className="text-xs text-gray-400 uppercase tracking-wider">Curator Wallets</CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="px-4 pb-3">
+                                        <div className="text-xl font-bold text-green-400">{pricingConfig.currency}{finStats.curatorHoldings.toLocaleString()}</div>
+                                        <p className="text-[10px] text-gray-500 mt-0.5">Sum of all curator balances (unpaid earnings)</p>
+                                    </CardContent>
+                                </Card>
+                                <Card className="bg-yellow-600/10 border-yellow-500/20">
+                                    <CardHeader className="pb-1 pt-3 px-4">
+                                        <CardTitle className="text-xs text-yellow-400 uppercase tracking-wider">Total in Wallets</CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="px-4 pb-3">
+                                        <div className="text-xl font-bold text-yellow-400">{pricingConfig.currency}{finStats.totalEcosystem.toLocaleString()}</div>
+                                        <p className="text-[10px] text-gray-500 mt-0.5">All users total (incl. admin: {pricingConfig.currency}{finStats.adminHoldings.toLocaleString()})</p>
+                                    </CardContent>
+                                </Card>
+                                <Card className={`border ${finStats.pendingWithdrawals > 0 ? 'bg-red-600/10 border-red-500/20' : 'bg-white/5 border-white/10'}`}>
+                                    <CardHeader className="pb-1 pt-3 px-4">
+                                        <CardTitle className={`text-xs uppercase tracking-wider ${finStats.pendingWithdrawals > 0 ? 'text-red-400' : 'text-gray-400'}`}>Withdrawals</CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="px-4 pb-3">
+                                        <div className={`text-xl font-bold ${finStats.pendingWithdrawals > 0 ? 'text-red-400' : 'text-white'}`}>
+                                            {pricingConfig.currency}{finStats.pendingWithdrawals.toLocaleString()}
+                                            {finStats.pendingWithdrawals > 0 && <span className="text-xs ml-1 animate-pulse">⚠ pending</span>}
+                                        </div>
+                                        <p className="text-[10px] text-gray-500 mt-0.5">Paid out: {pricingConfig.currency}{finStats.approvedWithdrawals.toLocaleString()}</p>
+                                    </CardContent>
+                                </Card>
+                            </div>
                         </div>
+
 
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                             {/* LIVE ACTIVITY */}
@@ -1252,38 +1319,34 @@ export default function AdminDashboard() {
                             <p className="text-gray-400">View all financial activity across the platform.</p>
                         </div>
 
-                        {/* Financial Snapshot */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+                        {/* Financial Snapshot — Transactions Tab */}
+                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
                             <Card className="bg-blue-600/10 border-blue-500/20">
-                                <CardHeader className="pb-2"><CardTitle className="text-sm text-gray-400">Total Volume</CardTitle></CardHeader>
-                                <CardContent><div className="text-2xl font-bold text-white">{pricingConfig.currency}{finStats.totalRevenue.toLocaleString()}</div></CardContent>
+                                <CardHeader className="pb-1 pt-3 px-4"><CardTitle className="text-xs text-blue-400 uppercase tracking-wider">Submission Volume</CardTitle></CardHeader>
+                                <CardContent className="px-4 pb-3">
+                                    <div className="text-xl font-bold text-white">{pricingConfig.currency}{finStats.totalSubmissionFees.toLocaleString()}</div>
+                                    <p className="text-[10px] text-gray-500">Total fees from accepted pitches</p>
+                                </CardContent>
                             </Card>
                             <Card className="bg-green-600/10 border-green-500/20">
-                                <CardHeader className="pb-2"><CardTitle className="text-sm text-gray-400">AfroPitch Profit</CardTitle></CardHeader>
-                                <CardContent>
-                                    <div className="text-2xl font-bold text-white">{pricingConfig.currency}{finStats.afropitchProfit.toLocaleString()}</div>
-                                    <p className="text-xs text-gray-400">Net Earnings/Commissions</p>
+                                <CardHeader className="pb-1 pt-3 px-4"><CardTitle className="text-xs text-green-400 uppercase tracking-wider">Platform Revenue</CardTitle></CardHeader>
+                                <CardContent className="px-4 pb-3">
+                                    <div className="text-xl font-bold text-white">{pricingConfig.currency}{finStats.platformRevenue.toLocaleString()}</div>
+                                    <p className="text-[10px] text-gray-500">AfroPitch net cut</p>
                                 </CardContent>
                             </Card>
                             <Card className="bg-purple-600/10 border-purple-500/20">
-                                <CardHeader className="pb-2"><CardTitle className="text-sm text-gray-400">Curator Holdings</CardTitle></CardHeader>
-                                <CardContent>
-                                    <div className="text-2xl font-bold text-white">{pricingConfig.currency}{finStats.curatorHoldings.toLocaleString()}</div>
-                                    <p className="text-xs text-gray-400">Payable to Curators</p>
-                                </CardContent>
-                            </Card>
-                            <Card className="bg-pink-600/10 border-pink-500/20">
-                                <CardHeader className="pb-2"><CardTitle className="text-sm text-gray-400">Artist Holdings</CardTitle></CardHeader>
-                                <CardContent>
-                                    <div className="text-2xl font-bold text-white">{pricingConfig.currency}{finStats.artistHoldings.toLocaleString()}</div>
-                                    <p className="text-xs text-gray-400">Artist Wallet Balances</p>
+                                <CardHeader className="pb-1 pt-3 px-4"><CardTitle className="text-xs text-purple-400 uppercase tracking-wider">Total Deposits</CardTitle></CardHeader>
+                                <CardContent className="px-4 pb-3">
+                                    <div className="text-xl font-bold text-white">{pricingConfig.currency}{finStats.totalDeposits.toLocaleString()}</div>
+                                    <p className="text-[10px] text-gray-500">Artist Paystack top-ups</p>
                                 </CardContent>
                             </Card>
                             <Card className="bg-orange-600/10 border-orange-500/20">
-                                <CardHeader className="pb-2"><CardTitle className="text-sm text-gray-400">Pending Payouts</CardTitle></CardHeader>
-                                <CardContent>
-                                    <div className="text-2xl font-bold text-white">{pricingConfig.currency}{finStats.totalPending.toLocaleString()}</div>
-                                    <p className="text-xs text-gray-400">Withdrawn: {pricingConfig.currency}{finStats.totalWithdrawn.toLocaleString()}</p>
+                                <CardHeader className="pb-1 pt-3 px-4"><CardTitle className="text-xs text-orange-400 uppercase tracking-wider">Withdrawals</CardTitle></CardHeader>
+                                <CardContent className="px-4 pb-3">
+                                    <div className="text-xl font-bold text-white">{pricingConfig.currency}{finStats.pendingWithdrawals.toLocaleString()} pending</div>
+                                    <p className="text-[10px] text-gray-500">Paid out: {pricingConfig.currency}{finStats.approvedWithdrawals.toLocaleString()}</p>
                                 </CardContent>
                             </Card>
                         </div>

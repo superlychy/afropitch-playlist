@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { sendDiscordNotification } from '@/lib/discord';
 
-// Initialize Service Role Client for Analytics Writes
 const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -11,15 +10,12 @@ const supabase = createClient(
 export async function POST(req: NextRequest) {
     try {
         const body = await req.json();
-        const { type, sessionId, href, referrer, userAgent } = body;
+        const { type, sessionId, href, referrer, userAgent, userId } = body;
 
-        // Get IP (Approximate)
-        const ip = req.headers.get('x-forwarded-for') || 'Unknown IP';
-        // Simple country lookup using Vercel headers if available, else 'Unknown'
+        const ip = req.headers.get('x-forwarded-for')?.split(',')[0].trim() || 'Unknown IP';
         const country = req.headers.get('x-vercel-ip-country') || 'Unknown';
 
         if (type === 'init') {
-            // Check if session exists (debounce reloads)
             const { data: existing } = await supabase
                 .from('analytics_visits')
                 .select('id, clicks, page_views')
@@ -27,22 +23,21 @@ export async function POST(req: NextRequest) {
                 .single();
 
             if (existing) {
-                // Determine if this is a "new page view" (navigation) or just a reload
-                // We update last_seen and increment page_views
+                // Update page views, last_seen, path, and attach user_id if now logged in
+                const updatePayload: any = {
+                    page_views: (existing.page_views || 1) + 1,
+                    last_seen_at: new Date().toISOString(),
+                    path: href,
+                };
+                if (userId) updatePayload.user_id = userId;
+
                 await supabase
                     .from('analytics_visits')
-                    .update({
-                        page_views: (existing.page_views || 1) + 1,
-                        last_seen_at: new Date().toISOString()
-                    })
+                    .update(updatePayload)
                     .eq('session_id', sessionId);
             } else {
-                // New Session Created!
-
-                // CHECK VISITOR FREQUENCY FOR NOTIFICATION
-                // Check if this IP has had a session in the last 1 HOUR
+                // New session — check if we should notify Discord
                 const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-
                 const { data: recentSessions } = await supabase
                     .from('analytics_visits')
                     .select('id')
@@ -56,48 +51,50 @@ export async function POST(req: NextRequest) {
                     session_id: sessionId,
                     ip_address: ip,
                     user_agent: userAgent,
-                    country: country,
+                    country,
                     path: href,
                     created_at: new Date().toISOString(),
                     last_seen_at: new Date().toISOString(),
                     page_views: 1,
                     clicks: 0,
-                    duration_seconds: 0
+                    duration_seconds: 0,
+                    user_id: userId || null,
                 });
 
-                // ONLY Notify if no recent sessions from this IP
                 if (shouldNotify) {
-                    const msg = `**New Visitor!** 🌍\n**IP:** ${ip} (${country})\n**Path:** ${href}`;
-                    sendDiscordNotification(msg).catch(err => console.error("Discord Error", err));
+                    const msg = `**New Visitor!** 🌍\n**IP:** ${ip} (${country})\n**Path:** ${href}${userId ? `\n**User:** logged in` : ''}`;
+                    sendDiscordNotification(msg).catch(() => { });
                 }
             }
         }
         else if (type === 'heartbeat') {
-            const { duration = 5, clickCount = 0 } = body;
+            const { duration = 10, clickCount = 0 } = body;
 
-            // Increment Duration
             await supabase.rpc('increment_analytics_duration', {
                 p_session_id: sessionId,
                 p_seconds: duration
             });
 
-            // Handle Batched Clicks
             if (clickCount > 0) {
                 await supabase.rpc('increment_analytics_clicks_count', {
                     p_session_id: sessionId,
                     p_count: clickCount
                 });
             }
-        }
-        else if (type === 'click') {
-            await supabase.rpc('increment_analytics_clicks', {
-                p_session_id: sessionId
-            });
+
+            // Patch user_id onto the session if they just logged in
+            if (userId) {
+                await supabase
+                    .from('analytics_visits')
+                    .update({ user_id: userId })
+                    .eq('session_id', sessionId)
+                    .is('user_id', null);
+            }
         }
         else if (type === 'login') {
             const { email, role } = body;
             const msg = `**User Login** 🔐\n**Email:** ${email}\n**Role:** ${role || 'Unknown'}\n**IP:** ${ip} (${country})`;
-            sendDiscordNotification(msg).catch(err => console.error("Discord Error", err));
+            sendDiscordNotification(msg).catch(() => { });
         }
 
         return NextResponse.json({ success: true });
