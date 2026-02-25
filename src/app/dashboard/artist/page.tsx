@@ -2,7 +2,7 @@
 
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -41,6 +41,16 @@ export default function ArtistDashboard() {
     const { user, loadFunds, isLoading, logout, refreshUser } = useAuth();
     const router = useRouter();
     const [amount, setAmount] = useState("");
+    // useRef always holds the latest amount — fixes stale closure bug in Paystack callback
+    const amountRef = useRef("");
+    const userRef = useRef(user);
+
+    // Keep refs in sync
+    useEffect(() => { amountRef.current = amount; }, [amount]);
+    useEffect(() => { userRef.current = user; }, [user]);
+
+    // Locked amount: captured the moment Pay is clicked, so it can't go stale
+    const [lockedAmount, setLockedAmount] = useState(0);
 
     // Force sync on mount - removed to prevent infinite loop
     /* useEffect(() => {
@@ -299,13 +309,19 @@ export default function ArtistDashboard() {
     if (isLoading) return <div className="p-8 text-center text-gray-500">Loading dashboard...</div>;
     if (!user) return null;
 
-    const handlePaymentSuccess = async (reference: any) => {
-        const val = parseInt(amount);
-        if (val <= 0) return;
+    const handlePaymentSuccess = useCallback(async (reference: any) => {
+        // Read from refs — always has the latest values, never stale
+        const currentUser = userRef.current;
+        const rawAmount = amountRef.current;
+        const val = parseInt(rawAmount);
+
+        if (!currentUser?.id || val <= 0) {
+            console.error("handlePaymentSuccess: missing user or amount", { currentUser, rawAmount, reference });
+            alert("Payment received but could not credit account — missing user session. Please contact support.");
+            return;
+        }
 
         let paystackRef = "";
-
-        // Robustly handle whatever shape react-paystack returns
         if (typeof reference === 'string') {
             paystackRef = reference;
         } else if (reference && typeof reference === 'object') {
@@ -314,12 +330,10 @@ export default function ArtistDashboard() {
             paystackRef = `manual_ref_${Date.now()}`;
         }
 
-        console.log("Payment successful, calling secure process_deposit RPC. Ref:", paystackRef, "Raw Event:", reference);
+        console.log("✅ Payment success. User:", currentUser.id, "Amount:", val, "Ref:", paystackRef);
 
-        // Use the secure server-side RPC — this is atomic and idempotent
-        // It: 1) Checks for duplicate references, 2) Increments balance, 3) Logs transaction
         const { data: result, error } = await supabase.rpc('process_deposit', {
-            p_user_id: user.id,
+            p_user_id: currentUser.id,
             p_amount: val,
             p_reference: paystackRef,
             p_description: `Wallet Deposit: ${paystackRef}`
@@ -327,22 +341,21 @@ export default function ArtistDashboard() {
 
         if (error) {
             console.error("process_deposit RPC error:", error);
-            alert("Payment was received but an error occurred crediting your account. Please contact support with reference: " + paystackRef);
+            alert(`Payment received but failed to credit account. Reference: ${paystackRef}. Contact support.`);
             return;
         }
 
         if (result?.success === false) {
-            // This means the reference was already processed (duplicate protection)
-            // It could happen if the webhook beat the frontend to processing
             alert("Your payment has already been processed. Refreshing your balance...");
         } else {
-            alert(`✅ Successfully loaded ${pricingConfig.currency}${val.toLocaleString()} to your wallet!`);
+            alert(`✅ ₦${val.toLocaleString()} successfully loaded to your wallet!`);
         }
 
-        // Always sync balance from DB (most reliable source)
+        // Always sync balance from DB — most reliable source
         await refreshUser();
         setAmount("");
-    };
+        setLockedAmount(0);
+    }, [refreshUser]);
 
 
     return (
@@ -574,10 +587,10 @@ export default function ArtistDashboard() {
                                 {parseInt(amount) > 0 ? (
                                     <PayWithPaystack
                                         email={user.email}
-                                        amount={parseInt(amount) * 100}
+                                        amount={(lockedAmount || parseInt(amount)) * 100}
                                         userId={user.id}
                                         onSuccess={handlePaymentSuccess}
-                                        onClose={() => { }}
+                                        onClose={() => setLockedAmount(0)}
                                     />
                                 ) : (
                                     <Button className="w-full bg-white/5 text-gray-500 cursor-not-allowed hover:bg-white/5">Enter Amount</Button>
