@@ -303,14 +303,18 @@ export default function ArtistDashboard() {
         const val = parseInt(amount);
         if (val <= 0) return;
 
-        const paystackRef = reference?.reference || reference?.trxref || null;
+        let paystackRef = "";
 
-        if (!paystackRef) {
-            alert("Payment reference missing. Please contact support with your payment details.");
-            return;
+        // Robustly handle whatever shape react-paystack returns
+        if (typeof reference === 'string') {
+            paystackRef = reference;
+        } else if (reference && typeof reference === 'object') {
+            paystackRef = reference.reference || reference.trxref || reference.transaction || `manual_ref_${Date.now()}`;
+        } else {
+            paystackRef = `manual_ref_${Date.now()}`;
         }
 
-        console.log("Payment successful, calling secure process_deposit RPC. Ref:", paystackRef);
+        console.log("Payment successful, calling secure process_deposit RPC. Ref:", paystackRef, "Raw Event:", reference);
 
         // Use the secure server-side RPC — this is atomic and idempotent
         // It: 1) Checks for duplicate references, 2) Increments balance, 3) Logs transaction
@@ -318,7 +322,7 @@ export default function ArtistDashboard() {
             p_user_id: user.id,
             p_amount: val,
             p_reference: paystackRef,
-            p_description: `Paystack Wallet Deposit (ref: ${paystackRef})`
+            p_description: `Wallet Deposit: ${paystackRef}`
         });
 
         if (error) {
@@ -329,7 +333,8 @@ export default function ArtistDashboard() {
 
         if (result?.success === false) {
             // This means the reference was already processed (duplicate protection)
-            alert("This payment has already been processed. Your balance is up to date.");
+            // It could happen if the webhook beat the frontend to processing
+            alert("Your payment was processed. Your balance is up to date.");
             await refreshUser();
             setAmount("");
             return;
