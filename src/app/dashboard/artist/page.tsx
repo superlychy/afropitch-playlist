@@ -334,17 +334,16 @@ export default function ArtistDashboard() {
         if (result?.success === false) {
             // This means the reference was already processed (duplicate protection)
             // It could happen if the webhook beat the frontend to processing
-            alert("Your payment was processed. Your balance is up to date.");
-            await refreshUser();
-            setAmount("");
-            return;
+            alert("Your payment has already been processed. Refreshing your balance...");
+        } else {
+            alert(`✅ Successfully loaded ${pricingConfig.currency}${val.toLocaleString()} to your wallet!`);
         }
 
-        // Update local state to reflect new balance immediately
-        loadFunds(val);
+        // Always sync balance from DB (most reliable source)
+        await refreshUser();
         setAmount("");
-        alert(`Successfully loaded ${pricingConfig.currency}${val.toLocaleString()} to your wallet!`);
     };
+
 
     return (
         <div className="container mx-auto px-4 max-w-5xl py-12 relative">
