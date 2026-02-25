@@ -2,7 +2,7 @@
 
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -84,6 +84,11 @@ export default function AdminDashboard() {
     const { user, isLoading, logout } = useAuth();
     const router = useRouter();
 
+    // Refs for realtime support chat
+    const userRef = useRef(user);
+    const chatChannelRef = useRef<any>(null);
+    useEffect(() => { userRef.current = user; }, [user]);
+
     // Persist active tab across refreshes
     const [activeTab, setActiveTabState] = useState<AdminTab>(() => {
         if (typeof window !== 'undefined') {
@@ -100,19 +105,11 @@ export default function AdminDashboard() {
     // DATA STATE
     const [usersList, setUsersList] = useState<AdminUser[]>([]);
     const [messageUser, setMessageUser] = useState<AdminUser | null>(null);
-    const [pendingCurators, setPendingCurators] = useState<any[]>([]); // New state
-    const [pendingSubmissionsCount, setPendingSubmissionsCount] = useState(0); // New State
+    const [pendingCurators, setPendingCurators] = useState<any[]>([]); // Registered curators awaiting verification
+    const [pendingSubmissionsCount, setPendingSubmissionsCount] = useState(0);
+    const [curatorApplications, setCuratorApplications] = useState<any[]>([]); // External public applicants
     const [withdrawals, setWithdrawals] = useState<WithdrawalRequest[]>([]);
     const [tickets, setTickets] = useState<SupportTicket[]>([]);
-
-    // ... (rest of states remain same if not touched, but I must match replace context)
-
-    // ... 
-    // I can't easily replace just the state lines without context.
-    // I will replace lines 76-80 approximately.
-
-    // Actually, I can replace the whole block if I am careful.
-    // Let's target the exact lines.
 
     const [allPlaylists, setAllPlaylists] = useState<AdminPlaylist[]>([]);
     const [isRefreshing, setIsRefreshing] = useState<string | null>(null);
@@ -211,15 +208,12 @@ export default function AdminDashboard() {
     const [broadcastAddressing, setBroadcastAddressing] = useState<'dear_all' | 'dear_name'>('dear_all');
     const [isSendingBroadcast, setIsSendingBroadcast] = useState(false);
 
-    // Notify Admin Login
+    // Notify Admin on Login
     useEffect(() => {
         if (user && user.role === 'admin') {
             const hasNotified = sessionStorage.getItem('admin_notified');
             if (!hasNotified) {
-                // Determine user email safely
                 const email = user.email || 'Admin';
-
-                // Invoke Edge Function directly
                 supabase.functions.invoke('notify-admin', {
                     body: {
                         event_type: 'ADMIN_LOGIN',
@@ -257,6 +251,14 @@ export default function AdminDashboard() {
                 .eq('verification_status', 'pending');
 
             if (pending) setPendingCurators(pending);
+
+            // Fetch public curator_applications (from /curators/join page)
+            const { data: extApps } = await supabase
+                .from('curator_applications')
+                .select('*')
+                .or('status.is.null,status.eq.pending')
+                .order('created_at', { ascending: false });
+            if (extApps) setCuratorApplications(extApps);
 
             // New: Count Pending Submissions
             const { count: subCount } = await supabase.from('submissions').select('*', { count: 'exact', head: true }).eq('status', 'pending');
@@ -828,8 +830,8 @@ export default function AdminDashboard() {
     const openChat = async (ticket: SupportTicket) => {
         setActiveTicket(ticket);
         setShowChat(true);
-        // Fetch Messages
-        const { data, error } = await supabase
+
+        const { data } = await supabase
             .from('support_messages')
             .select('*')
             .eq('ticket_id', ticket.id)
@@ -841,9 +843,31 @@ export default function AdminDashboard() {
                 is_admin: user?.id === m.sender_id
             })));
         } else {
-            // If no messages yet, maybe effectively empty
             setChatMessages([]);
         }
+
+        // Cleanup previous realtime channel
+        if (chatChannelRef.current) supabase.removeChannel(chatChannelRef.current);
+
+        // Subscribe to new messages in this ticket
+        const channel = supabase
+            .channel(`admin-chat-${ticket.id}`)
+            .on(
+                'postgres_changes',
+                { event: 'INSERT', schema: 'public', table: 'support_messages', filter: `ticket_id=eq.${ticket.id}` },
+                (payload) => {
+                    setChatMessages(prev => {
+                        if (prev.some(m => m.id === payload.new.id)) return prev;
+                        return [...prev, {
+                            ...payload.new,
+                            is_admin: userRef.current?.id === payload.new.sender_id
+                        }];
+                    });
+                }
+            )
+            .subscribe();
+
+        chatChannelRef.current = channel;
     };
 
     const sendMessage = async () => {
@@ -920,22 +944,63 @@ export default function AdminDashboard() {
     };
 
     const handleCuratorAction = async (id: string, action: 'verified' | 'rejected') => {
-        const { data, error } = await supabase.from('profiles').update({ verification_status: action }).eq('id', id).select();
+        const { data, error } = await supabase
+            .from('profiles')
+            .update({ verification_status: action })
+            .eq('id', id)
+            .select();
 
         if (error) {
             alert("Error updating status: " + error.message);
         } else if (!data || data.length === 0) {
-            alert("Update failed: Permission denied or user not found. Please refresh.");
-            // Revert state by triggering a refresh or manual revert?
-            // Since we already filtered it out optimistically (wait, we didn't filter it yet in the previous code? Ah, we did below).
-            // I'll move optimistic update to AFTER check.
+            alert("Update failed: Permission denied or user not found.");
         } else {
-            // Optimistic update
             setPendingCurators(prev => prev.filter(c => c.id !== id));
-            alert(`Curator application ${action}.`);
 
-            // If verified, maybe send email? (Requires Edge Function update, skipping for now as per MVP)
+            // Send in-app notification to the curator
+            const msg = action === 'verified'
+                ? '🎉 Congratulations! Your curator account has been verified. You can now add playlists and receive paid submissions.'
+                : '❌ Your curator verification application was not approved. Please contact support for more info.';
+
+            await supabase.from('notifications').insert({
+                user_id: id,
+                title: action === 'verified' ? 'Curator Account Verified!' : 'Verification Not Approved',
+                message: msg,
+                is_read: false
+            });
+
+            // Also open a support ticket so it appears in their chat
+            const { data: ticket } = await supabase.from('support_tickets').insert({
+                user_id: id,
+                subject: action === 'verified' ? 'Your Account is Verified ✅' : 'Verification Update',
+                message: msg,
+                status: 'closed'
+            }).select().single();
+
+            if (ticket) {
+                await supabase.from('support_messages').insert({
+                    ticket_id: ticket.id,
+                    sender_id: user?.id,
+                    message: msg
+                });
+            }
+
+            alert(`Curator application ${action}. Notification sent.`);
         }
+    };
+
+    const handleExternalAppAction = async (appId: string, action: 'approved' | 'rejected') => {
+        const { error } = await supabase
+            .from('curator_applications')
+            .update({ status: action })
+            .eq('id', appId);
+
+        if (error) {
+            alert('Error: ' + error.message);
+            return;
+        }
+        setCuratorApplications(prev => prev.filter(a => a.id !== appId));
+        alert(`Application ${action}. Reach out to the applicant at their email to set up their account.`);
     };
 
     const handleSendBroadcast = async () => {
@@ -1023,7 +1088,7 @@ export default function AdminDashboard() {
                                 let count = 0;
                                 if (tab === 'withdrawals') count = pendingWithdrawalsCount;
                                 if (tab === 'support') count = openTicketsCount;
-                                if (tab === 'applications') count = pendingCurators.length;
+                                if (tab === 'applications') count = pendingCurators.length + curatorApplications.length;
                                 if (tab === 'playlists') count = pendingSubmissionsCount;
 
                                 return (
@@ -1746,49 +1811,123 @@ export default function AdminDashboard() {
             {/* APPLICATIONS VIEW */}
             {
                 activeTab === "applications" && (
-                    <Card className="bg-black/40 border-white/10">
-                        <CardHeader>
-                            <CardTitle className="text-white">Curator Applications</CardTitle>
-                            <CardDescription>Review and approve new curators.</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="space-y-4">
-                                {pendingCurators.length === 0 && <p className="text-gray-500 text-center py-4">No pending applications.</p>}
-                                {pendingCurators.map(c => (
-                                    <div key={c.id} className="flex flex-col md:flex-row md:items-center justify-between p-4 bg-white/5 rounded-lg border border-white/5 gap-4">
-                                        <div className="flex items-center gap-4">
-                                            <div className="w-10 h-10 rounded-full bg-yellow-500/20 text-yellow-500 flex items-center justify-center font-bold">
-                                                {c.full_name[0]}
-                                            </div>
-                                            <div>
-                                                <p className="font-bold text-white flex items-center gap-2">
-                                                    {c.full_name}
-                                                    <span className="text-[10px] bg-yellow-500/20 text-yellow-500 px-2 rounded-full uppercase">Pending</span>
-                                                </p>
-                                                <p className="text-sm text-gray-500">{c.email}</p>
-                                                <div className="mt-1 text-xs text-gray-400">
-                                                    Bank: {c.bank_name || 'Not set'} • Acc: {c.account_number || 'N/A'}
+                    <div className="space-y-6">
+                        {/* Section 1: Registered curators awaiting profile verification */}
+                        <Card className="bg-black/40 border-white/10">
+                            <CardHeader>
+                                <CardTitle className="text-white flex items-center gap-2">
+                                    <Users className="w-5 h-5 text-yellow-500" />
+                                    Registered Curators Awaiting Verification
+                                </CardTitle>
+                                <CardDescription>Curators who have applied via their dashboard for identity verification.</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="space-y-4">
+                                    {pendingCurators.length === 0 && (
+                                        <p className="text-gray-500 text-center py-4 text-sm">No pending profile verifications.</p>
+                                    )}
+                                    {pendingCurators.map(c => (
+                                        <div key={c.id} className="flex flex-col md:flex-row md:items-center justify-between p-4 bg-white/5 rounded-lg border border-white/5 gap-4">
+                                            <div className="flex items-center gap-4">
+                                                <div className="w-10 h-10 rounded-full bg-yellow-500/20 text-yellow-500 flex items-center justify-center font-bold text-lg">
+                                                    {c.full_name?.[0] || '?'}
                                                 </div>
-                                                {c.verification_docs && (
-                                                    <div className="mt-1 text-xs text-blue-400">
-                                                        Docs: {c.verification_docs}
+                                                <div>
+                                                    <p className="font-bold text-white flex items-center gap-2">
+                                                        {c.full_name}
+                                                        <span className="text-[10px] bg-yellow-500/20 text-yellow-500 px-2 rounded-full uppercase">Pending</span>
+                                                    </p>
+                                                    <p className="text-sm text-gray-500">{c.email}</p>
+                                                    <div className="mt-1 text-xs text-gray-400">
+                                                        Bank: {c.bank_name || 'Not set'} • Acc: {c.account_number || 'N/A'}
+                                                        {c.nin_number && <span className="ml-2">• NIN: {c.nin_number}</span>}
                                                     </div>
-                                                )}
+                                                    {c.verification_docs && (() => {
+                                                        try {
+                                                            const docs = JSON.parse(c.verification_docs);
+                                                            return (
+                                                                <div className="mt-2 text-xs text-blue-400 space-y-0.5">
+                                                                    {docs.portfolio && <p>Portfolio: {docs.portfolio}</p>}
+                                                                    {docs.phone && <p>Phone: {docs.phone}</p>}
+                                                                    {docs.experience && <p>Experience: {docs.experience} yrs</p>}
+                                                                    {docs.genres && <p>Genres: {docs.genres}</p>}
+                                                                </div>
+                                                            );
+                                                        } catch { return <div className="mt-1 text-xs text-blue-400">{c.verification_docs}</div>; }
+                                                    })()}
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-2 shrink-0">
+                                                <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={() => handleCuratorAction(c.id, 'verified')}>
+                                                    <CheckCircle className="w-4 h-4 mr-1" /> Approve
+                                                </Button>
+                                                <Button size="sm" variant="destructive" onClick={() => handleCuratorAction(c.id, 'rejected')}>
+                                                    <XCircle className="w-4 h-4 mr-1" /> Reject
+                                                </Button>
                                             </div>
                                         </div>
-                                        <div className="flex items-center gap-2">
-                                            <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={() => handleCuratorAction(c.id, 'verified')}>
-                                                <CheckCircle className="w-4 h-4 mr-2" /> Approve
-                                            </Button>
-                                            <Button size="sm" variant="destructive" onClick={() => handleCuratorAction(c.id, 'rejected')}>
-                                                <XCircle className="w-4 h-4 mr-2" /> Reject
-                                            </Button>
+                                    ))}
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        {/* Section 2: Public applicants from /curators/join */}
+                        <Card className="bg-black/40 border-white/10">
+                            <CardHeader>
+                                <CardTitle className="text-white flex items-center gap-2">
+                                    <Users className="w-5 h-5 text-blue-400" />
+                                    External Public Applications
+                                    {curatorApplications.length > 0 && (
+                                        <span className="text-xs bg-blue-500 text-white px-2 py-0.5 rounded-full">{curatorApplications.length}</span>
+                                    )}
+                                </CardTitle>
+                                <CardDescription>Applications submitted via the public /curators/join page (not yet registered users).</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="space-y-4">
+                                    {curatorApplications.length === 0 && (
+                                        <p className="text-gray-500 text-center py-4 text-sm">No external applications.</p>
+                                    )}
+                                    {curatorApplications.map(app => (
+                                        <div key={app.id} className="flex flex-col md:flex-row md:items-center justify-between p-4 bg-white/5 rounded-lg border border-blue-500/10 gap-4">
+                                            <div className="flex items-start gap-4">
+                                                <div className="w-10 h-10 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center font-bold text-lg shrink-0">
+                                                    {app.name?.[0] || '?'}
+                                                </div>
+                                                <div className="space-y-1 min-w-0">
+                                                    <p className="font-bold text-white">{app.name}</p>
+                                                    <p className="text-sm text-blue-400">{app.email}</p>
+                                                    {app.playlist_link && (
+                                                        <a href={app.playlist_link} target="_blank" rel="noopener noreferrer"
+                                                            className="text-xs text-green-400 hover:underline truncate block max-w-xs">
+                                                            🎵 {app.playlist_link}
+                                                        </a>
+                                                    )}
+                                                    {app.bio && <p className="text-xs text-gray-400 mt-1">"{app.bio}"</p>}
+                                                    {app.social_links && (
+                                                        <div className="text-xs text-gray-500 flex gap-3 flex-wrap">
+                                                            {app.social_links.instagram && <span>IG: @{app.social_links.instagram}</span>}
+                                                            {app.social_links.twitter && <span>TW: @{app.social_links.twitter}</span>}
+                                                            {app.social_links.website && <span>Web: {app.social_links.website}</span>}
+                                                        </div>
+                                                    )}
+                                                    <p className="text-[10px] text-gray-600">Applied: {new Date(app.created_at).toLocaleDateString()}</p>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-2 shrink-0">
+                                                <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={() => handleExternalAppAction(app.id, 'approved')}>
+                                                    <CheckCircle className="w-4 h-4 mr-1" /> Approve
+                                                </Button>
+                                                <Button size="sm" variant="destructive" onClick={() => handleExternalAppAction(app.id, 'rejected')}>
+                                                    <XCircle className="w-4 h-4 mr-1" /> Reject
+                                                </Button>
+                                            </div>
                                         </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </CardContent>
-                    </Card>
+                                    ))}
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
                 )
             }
 

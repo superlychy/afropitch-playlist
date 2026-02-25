@@ -99,6 +99,8 @@ export default function CuratorDashboard() {
     const [supportSubject, setSupportSubject] = useState("");
     const [supportMessage, setSupportMessage] = useState("");
     const [isSubmittingTicket, setIsSubmittingTicket] = useState(false);
+    const chatBottomRef = useRef<HTMLDivElement>(null);
+    const chatChannelRef = useRef<any>(null);
 
     // Add Playlist State
     const [newPlaylistLink, setNewPlaylistLink] = useState("");
@@ -428,34 +430,6 @@ export default function CuratorDashboard() {
         if (data) setSupportTickets(data);
     };
 
-    const handleSupportSubmit = async () => {
-        if (!user || !supportSubject || !supportMessage) return;
-        setIsSubmittingTicket(true);
-
-        const { error } = await supabase.from('support_tickets').insert({
-            user_id: user.id,
-            subject: supportSubject,
-            message: supportMessage, // Initial message
-            status: 'open'
-        }).select().single();
-
-        if (error) {
-            alert("Error submitting ticket: " + error.message);
-        } else {
-            // We should also insert the message into support_messages if we want it to appear in chat
-            // But the schema has 'message' on the ticket itself as 'last_message' or 'initial_message'.
-            // Actually admin reads 'support_messages'. So we must insert into 'support_messages' too.
-            // Wait, the schema I read for support_tickets has 'message' column.
-            // But the admin chat relies on 'support_messages'.
-            // Let's insert into support_messages as well.
-
-            // First get the new ticket ID.
-            // The .select().single() above returns the ticket.
-        }
-
-        // Re-do with proper logic
-        setIsSubmittingTicket(false);
-    };
 
     const createTicket = async () => {
         if (!user || !supportSubject || !supportMessage) return;
@@ -513,6 +487,31 @@ export default function CuratorDashboard() {
 
         if (data) setChatMessages(data);
         setIsLoadingChat(false);
+
+        // Cleanup previous channel
+        if (chatChannelRef.current) {
+            supabase.removeChannel(chatChannelRef.current);
+        }
+
+        // Subscribe to new messages in this ticket (realtime)
+        const channel = supabase
+            .channel(`support-chat-${ticket.id}`)
+            .on(
+                'postgres_changes',
+                { event: 'INSERT', schema: 'public', table: 'support_messages', filter: `ticket_id=eq.${ticket.id}` },
+                (payload) => {
+                    setChatMessages(prev => {
+                        // Avoid duplicates (we may have added it optimistically)
+                        if (prev.some(m => m.id === payload.new.id)) return prev;
+                        return [...prev, payload.new];
+                    });
+                    setTimeout(() => chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
+                }
+            )
+            .subscribe();
+
+        chatChannelRef.current = channel;
+        setTimeout(() => chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
     };
 
     const sendChatMessage = async () => {
@@ -964,7 +963,7 @@ export default function CuratorDashboard() {
                                             );
                                         })}
                                     </div>
-                                    <div ref={(el) => { if (el) el.scrollIntoView({ behavior: "smooth" }); }}></div>
+                                    <div ref={chatBottomRef} />
 
                                     <div className="p-3 bg-zinc-900 border-t border-white/10 flex gap-2">
                                         <Input
