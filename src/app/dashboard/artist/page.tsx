@@ -365,7 +365,19 @@ export default function ArtistDashboard() {
                     <h1 className="text-3xl font-bold text-white">Artist Dashboard</h1>
                     <p className="text-gray-400">Welcome back, <span className="text-green-500">{user.name || 'Artist'}</span>. Manage your budget and track submissions.</p>
                 </div>
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-3 flex-wrap">
+                    {/* Top Up Wallet — prominent header button */}
+                    <Button
+                        className="bg-green-600 hover:bg-green-700 font-bold px-5 h-10 flex items-center gap-2 shadow-lg shadow-green-900/30"
+                        onClick={() => {
+                            // Scroll to wallet card on desktop, or just focus the amount input
+                            document.getElementById('top-up-amount')?.focus();
+                            document.getElementById('wallet-card')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }}
+                    >
+                        <Wallet className="w-4 h-4" /> Top Up Wallet
+                    </Button>
+
                     <Button
                         variant="outline"
                         size="icon"
@@ -425,9 +437,9 @@ export default function ArtistDashboard() {
                 </Card>
             </div>
 
-            {/* Main Content Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                {/* Left Column: Submissions */}
+            {/* Main Content Grid — wallet first on mobile via flex-col-reverse */}
+            <div className="flex flex-col-reverse lg:grid lg:grid-cols-3 gap-8">
+                {/* Left Column: Submissions — on mobile this becomes the bottom */}
                 <div className="lg:col-span-2 space-y-6">
                     <h2 className="text-xl font-bold text-white flex items-center gap-2"><History className="w-5 h-5 text-gray-400" /> Recent Submissions</h2>
                     {loadingSubmissions ? (
@@ -562,9 +574,9 @@ export default function ArtistDashboard() {
                     )}
                 </div>
 
-                {/* Right Column: Wallet & History */}
-                <div className="space-y-6">
-                    {/* Integrated Wallet Card */}
+                {/* Right Column (wallet) — on mobile this renders at the TOP because of flex-col-reverse */}
+                <div className="space-y-6" id="wallet-card">
+                    {/* Wallet Balance Card */}
                     <Card className="bg-zinc-900 border-white/10 overflow-hidden">
                         <div className="bg-gradient-to-r from-green-900/40 to-black p-6 border-b border-green-500/10">
                             <h3 className="text-xs font-medium text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-2">
@@ -575,9 +587,12 @@ export default function ArtistDashboard() {
                             </div>
                         </div>
                         <CardContent className="p-6">
-                            <h4 className="text-sm font-medium text-gray-300 mb-3">Load Credits</h4>
+                            <h4 className="text-sm font-medium text-gray-300 mb-3 flex items-center gap-2">
+                                <Plus className="w-4 h-4 text-green-500" /> Top Up Wallet
+                            </h4>
                             <div className="space-y-3">
                                 <Input
+                                    id="top-up-amount"
                                     type="number"
                                     placeholder="Amount (NGN)"
                                     value={amount}
@@ -599,12 +614,12 @@ export default function ArtistDashboard() {
                         </CardContent>
                     </Card>
 
-                    <div className="pt-4">
+                    <div className="pt-2">
                         <div className="flex items-center justify-between mb-4">
-                            <h2 className="text-lg font-bold text-white flex items-center gap-2"><History className="w-5 h-5 text-gray-400" /> Recent Transactions</h2>
-                            {/* View All logic to be implemented fully later or simple routing */}
+                            <h2 className="text-lg font-bold text-white flex items-center gap-2"><History className="w-5 h-5 text-gray-400" /> Wallet History</h2>
                         </div>
-                        <TransactionsList userId={user.id} />
+                        {/* Only show deposits and refunds — no earnings/payments/withdrawals */}
+                        <TransactionsList userId={user.id} allowedTypes={['deposit', 'refund']} />
                     </div>
                 </div>
             </div>

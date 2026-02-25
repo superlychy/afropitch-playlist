@@ -32,7 +32,7 @@ const TYPE_COLORS: Record<string, string> = {
 
 const isCredit = (type: string) => ['deposit', 'refund', 'earning'].includes(type);
 
-export function TransactionsList({ userId }: { userId?: string }) {
+export function TransactionsList({ userId, allowedTypes }: { userId?: string; allowedTypes?: string[] }) {
     const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [search, setSearch] = useState("");
@@ -63,7 +63,12 @@ export function TransactionsList({ userId }: { userId?: string }) {
         fetchTransactions();
     }, [userId]);
 
-    const filtered = transactions.filter(tx => {
+    // Pre-filter to only allowed types if specified
+    const visibleTransactions = allowedTypes
+        ? transactions.filter(tx => allowedTypes.includes(tx.type))
+        : transactions;
+
+    const filtered = visibleTransactions.filter(tx => {
         const matchesType = typeFilter === 'all' || tx.type === typeFilter;
         const searchLower = search.toLowerCase();
         const matchesSearch = !search
@@ -74,9 +79,9 @@ export function TransactionsList({ userId }: { userId?: string }) {
         return matchesType && matchesSearch;
     });
 
-    const totalDeposits = transactions.filter(t => t.type === 'deposit').reduce((s, t) => s + Number(t.amount), 0);
-    const totalWithdrawals = transactions.filter(t => t.type === 'withdrawal').reduce((s, t) => s + Math.abs(Number(t.amount)), 0);
-    const totalPayments = transactions.filter(t => t.type === 'payment').reduce((s, t) => s + Math.abs(Number(t.amount)), 0);
+    const totalDeposits = visibleTransactions.filter(t => t.type === 'deposit').reduce((s, t) => s + Number(t.amount), 0);
+    const totalWithdrawals = visibleTransactions.filter(t => t.type === 'withdrawal').reduce((s, t) => s + Math.abs(Number(t.amount)), 0);
+    const totalPayments = visibleTransactions.filter(t => t.type === 'payment').reduce((s, t) => s + Math.abs(Number(t.amount)), 0);
 
     if (isLoading) return (
         <div className="flex items-center gap-2 text-gray-500 text-sm py-6">
@@ -116,18 +121,20 @@ export function TransactionsList({ userId }: { userId?: string }) {
                     />
                 </div>
                 <div className="flex gap-1 flex-wrap">
-                    {['all', 'deposit', 'payment', 'refund', 'earning', 'withdrawal'].map(t => (
-                        <button
-                            key={t}
-                            onClick={() => setTypeFilter(t)}
-                            className={`px-3 py-1.5 rounded text-xs font-bold capitalize border transition-all ${typeFilter === t
-                                ? 'bg-green-600 text-white border-green-500'
-                                : 'bg-white/5 text-gray-400 border-white/10 hover:border-white/30'
-                                }`}
-                        >
-                            {t}
-                        </button>
-                    ))}
+                    {(['all', 'deposit', 'payment', 'refund', 'earning', 'withdrawal'] as string[])
+                        .filter(t => !allowedTypes || t === 'all' || allowedTypes.includes(t))
+                        .map(t => (
+                            <button
+                                key={t}
+                                onClick={() => setTypeFilter(t)}
+                                className={`px-3 py-1.5 rounded text-xs font-bold capitalize border transition-all ${typeFilter === t
+                                    ? 'bg-green-600 text-white border-green-500'
+                                    : 'bg-white/5 text-gray-400 border-white/10 hover:border-white/30'
+                                    }`}
+                            >
+                                {t}
+                            </button>
+                        ))}
                 </div>
                 <Button size="sm" variant="ghost" onClick={fetchTransactions} className="text-gray-400 hover:text-white">
                     <RefreshCw className="w-4 h-4" />
