@@ -303,30 +303,42 @@ export default function ArtistDashboard() {
         const val = parseInt(amount);
         if (val <= 0) return;
 
-        // 1. Update Database
-        const { error } = await supabase.from('profiles').update({
-            balance: (user.balance || 0) + val
-        }).eq('id', user.id);
+        const paystackRef = reference?.reference || reference?.trxref || null;
 
-        if (error) {
-            alert("Payment successful but failed to update balance. Please contact support.");
-            console.error(error);
+        if (!paystackRef) {
+            alert("Payment reference missing. Please contact support with your payment details.");
             return;
         }
 
-        // 2. Insert Transaction Record
-        await supabase.from('transactions').insert({
-            user_id: user.id,
-            amount: val,
-            type: 'deposit',
-            // Use reference if available for clearer tracking
-            description: `Wallet Deposit: ${reference?.reference || 'Manual'}`
+        console.log("Payment successful, calling secure process_deposit RPC. Ref:", paystackRef);
+
+        // Use the secure server-side RPC — this is atomic and idempotent
+        // It: 1) Checks for duplicate references, 2) Increments balance, 3) Logs transaction
+        const { data: result, error } = await supabase.rpc('process_deposit', {
+            p_user_id: user.id,
+            p_amount: val,
+            p_reference: paystackRef,
+            p_description: `Paystack Wallet Deposit (ref: ${paystackRef})`
         });
 
-        // 2. Update Local State
+        if (error) {
+            console.error("process_deposit RPC error:", error);
+            alert("Payment was received but an error occurred crediting your account. Please contact support with reference: " + paystackRef);
+            return;
+        }
+
+        if (result?.success === false) {
+            // This means the reference was already processed (duplicate protection)
+            alert("This payment has already been processed. Your balance is up to date.");
+            await refreshUser();
+            setAmount("");
+            return;
+        }
+
+        // Update local state to reflect new balance immediately
         loadFunds(val);
         setAmount("");
-        alert(`Successfully loaded ${pricingConfig.currency}${val.toLocaleString()}`);
+        alert(`Successfully loaded ${pricingConfig.currency}${val.toLocaleString()} to your wallet!`);
     };
 
     return (
@@ -559,6 +571,7 @@ export default function ArtistDashboard() {
                                     <PayWithPaystack
                                         email={user.email}
                                         amount={parseInt(amount) * 100}
+                                        userId={user.id}
                                         onSuccess={handlePaymentSuccess}
                                         onClose={() => { }}
                                     />

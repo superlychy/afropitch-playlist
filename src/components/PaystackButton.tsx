@@ -8,11 +8,12 @@ import { CreditCard } from "lucide-react";
 interface PayProps {
     email: string;
     amount: number; // in Kobo (Naira * 100) or smallest currency unit
+    userId?: string;
     onSuccess: (reference: any) => void;
     onClose: () => void;
 }
 
-const PayWithPaystack = ({ email, amount, onSuccess, onClose }: PayProps) => {
+const PayWithPaystack = ({ email, amount, userId, onSuccess, onClose }: PayProps) => {
 
     // REPLACE THIS WITH YOUR OWN PUBLIC KEY FROM PAYSTACK DASHBOARD
     const publicKey = process.env.NEXT_PUBLIC_PAYSTACK_KEY || "pk_test_0e3dd68677c77840131496660e5361362e697858";
@@ -22,8 +23,14 @@ const PayWithPaystack = ({ email, amount, onSuccess, onClose }: PayProps) => {
         amount, // Paystack expects amount in kobo
         metadata: {
             name: "AfroPitch Submission",
-            phone: "",
-            custom_fields: []
+            user_id: userId,
+            custom_fields: userId ? [
+                {
+                    display_name: "User ID",
+                    variable_name: "user_id",
+                    value: userId
+                }
+            ] : []
         },
         publicKey,
         text: "Pay Now",
