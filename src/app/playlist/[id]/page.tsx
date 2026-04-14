@@ -144,80 +144,27 @@ export default function PlaylistPage() {
         </div>
       </div>
 
-      {/* Track List */}
-      <div className="max-w-4xl mx-auto px-4 mt-12">
-        <h2 className="text-xl font-bold text-white mb-6">Tracks</h2>
-
-        {data.tracks.length === 0 ? (
-          <div className="text-center py-12 bg-white/5 rounded-xl">
-            <Music className="w-12 h-12 mx-auto text-gray-600 mb-2" />
-            <p className="text-gray-400">
-              No tracks found. Click "Sync from Spotify" to fetch tracks.
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-1">
-            {data.tracks.map((track, i) => (
-              <div
-                key={i}
-                className="flex items-center gap-4 p-3 rounded-lg hover:bg-white/5 transition-colors group"
-              >
-                <span className="w-8 text-center text-sm text-gray-500 font-medium">
-                  {i + 1}
-                </span>
-                {track.album_image ? (
-                  <img
-                    src={track.album_image}
-                    alt={track.name}
-                    className="w-12 h-12 rounded"
-                  />
-                ) : (
-                  <div className="w-12 h-12 rounded bg-zinc-800 flex items-center justify-center">
-                    <Music className="w-5 h-5 text-gray-600" />
-                  </div>
-                )}
-                <div className="flex-1 min-w-0">
-                  <p className="text-white font-medium truncate">
-                    {track.name}
-                  </p>
-                  <p className="text-sm text-gray-400 truncate">
-                    {track.artists}
-                  </p>
-                </div>
-                <span className="text-sm text-gray-500">
-                  {formatDuration(track.duration)}
-                </span>
-                {track.spotify_url && (
-                  <a
-                    href={track.spotify_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="opacity-0 group-hover:opacity-100 transition-opacity"
-                  >
-                    <ExternalLink className="w-4 h-4 text-green-500" />
-                  </a>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Spotify Embed */}
-        {data.tracks.length > 0 && (
-          <div className="mt-12">
-            <h2 className="text-xl font-bold text-white mb-6">
-              Listen on Spotify
-            </h2>
+      {/* Spotify Embed */}
+      <div className="max-w-4xl mx-auto px-4 mt-6 md:mt-12">
+        {data.playlist.playlist_link ? (
+          <div className="w-full">
             <iframe
               src={`https://open.spotify.com/embed/playlist/${
-                data.tracks[0]?.spotify_url?.match(/playlist\/([a-zA-Z0-9]+)/)?.[1] || ""
+                data.playlist.playlist_link.match(/playlist\/([a-zA-Z0-9]+)/)?.[1] || ""
               }?utm_source=generator&theme=0`}
               width="100%"
-              height="352"
+              height="600"
               style={{ borderRadius: "12px", border: "none" }}
               allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
               loading="lazy"
             />
+          </div>
+        ) : (
+          <div className="text-center py-12 bg-white/5 rounded-xl border border-white/5">
+            <Music className="w-12 h-12 mx-auto text-gray-600 mb-2" />
+            <p className="text-gray-400">
+              No Spotify link available for this playlist.
+            </p>
           </div>
         )}
       </div>

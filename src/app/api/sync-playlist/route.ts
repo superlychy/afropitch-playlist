@@ -150,6 +150,7 @@ export async function POST(req: Request) {
         description: spData?.description || "Curated AfroPitch Playlist",
         cover_image: spData?.images?.[0]?.url || null,
         followers: spData?.followers?.total || 0,
+        playlist_link: spotifyUrl,
       },
       tracks: trackList,
       total_tracks: trackList.length,

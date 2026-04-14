@@ -7,7 +7,7 @@ import { useToast } from "@/components/ui/toast";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { BarChart3, TrendingUp, Music, Users, Trophy, DollarSign, ShieldAlert, CheckCircle, XCircle, MessageSquare, LogOut, Bell, Plus, Search, Loader2, Send, RefreshCw } from "lucide-react";
+import { BarChart3, TrendingUp, Music, Users, Trophy, DollarSign, ShieldAlert, CheckCircle, XCircle, MessageSquare, LogOut, Bell, Plus, Search, Loader2, Send, RefreshCw, Zap } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { TransactionsList } from "@/components/TransactionsList";
 import { pricingConfig } from "@/../config/pricing";
@@ -79,7 +79,7 @@ interface TopPlaylist {
     total_clicks: number;
 }
 
-const VALID_TABS = ["overview", "analytics", "users", "withdrawals", "transactions", "support", "playlists", "applications", "broadcast", "inbox"] as const;
+const VALID_TABS = ["overview", "analytics", "users", "withdrawals", "transactions", "support", "playlists", "submissions", "applications", "broadcast", "inbox"] as const;
 type AdminTab = typeof VALID_TABS[number];
 
 export default function AdminDashboard() {
@@ -122,6 +122,7 @@ export default function AdminDashboard() {
     // Song Management State
     const [expandedPlaylistId, setExpandedPlaylistId] = useState<string | null>(null);
     const [playlistSongs, setPlaylistSongs] = useState<any[]>([]);
+    const [allSubmissions, setAllSubmissions] = useState<any[]>([]);
     const [isLoadingSongs, setIsLoadingSongs] = useState(false);
 
     // Financial Stats — sourced from real DB data
@@ -801,6 +802,31 @@ export default function AdminDashboard() {
 
         if (data) setPlaylistSongs(data);
     };
+
+    const fetchAllSubmissions = async () => {
+        const { data } = await supabase
+            .from('submissions')
+            .select('*, artist:profiles!artist_id(full_name), playlist:playlists(name, curator:profiles!curator_id(full_name))')
+            .order('created_at', { ascending: false });
+        if (data) setAllSubmissions(data);
+    };
+
+    const toggleRankingBoost = async (submissionId: string) => {
+        const sub = allSubmissions.find(s => s.id === submissionId);
+        if (!sub) return;
+        const newVal = sub.ranking_boosted_at ? null : new Date().toISOString();
+        const { error } = await supabase.from('submissions').update({ ranking_boosted_at: newVal }).eq('id', submissionId);
+        if (error) {
+            toast("Error updating ranking: " + error.message, "error");
+        } else {
+            setAllSubmissions(prev => prev.map(s => s.id === submissionId ? { ...s, ranking_boosted_at: newVal } : s));
+            if (newVal) toast("Artist notified of ranking boost!", "success");
+        }
+    };
+
+    useEffect(() => {
+        if (activeTab === 'submissions') fetchAllSubmissions();
+    }, [activeTab]);
 
     const handleSubmissionAction = async (submissionId: string, action: 'accepted' | 'declined') => {
         const sub = playlistSongs.find(s => s.id === submissionId);
@@ -2098,6 +2124,67 @@ export default function AdminDashboard() {
                                             </>
                                         )}
                                     </Button>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
+                )
+            }
+
+            {/* SUBMISSIONS HISTORY VIEW */}
+            {
+                activeTab === "submissions" && (
+                    <div className="animate-in fade-in duration-300">
+                        <Card className="bg-black/40 border-white/10">
+                            <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                <div>
+                                    <CardTitle className="text-xl text-white">Submission History</CardTitle>
+                                    <CardDescription className="text-gray-400">View all incoming songs, statuses, and manage ranking boosts.</CardDescription>
+                                </div>
+                                <Button variant="outline" className="border-white/10 text-white hover:bg-white/10" onClick={fetchAllSubmissions}>Refresh List</Button>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="space-y-2">
+                                    {allSubmissions.length === 0 ? (
+                                        <div className="text-center py-10 text-gray-500">No submissions found.</div>
+                                    ) : (
+                                        allSubmissions.map(sub => (
+                                            <div key={sub.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-lg bg-black/40 border border-white/5 hover:bg-white/5 transition-colors gap-4">
+                                                <div className="flex flex-col min-w-0">
+                                                    <div className="flex items-center gap-2 mb-1">
+                                                        <span className={`text-[10px] px-2 py-0.5 rounded-full uppercase font-bold tracking-wider ${
+                                                            sub.status === 'accepted' ? 'bg-green-500/20 text-green-400' :
+                                                            sub.status === 'declined' ? 'bg-red-500/20 text-red-400' :
+                                                            'bg-yellow-500/20 text-yellow-400'
+                                                        }`}>
+                                                            {sub.status}
+                                                        </span>
+                                                        {sub.ranking_boosted_at && <span className="text-[10px] bg-green-500 text-black px-1.5 py-0.5 rounded font-bold animate-pulse">Rising</span>}
+                                                    </div>
+                                                    <span className="text-white font-bold truncate">{sub.song_title}</span>
+                                                    <span className="text-sm text-gray-400 truncate">By {sub.artist?.full_name || 'Unknown'}</span>
+                                                </div>
+                                                <div className="flex flex-col text-left sm:text-right text-xs gap-1 opacity-70">
+                                                    <span>Playlist: <strong className="text-white">{sub.playlist?.name}</strong></span>
+                                                    <span>Curator: {sub.playlist?.curator?.full_name || 'Unknown'}</span>
+                                                    <span>{new Date(sub.created_at).toLocaleDateString()}</span>
+                                                </div>
+                                                <div className="flex items-center justify-start sm:justify-end gap-2 shrink-0">
+                                                    {sub.status === 'accepted' && (
+                                                        <Button
+                                                            size="sm"
+                                                            variant="outline"
+                                                            className={`h-8 gap-2 font-bold ${sub.ranking_boosted_at ? 'bg-green-600 border-green-500 text-white hover:bg-green-700' : 'border-white/10 hover:border-green-500/50 hover:text-green-400'}`}
+                                                            onClick={() => toggleRankingBoost(sub.id)}
+                                                            title={sub.ranking_boosted_at ? "Remove Boost" : "Boost Ranking"}
+                                                        >
+                                                            <Zap className="w-3.5 h-3.5" /> Zap
+                                                        </Button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ))
+                                    )}
                                 </div>
                             </CardContent>
                         </Card>
