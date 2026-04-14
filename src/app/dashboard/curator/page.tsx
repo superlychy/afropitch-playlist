@@ -1,6 +1,7 @@
 "use client";
 
 import { useAuth } from "@/context/AuthContext";
+import { useToast } from "@/components/ui/toast";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useRef, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -27,6 +28,7 @@ interface Playlist {
 
 export default function CuratorDashboard() {
     const { user, isLoading, deductFunds, logout, refreshUser } = useAuth();
+    const { toast } = useToast();
     const router = useRouter();
 
     useEffect(() => {
@@ -225,9 +227,9 @@ export default function CuratorDashboard() {
         }).eq('id', user.id);
 
         if (error) {
-            alert("Error: " + error.message);
+            toast("Error: " + error.message, "error");
         } else {
-            alert("Profile updated!");
+            toast("Profile updated!", "success");
             setShowProfile(false);
         }
         setIsUpdatingProfile(false);
@@ -235,7 +237,7 @@ export default function CuratorDashboard() {
 
     const handleApplyCurator = async () => {
         if (!appPortfolio || !appExperience || !appPhone || !appNin) {
-            alert("Please fill in all required fields (Portfolio, Experience, Phone, and NIN).");
+            toast("Please fill in all required fields (Portfolio, Experience, Phone, and NIN).", "error");
             return;
         }
         setIsApplying(true);
@@ -258,7 +260,7 @@ export default function CuratorDashboard() {
 
             if (error) {
                 console.error("Application error:", error);
-                alert("Error submitting application: " + error.message);
+                toast("Error submitting application: " + error.message, "error");
             } else {
                 // Manually trigger Admin Notification (Backup for DB Webhook)
                 supabase.functions.invoke('notify-admin', {
@@ -277,7 +279,7 @@ export default function CuratorDashboard() {
                     }
                 }).catch(err => console.error("Manual Notify Failed:", err));
 
-                alert("Application submitted successfully! We will review your ID and details shortly.");
+                toast("Application submitted! We will review your details shortly.", "success");
                 setVerificationStatus('pending');
                 setShowApplicationModal(false);
                 // Clear form
@@ -290,7 +292,7 @@ export default function CuratorDashboard() {
             }
         } catch (err) {
             console.error("Unexpected error applying:", err);
-            alert("Unexpected error. Please try again.");
+            toast("Unexpected error. Please try again.", "error");
         } finally {
             setIsApplying(false);
         }
@@ -374,13 +376,13 @@ export default function CuratorDashboard() {
         const amount = parseFloat(withdrawAmount);
 
         if (isNaN(amount) || amount <= 0) {
-            alert("Please enter a valid amount.");
+            toast("Please enter a valid amount.", "error");
             setIsWithdrawing(false);
             return;
         }
 
         if (amount > user.balance) {
-            alert("Insufficient funds.");
+            toast("Insufficient funds.", "error");
             setIsWithdrawing(false);
             return;
         }
@@ -396,12 +398,12 @@ export default function CuratorDashboard() {
 
         if (error) {
             console.error("Payout RPC Error:", error);
-            alert("Unable to process payout request. Please try again later or contact support.");
+            toast("Unable to process payout. Please try again or contact support.", "error");
         } else if (data && !data.success) {
-            alert("Payout Request Failed: " + data.message);
+            toast("Payout Failed: " + data.message, "error");
         } else {
             // Success
-            alert("Withdrawal requested successfully! It will be processed within 1-24 hours.");
+            toast("Withdrawal requested! Processing within 1-24 hours.", "success");
 
             // Update local state
             if (deductFunds) deductFunds(amount);
@@ -446,7 +448,7 @@ export default function CuratorDashboard() {
 
             if (error) {
                 console.error("Ticket Create Error:", error);
-                alert("Error creating ticket: " + error.message);
+                toast("Error creating ticket: " + error.message, "error");
                 return;
             }
 
@@ -460,7 +462,7 @@ export default function CuratorDashboard() {
 
                 if (msgError) console.error("Initial message error:", msgError);
 
-                alert("Support ticket created successfully!");
+                toast("Support ticket created!", "success");
                 setSupportSubject("");
                 setSupportMessage("");
                 setSupportView('list');
@@ -468,7 +470,7 @@ export default function CuratorDashboard() {
             }
         } catch (err: any) {
             console.error("Unexpected error submitting ticket:", err);
-            alert("An unexpected error occurred. Please check your connection and try again.");
+            toast("An unexpected error occurred. Please try again.", "error");
         } finally {
             setIsSubmittingTicket(false);
         }
@@ -540,7 +542,7 @@ export default function CuratorDashboard() {
     const handleCreatePlaylist = async () => {
         if (!user || !newName) return;
         if (verificationStatus !== 'verified') {
-            alert("Verification required to add playlists.");
+            toast("Verification required to add playlists.", "warning");
             return;
         }
         setIsCreating(true);
@@ -574,9 +576,9 @@ export default function CuratorDashboard() {
         }
 
         if (error) {
-            alert("Error saving playlist: " + error.message);
+            toast("Error saving playlist: " + error.message, "error");
         } else {
-            alert(editingPlaylist ? "Playlist updated!" : "Playlist created!");
+            toast(editingPlaylist ? "Playlist updated!" : "Playlist created!", "success");
             setShowAddPlaylist(false);
             setEditingPlaylist(null);
             setNewName("");
@@ -605,7 +607,7 @@ export default function CuratorDashboard() {
         const { error } = await supabase.from('playlists').delete().eq('id', id);
 
         if (error) {
-            alert("Error deleting playlist: " + error.message);
+            toast("Error deleting playlist: " + error.message, "error");
         } else {
             setMyPlaylists(prev => prev.filter(p => p.id !== id));
         }
@@ -623,10 +625,10 @@ export default function CuratorDashboard() {
             .eq('id', submissionId);
 
         if (error) {
-            alert("Error updating ranking: " + error.message);
+            toast("Error updating ranking: " + error.message, "error");
         } else {
             setPlaylistSongs(prev => prev.map(s => s.id === submissionId ? { ...s, ranking_boosted_at: newVal } : s));
-            if (newVal) alert("Artist notified of ranking boost!");
+            if (newVal) toast("Artist notified of ranking boost!", "success");
         }
     };
 
@@ -653,7 +655,7 @@ export default function CuratorDashboard() {
 
     const handleRefreshPlaylist = async (playlist: Playlist) => {
         if (!playlist.playlist_link) {
-            alert("Cannot refresh: No Spotify link found for this playlist.");
+            toast("Cannot refresh: No Spotify link found.", "warning");
             return;
         }
         setIsRefreshing(playlist.id);
@@ -680,14 +682,14 @@ export default function CuratorDashboard() {
 
                 if (error) throw error;
 
-                alert("Playlist updated successfully from Spotify!");
+                toast("Playlist updated from Spotify!", "success");
                 fetchCuratorData(); // Reload list
             } else {
-                alert("Failed to fetch Spotify data: " + (data.error || "Unknown error"));
+                toast("Failed to fetch Spotify data: " + (data.error || "Unknown error"), "error");
             }
         } catch (err) {
             console.error("Refresh Error", err);
-            alert("Error refreshing playlist.");
+            toast("Error refreshing playlist.", "error");
         } finally {
             setIsRefreshing(null);
         }
@@ -758,9 +760,9 @@ export default function CuratorDashboard() {
 
         if (error) {
             console.error("RPC Error:", error);
-            alert("Error processing review: " + error.message);
+            toast("Error processing review: " + error.message, "error");
         } else if (data && !data.success) {
-            alert("Error: " + data.message);
+            toast("Error: " + data.message, "error");
         } else {
             // Success
             fetchCuratorData();

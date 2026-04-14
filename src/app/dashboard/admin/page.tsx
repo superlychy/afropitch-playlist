@@ -3,6 +3,7 @@
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useRef } from "react";
+import { useToast } from "@/components/ui/toast";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,6 +15,7 @@ import AnalyticsPage from "./analytics/page";
 import { AdminActivityFeed } from "@/components/AdminActivityFeed";
 import { AdminMessageForm } from "@/components/AdminMessageForm";
 import { CustomEmailForm } from "@/components/CustomEmailForm";
+import { AdminInbox } from "@/components/AdminInbox";
 
 // ----------------------------------------------------------------------
 // TYPES & MOCK DATA (Ideally move to types file)
@@ -77,11 +79,12 @@ interface TopPlaylist {
     total_clicks: number;
 }
 
-const VALID_TABS = ["overview", "analytics", "users", "withdrawals", "transactions", "support", "playlists", "applications", "broadcast"] as const;
+const VALID_TABS = ["overview", "analytics", "users", "withdrawals", "transactions", "support", "playlists", "applications", "broadcast", "inbox"] as const;
 type AdminTab = typeof VALID_TABS[number];
 
 export default function AdminDashboard() {
     const { user, isLoading, logout } = useAuth();
+    const { toast } = useToast();
     const router = useRouter();
 
     // Refs for realtime support chat
@@ -463,7 +466,7 @@ export default function AdminDashboard() {
         // Call Supabase
         const { error } = await supabase.from('profiles').update({ is_blocked: newStatus }).eq('id', userId);
         if (error) {
-            alert("Error updating user block status: " + error.message);
+            toast("Error updating user block status: " + error.message, "error");
             // Revert on error
             setUsersList(prev => prev.map(u => u.id === userId ? { ...u, is_blocked: !newStatus } : u));
         }
@@ -480,11 +483,11 @@ export default function AdminDashboard() {
             const { error } = await supabase.from('profiles').delete().eq('id', userId);
 
             if (error) {
-                alert("Error deleting user: " + error.message);
+                toast("Error deleting user: " + error.message, "error");
                 // Can't easily revert local filter without refetching, so refetch would be safesty.
                 // Or just ignore if user doesn't notice immediately.
             } else {
-                alert("User deleted from public profiles. Auth account may still exist.");
+                toast("Profile deleted. Auth account may still exist.", "warning");
             }
         }
     };
@@ -494,7 +497,7 @@ export default function AdminDashboard() {
 
         const amount = parseFloat(fundingAmount);
         if (isNaN(amount) || amount <= 0) {
-            alert("Please enter a valid amount > 0");
+            toast("Please enter a valid amount > 0", "error");
             return;
         }
 
@@ -506,9 +509,9 @@ export default function AdminDashboard() {
         });
 
         if (error) {
-            alert("Top Up Failed: " + error.message);
+            toast("Top Up Failed: " + error.message, "error");
         } else {
-            alert("Successfully added funds!");
+            toast("Successfully added funds!", "success");
             setShowTopUp(null);
             setFundingAmount("");
             refreshUsers();
@@ -522,17 +525,17 @@ export default function AdminDashboard() {
         const { error } = await supabase.from('playlists').delete().eq('id', id);
 
         if (error) {
-            alert("Error deleting playlist: " + error.message);
+            toast("Error deleting playlist: " + error.message, "error");
         } else {
             setAllPlaylists(prev => prev.filter(p => p.id !== id));
-            alert("Playlist deleted successfully.");
+            toast("Playlist deleted successfully.", "success");
         }
     };
 
     const handleWithdrawal = async (id: string, action: 'approve' | 'reject') => {
         const withdrawal = withdrawals.find(w => w.id === id);
         if (!withdrawal) {
-            alert("Withdrawal not found.");
+            toast("Withdrawal not found.", "error");
             return;
         }
 
@@ -560,7 +563,7 @@ export default function AdminDashboard() {
                     throw error;
                 }
 
-                alert("Withdrawal rejected and funds refunded to user's wallet.");
+                toast("Withdrawal rejected and funds refunded to user's wallet.", "error");
 
             } else {
                 // Approve Logic
@@ -573,11 +576,11 @@ export default function AdminDashboard() {
                     throw error;
                 }
 
-                alert("Withdrawal approved. Please process the bank transfer manually.");
+                toast("Withdrawal approved. Please process the bank transfer manually.", "error");
             }
         } catch (error: any) {
             console.error(`Error ${action}ing withdrawal:`, error);
-            alert(`Error ${action}ing withdrawal: ${error.message || 'Unknown error'}`);
+            toast(`Error ${action}ing withdrawal: ${error.message || 'Unknown error'}`, "error");
 
             // Revert optimistic update on error
             setWithdrawals(prev => prev.map(w => w.id === id ? { ...w, status: originalStatus } : w));
@@ -614,7 +617,7 @@ export default function AdminDashboard() {
                 .single();
 
             if (error) {
-                alert("Could not start chat (check Admin Policy): " + error.message);
+                toast("Could not start chat (check Admin Policy): " + error.message, "error");
             } else if (newTicket) {
                 await supabase.from('support_messages').insert({
                     ticket_id: newTicket.id,
@@ -683,15 +686,31 @@ export default function AdminDashboard() {
             if (error) {
                 throw error;
             } else {
-                alert("Playlist added successfully! It will appear under 'AfroPitch Team Playlists'.");
+                toast("Playlist added successfully! It will appear under 'AfroPitch Team Playlists'.", "success");
                 setShowAddPlaylist(false);
                 setNewPlaylistLink("");
                 setFetchedPlaylistInfo(null);
-                window.location.reload();
+                // Refresh playlists data
+                const { data: playlistsData } = await supabase
+                    .from('playlists')
+                    .select('*, profiles(full_name)')
+                    .order('created_at', { ascending: false });
+                if (playlistsData) {
+                    setAllPlaylists(playlistsData.map((p: any) => ({
+                        id: p.id,
+                        curator_id: p.curator_id,
+                        curator_name: p.profiles?.full_name || 'Unknown',
+                        name: p.name,
+                        followers: p.followers,
+                        type: p.type,
+                        playlist_link: p.playlist_link,
+                        created_at: new Date(p.created_at).toLocaleDateString()
+                    })));
+                }
             }
         } catch (err: any) {
             console.error("Add Playlist Error:", err);
-            alert("Error adding playlist: " + err.message);
+            toast("Error adding playlist: " + err.message, "error");
         } finally {
             setIsSavingPlaylist(false);
         }
@@ -699,7 +718,7 @@ export default function AdminDashboard() {
 
     const handleRefreshPlaylist = async (playlist: any) => {
         if (!playlist.playlist_link) {
-            alert("Cannot refresh: No Spotify link found.");
+            toast("Cannot refresh: No Spotify link found.", "error");
             return;
         }
         setIsRefreshing(playlist.id);
@@ -739,13 +758,13 @@ export default function AdminDashboard() {
                     // Optional: update cover_image and description in local state if we tracked it fully
                 } : p));
 
-                alert(`Playlist "${data.name}" updated successfully!`);
+                toast(`Playlist "${data.name}" updated!`, "success");
             } else {
                 throw new Error(data.error || "Unknown validation error");
             }
         } catch (err: any) {
             console.error("Refresh Error:", err);
-            alert("Error refreshing playlist: " + err.message);
+            toast("Error refreshing playlist: " + err.message, "error");
         } finally {
             setIsRefreshing(null);
         }
@@ -816,13 +835,13 @@ export default function AdminDashboard() {
             const successMsg = action === 'accepted'
                 ? "Song accepted! Artist notified and link tracking generated."
                 : "Song rejected. Refund processed to artist wallet.";
-            alert(successMsg);
+            toast(successMsg, "error");
 
             // Update local state
             setPlaylistSongs(prev => prev.map(s => s.id === submissionId ? { ...s, status: action } : s));
         } catch (err: any) {
             console.error("Submission Action Error:", err);
-            alert(`Error processing submission: ${err.message}`);
+            toast(`Error processing submission: ${err.message}`, "error");
         }
     };
 
@@ -894,7 +913,7 @@ export default function AdminDashboard() {
         });
 
         if (error) {
-            alert("Failed to send: " + error.message);
+            toast("Failed to send: " + error.message, "error");
             // Remove optimistic? nah, just alert.
         } else {
             // Also update ticket status to 'open' if it was closed? Or maybe 'replied'?
@@ -915,7 +934,7 @@ export default function AdminDashboard() {
         // So we can't insert a functioning profile easily.
 
         // Alternative: Show instructions.
-        alert("Note: To fully create a user, you must use the Supabase Dashboard or an Admin API. \n\nWe will create a 'Pending Profile' here. The user must Sign Up with [" + newUserEmail + "] to claim it.");
+        toast("Note: To fully create a user, you must use the Supabase Dashboard or an Admin API. \n\nWe will create a 'Pending Profile' here. The user must Sign Up with [" + newUserEmail + "] to claim it.", "error");
 
         // We can't actually insert into public.profiles with a random ID because it references auth.users usually? 
         // Wait, schema: create table public.profiles (id uuid primary key...). It does NOT reference auth.users constraint-wise in the schema I read!
@@ -934,7 +953,7 @@ export default function AdminDashboard() {
         // I will implement a visual success and clear form.
 
         setTimeout(() => {
-            alert(`User invitiation sent to ${newUserEmail} for role: ${newRole}.`);
+            toast(`User invitation sent to ${newUserEmail}`, "success");
             setIsAddingUser(false);
             setShowAddUser(false);
             setNewName("");
@@ -951,9 +970,9 @@ export default function AdminDashboard() {
             .select();
 
         if (error) {
-            alert("Error updating status: " + error.message);
+            toast("Error updating status: " + error.message, "error");
         } else if (!data || data.length === 0) {
-            alert("Update failed: Permission denied or user not found.");
+            toast("Update failed: Permission denied or user not found.", "error");
         } else {
             setPendingCurators(prev => prev.filter(c => c.id !== id));
 
@@ -985,7 +1004,7 @@ export default function AdminDashboard() {
                 });
             }
 
-            alert(`Curator application ${action}. Notification sent.`);
+            toast(`Curator application ${action}`, "success");
         }
     };
 
@@ -996,16 +1015,16 @@ export default function AdminDashboard() {
             .eq('id', appId);
 
         if (error) {
-            alert('Error: ' + error.message);
+            toast('Error: ' + error.message, "error");
             return;
         }
         setCuratorApplications(prev => prev.filter(a => a.id !== appId));
-        alert(`Application ${action}. Reach out to the applicant at their email to set up their account.`);
+        toast(`Application ${action}.`, "success");
     };
 
     const handleSendBroadcast = async () => {
         if (!broadcastSubject || !broadcastMessage) {
-            alert("Please fill in subject and message.");
+            toast("Please fill in subject and message.", "error");
             return;
         }
         setIsSendingBroadcast(true);
@@ -1029,15 +1048,15 @@ export default function AdminDashboard() {
 
             if (error) {
                 console.error("Broadcast Error:", error);
-                alert("Error sending broadcast: " + error.message);
+                toast("Error sending broadcast: " + error.message, "error");
             } else {
-                alert("Broadcast queued successfully! Users will receive it shortly.");
+                toast("Broadcast queued successfully! Users will receive it shortly.", "error");
                 setBroadcastSubject("");
                 setBroadcastMessage("");
             }
         } catch (err: any) {
             console.error("Unexpected Broadcast Error:", err);
-            alert("An unexpected error occurred while sending broadcast.");
+            toast("An unexpected error occurred while sending broadcast.", "error");
         } finally {
             setIsSendingBroadcast(false);
         }
@@ -1047,7 +1066,7 @@ export default function AdminDashboard() {
 
     return (
         <>
-            <div className="container mx-auto px-4 max-w-7xl py-12 min-h-screen">
+            <div className="container mx-auto px-4 max-w-7xl py-8">
                 <div className="flex justify-between items-center mb-8">
                     <div>
                         <h1 className="text-3xl font-bold text-white flex items-center gap-3">
@@ -1083,8 +1102,8 @@ export default function AdminDashboard() {
                         </div>
                     </div>
                     <div className="flex items-center gap-4">
-                        <div className="flex bg-white/5 p-1 rounded-lg border border-white/10 hidden md:flex">
-                            {["overview", "analytics", "users", "withdrawals", "transactions", "support", "playlists", "applications", "broadcast"].map((tab) => {
+                        <div className="flex bg-white/5 p-1 rounded-lg border border-white/10 overflow-x-auto max-w-full scrollbar-hide">
+                            {["overview", "analytics", "users", "withdrawals", "transactions", "support", "playlists", "applications", "inbox", "broadcast"].map((tab) => {
                                 let count = 0;
                                 if (tab === 'withdrawals') count = pendingWithdrawalsCount;
                                 if (tab === 'support') count = openTicketsCount;
@@ -1095,7 +1114,7 @@ export default function AdminDashboard() {
                                     <button
                                         key={tab}
                                         onClick={() => setActiveTab(tab as any)}
-                                        className={`px-3 py-1.5 rounded-md text-xs font-medium capitalize transition-all relative ${activeTab === tab ? "bg-green-600 text-white" : "text-gray-400 hover:text-white"}`}
+                                        className={`px-2 sm:px-3 py-1.5 rounded-md text-xs font-medium capitalize transition-all relative whitespace-nowrap ${activeTab === tab ? "bg-green-600 text-white" : "text-gray-400 hover:text-white"}`}
                                     >
                                         {tab}
                                         {count > 0 && (
@@ -1137,11 +1156,11 @@ export default function AdminDashboard() {
                                     }
 
                                     // Try raw fetch alternative to debug
-                                    alert(`Invoke Failed: ${error.message}. Check Console for details.`);
+                                    toast(`Invoke Failed: ${error.message}. Check Console for details.`, "error");
                                 }
-                                else alert("Test sent! Check your Discord/Slack.");
+                                else toast("Test sent! Check your Discord/Slack.", "error");
                             } catch (e: any) {
-                                alert("Unexpected Client Error: " + e.message);
+                                toast("Unexpected Client Error: " + e.message, "error");
                             }
                         }}>
                             Test Webhook
@@ -1327,6 +1346,23 @@ export default function AdminDashboard() {
                             <div className="flex gap-2">
                                 <Button size="sm" className="bg-blue-600 text-white hover:bg-blue-700" onClick={() => setShowCustomEmail(true)}>
                                     <Send className="w-4 h-4 mr-2" /> Send Email
+                                </Button>
+                                <Button size="sm" className="bg-yellow-600 text-white hover:bg-yellow-700" onClick={async () => {
+                                    const { data: { session } } = await supabase.auth.getSession();
+                                    const token = session?.access_token;
+                                    const res = await fetch("/api/admin/sync-users", {
+                                        method: "POST",
+                                        headers: token ? { Authorization: `Bearer ${token}` } : {},
+                                    });
+                                    const data = await res.json();
+                                    if (data.success) {
+                                        toast(`Synced ${data.synced} missing users!`, "success");
+                                        refreshUsers();
+                                    } else {
+                                        toast("Sync failed: " + (data.error || "Unknown"), "error");
+                                    }
+                                }}>
+                                    <Users className="w-4 h-4 mr-2" /> Sync Users
                                 </Button>
                                 <Button size="sm" className="bg-white text-black hover:bg-gray-200" onClick={() => setShowAddUser(true)}>
                                     <Users className="w-4 h-4 mr-2" /> Add User
@@ -1717,7 +1753,7 @@ export default function AdminDashboard() {
                                                 if (!activeTicket) return;
                                                 const { error } = await supabase.from('support_tickets').update({ status: 'closed' }).eq('id', activeTicket.id);
                                                 if (!error) {
-                                                    alert("Ticket closed.");
+                                                    toast("Ticket closed.", "error");
                                                     setTickets(prev => prev.map(t => t.id === activeTicket.id ? { ...t, status: 'closed' } : t));
                                                     setActiveTicket(prev => prev ? { ...prev, status: 'closed' } : null);
                                                     setShowChat(false);
@@ -2069,6 +2105,15 @@ export default function AdminDashboard() {
                 )
             }
 
+            {/* INBOX VIEW */}
+            {
+                activeTab === "inbox" && (
+                    <div className="animate-in fade-in duration-300">
+                        <AdminInbox />
+                    </div>
+                )
+            }
+
             {/* EDIT PLAYLIST MODAL */}
             {
                 showEditPlaylist && adminEditingPlaylist && (
@@ -2089,13 +2134,26 @@ export default function AdminDashboard() {
                                 <Button variant="ghost" onClick={() => setShowEditPlaylist(false)}>Cancel</Button>
                                 <Button className="bg-green-600" onClick={async () => {
                                     setAdminIsSaving(true);
-                                    await supabase.from('playlists').update({
+                                    const { error: saveError } = await supabase.from('playlists').update({
                                         name: adminNewName,
                                         followers: adminNewFollowers
                                     }).eq('id', adminEditingPlaylist.id);
                                     setAdminIsSaving(false);
                                     setShowEditPlaylist(false);
-                                    window.location.reload();
+                                    // Update local state instead of reload
+                                    if (!saveError) {
+                                        setAllPlaylists(function(prev) {
+                                            return prev.map(function(p) {
+                                                if (p.id === adminEditingPlaylist.id) {
+                                                    return Object.assign({}, p, { name: adminNewName, followers: adminNewFollowers });
+                                                }
+                                                return p;
+                                            });
+                                        });
+                                        toast("Playlist updated!", "success");
+                                    } else {
+                                        toast("Error: " + saveError.message, "error");
+                                    }
                                 }} disabled={adminIsSaving}>
                                     {adminIsSaving ? "Saving..." : "Save Changes"}
                                 </Button>

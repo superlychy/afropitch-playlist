@@ -25,7 +25,7 @@ begin
       url := 'https://gildytqinnntmtvbagxm.supabase.co/functions/v1/notify-user',
       headers := jsonb_build_object(
           'Content-Type', 'application/json',
-          'Authorization', 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdpbGR5dHFpbm5udG10dmJhZ3htIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY3MDIzOTEsImV4cCI6MjA4MjI3ODM5MX0.9x7utKiltdD8zzwWWi_8D2PTW0Y17Pi9dHQ5eTnX7fg'
+          'Authorization', 'Bearer YOUR_SUPABASE_KEY'
       ),
       body := payload
   ) into request_id;

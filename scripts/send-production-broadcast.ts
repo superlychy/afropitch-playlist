@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 
 // Configuration
 const supabaseUrl = 'https://gildytqinnntmtvbagxm.supabase.co';
-const serviceRoleKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdpbGR5dHFpbm5udG10dmJhZ3htIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NjcwMjM5MSwiZXhwIjoyMDgyMjc4MzkxfQ.L37HsKmzmvxUh1r8r5dYrRuy8i50akMfd5hpWOcv5ms';
+const serviceRoleKey = 'YOUR_SUPABASE_KEY';
 
 // Create Supabase Client with Service Role (Bypasses RLS)
 const supabase = createClient(supabaseUrl, serviceRoleKey, {

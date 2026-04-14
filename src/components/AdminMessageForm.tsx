@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useToast } from "@/components/ui/toast";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,7 +32,7 @@ export function AdminMessageForm({ userId, userEmail, userName, onClose }: Admin
 
     const handleSend = async () => {
         if (!subject || !message) {
-            alert("Please fill in all fields");
+            toast("Please fill in all fields.", "error");
             return;
         }
 
@@ -41,7 +42,7 @@ export function AdminMessageForm({ userId, userEmail, userName, onClose }: Admin
             // Get session token for authorization
             const { data: { session } } = await supabase.auth.getSession();
             if (!session) {
-                alert("You must be logged in to send messages");
+                toast("You must be logged in.", "error");
                 setSending(false);
                 return;
             }
@@ -74,7 +75,7 @@ export function AdminMessageForm({ userId, userEmail, userName, onClose }: Admin
 
         } catch (error: any) {
             console.error('Error sending email:', error);
-            alert(`Failed to send email: ${error.message}`);
+            toast(`Failed to send email: ${error.message}`, "error");
         } finally {
             setSending(false);
         }

@@ -5,6 +5,9 @@ import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { AIHelp } from "@/components/AIHelp";
 import { AnalyticsTracker } from "@/components/AnalyticsTracker";
+import { AuthProvider } from "@/context/AuthContext";
+import { UserActivityTracker } from "@/components/UserActivityTracker";
+import { ToastProvider } from "@/components/ui/toast";
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteConfig.url),
@@ -48,9 +51,6 @@ export const metadata: Metadata = {
   },
 };
 
-import { AuthProvider } from "@/context/AuthContext";
-import { UserActivityTracker } from "@/components/UserActivityTracker";
-
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -60,14 +60,16 @@ export default function RootLayout({
     <html lang="en" className="dark">
       <body className="font-sans antialiased">
         <AuthProvider>
-          <Navbar />
-          <main className="min-h-screen pt-16 bg-background text-foreground selection:bg-green-500/30">
-            {children}
-          </main>
-          <Footer />
-          <AIHelp />
-          <AnalyticsTracker />
-          <UserActivityTracker />
+          <ToastProvider>
+            <Navbar />
+            <main className="min-h-screen pt-16 bg-background text-foreground selection:bg-green-500/30">
+              {children}
+            </main>
+            <Footer />
+            <AIHelp />
+            <AnalyticsTracker />
+            <UserActivityTracker />
+          </ToastProvider>
         </AuthProvider>
         <script
           type="application/ld+json"
@@ -78,16 +80,13 @@ export default function RootLayout({
               "name": siteConfig.name,
               "url": siteConfig.url,
               "logo": `${siteConfig.url}/logo.png`,
-              "sameAs": [
-                siteConfig.links.twitter,
-                siteConfig.links.instagram
-              ],
-              "contactPoint": {
+              sameAs: [siteConfig.links.twitter, siteConfig.links.instagram],
+              contactPoint: {
                 "@type": "ContactPoint",
-                "email": siteConfig.contact.email,
-                "contactType": "customer support"
-              }
-            })
+                email: siteConfig.contact.email,
+                contactType: "customer support",
+              },
+            }),
           }}
         />
       </body>

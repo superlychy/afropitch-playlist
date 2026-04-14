@@ -1,164 +1,257 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
+import { useState, useEffect } from "react";
+import { useParams } from "next/navigation";
+import { Music, ExternalLink, Play, Users, RefreshCw, ArrowLeft } from "lucide-react";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import { ArrowLeft, ExternalLink, Music2, Share2, User } from "lucide-react";
-import { pricingConfig } from "@/../config/pricing";
 
-export default function PlaylistDetail() {
-    const params = useParams();
-    const id = params.id as string;
-    const router = useRouter();
-    const [playlist, setPlaylist] = useState<any>(null);
-    const [curator, setCurator] = useState<any>(null);
-    const [isLoading, setIsLoading] = useState(true);
-
-    useEffect(() => {
-        const fetchDetails = async () => {
-            // Fetch playlist
-            const { data: plData, error: plError } = await supabase
-                .from('playlists')
-                .select('*')
-                .eq('id', id)
-                .single();
-
-            if (plError || !plData) {
-                console.error(plError);
-                setIsLoading(false);
-                return; // Handle 404
-            }
-            setPlaylist(plData);
-
-            // Fetch curator
-            const { data: curData } = await supabase
-                .from('profiles')
-                .select('*')
-                .eq('id', plData.curator_id)
-                .single();
-
-            if (curData) setCurator(curData);
-            setIsLoading(false);
-        };
-
-        if (id) fetchDetails();
-    }, [id]);
-
-    if (isLoading) return <div className="min-h-screen flex items-center justify-center text-white bg-black">Loading...</div>;
-    if (!playlist) return <div className="min-h-screen flex items-center justify-center text-white bg-black">Playlist not found</div>;
-
-    // Parse song count from description if available
-    const songCountMatch = (playlist.description || "").match(/(\d+)\s+(songs|items|tracks)/i);
-    const songCount = songCountMatch ? parseInt(songCountMatch[1]) : 0;
-
-    const getPlatformName = (link: string) => {
-        if (!link) return 'Playlist';
-        if (link.includes('spotify.com')) return 'Spotify';
-        if (link.includes('audiomack.com')) return 'Audiomack';
-        if (link.includes('apple.com')) return 'Apple Music';
-        if (link.includes('deezer.com')) return 'Deezer';
-        if (link.includes('soundcloud.com')) return 'SoundCloud';
-        if (link.includes('youtube.com') || link.includes('youtu.be')) return 'YouTube';
-        return 'Playlist';
-    };
-
-    return (
-        <div className="min-h-screen bg-black text-white pb-20">
-            {/* Nav Back */}
-            <div className="p-6">
-                <Button variant="ghost" onClick={() => router.back()} className="text-gray-400 hover:text-white pl-0 gap-2">
-                    <ArrowLeft className="w-4 h-4" /> Back
-                </Button>
-            </div>
-
-            <div className="max-w-5xl mx-auto px-6">
-                <div className="flex flex-col md:flex-row gap-10 items-start">
-                    {/* Cover Image */}
-                    <div className="w-full md:w-80 aspect-square rounded-2xl overflow-hidden shadow-2xl relative group bg-zinc-900 border border-white/10">
-                        {playlist.cover_image?.startsWith('http') ? (
-                            <img src={playlist.cover_image} alt={playlist.name} className="w-full h-full object-cover" />
-                        ) : (
-                            <div className="w-full h-full bg-zinc-800 flex items-center justify-center"><Music2 className="w-20 h-20 text-gray-600" /></div>
-                        )}
-                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                            {playlist.playlist_link && (
-                                <a href={playlist.playlist_link} target="_blank" rel="noreferrer">
-                                    <Button variant="outline" className="gap-2 bg-white text-black hover:bg-gray-200 border-none">Listen <ExternalLink className="w-4 h-4" /></Button>
-                                </a>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Details */}
-                    <div className="flex-1 space-y-6 pt-4">
-                        <div>
-                            <span className="text-green-500 font-bold tracking-wider text-sm uppercase mb-2 block">{playlist.genre}</span>
-                            <h1 className="text-4xl md:text-5xl font-bold mb-4">{playlist.name}</h1>
-                            <p className="text-xl text-gray-300 max-w-2xl">{playlist.description?.replace(/\s*·\s*0\s+saves/gi, '')}</p>
-                        </div>
-
-                        <div className="flex flex-wrap gap-6 text-sm text-gray-400 border-y border-white/10 py-6">
-                            {(playlist.followers > 0) && (
-                                <div className="flex flex-col">
-                                    <span className="text-white font-bold text-lg">{playlist.followers.toLocaleString()}</span>
-                                    <span>Followers</span>
-                                </div>
-                            )}
-                            {songCount > 0 && (
-                                <div className="flex flex-col">
-                                    <span className="text-white font-bold text-lg">{songCount}</span>
-                                    <span>Items</span>
-                                </div>
-                            )}
-                            <div className="flex flex-col">
-                                <span className="text-white font-bold text-lg">
-                                    {playlist.type === 'exclusive'
-                                        ? `${pricingConfig.currency}${pricingConfig.tiers.exclusive.price.toLocaleString()}`
-                                        : playlist.type === 'express'
-                                            ? `${pricingConfig.currency}${pricingConfig.tiers.express.price.toLocaleString()}`
-                                            : playlist.type === 'standard'
-                                                ? `${pricingConfig.currency}${pricingConfig.tiers.standard.price.toLocaleString()}`
-                                                : playlist.submission_fee > 0 ? `${pricingConfig.currency}${playlist.submission_fee.toLocaleString()}` : 'Free'
-                                    }
-                                </span>
-                                <span>Submission Fee</span>
-                            </div>
-                        </div>
-
-                        <div className="flex gap-4">
-                            <Link href={`/submit?playlist=${playlist.id}`} className="flex-1 md:flex-none">
-                                <Button className="w-full md:w-auto bg-green-600 hover:bg-green-700 h-12 px-8 text-lg">
-                                    Submit Song
-                                </Button>
-                            </Link>
-                            {playlist.playlist_link && (
-                                <a href={playlist.playlist_link} target="_blank" rel="noreferrer">
-                                    <Button variant="outline" className="h-12 border-white/20 hover:bg-white/10 gap-2">
-                                        Open in {getPlatformName(playlist.playlist_link)} <ExternalLink className="w-4 h-4" />
-                                    </Button>
-                                </a>
-                            )}
-                        </div>
-
-                        {/* Curator Info */}
-                        {curator && (
-                            <div className="bg-white/5 rounded-xl p-6 mt-8 flex items-center gap-4 cursor-pointer hover:bg-white/10 transition-colors" onClick={() => router.push(`/curators/${curator.id}`)}>
-                                <div className="w-12 h-12 rounded-full bg-zinc-700 flex items-center justify-center text-xl font-bold overflow-hidden text-white/50">
-                                    {curator.avatar_url ? <img src={curator.avatar_url} className="w-full h-full object-cover" /> : (curator.full_name?.[0] || "C")}
-                                </div>
-                                <div>
-                                    <p className="text-xs text-gray-400">Curated by</p>
-                                    <p className="font-bold text-white hover:underline">{curator.full_name || curator.email?.split("@")[0]}</p>
-                                </div>
-                                <ArrowLeft className="w-4 h-4 text-gray-500 ml-auto rotate-180" />
-                            </div>
-                        )}
-                    </div>
-                </div>
-            </div>
-        </div>
-    )
+interface Track {
+  name: string;
+  artists: string;
+  spotify_url: string | null;
+  album_image: string | null;
+  duration: number;
+  isrc: string | null;
 }
 
+interface PlaylistData {
+  playlist: {
+    id: string;
+    name: string;
+    description: string;
+    cover_image: string;
+    followers: number;
+  };
+  tracks: Track[];
+  total_tracks: number;
+  synced_at: string;
+}
+
+export default function PlaylistPage() {
+  const { id } = useParams();
+  const [data, setData] = useState<PlaylistData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
+
+  const fetchData = async (sync = false) => {
+    if (sync) setSyncing(true);
+    try {
+      // Sync from Spotify
+      const syncRes = await fetch("/api/sync-playlist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ playlist_id: id }),
+      });
+      const syncData = await syncRes.json();
+
+      if (syncData.success) {
+        setData(syncData);
+      }
+    } catch (err) {
+      console.error("Fetch error:", err);
+    } finally {
+      setLoading(false);
+      setSyncing(false);
+    }
+  };
+
+  useEffect(() => {
+    if (id) fetchData();
+  }, [id]);
+
+  const formatDuration = (ms: number) => {
+    const mins = Math.floor(ms / 60000);
+    const secs = Math.floor((ms % 60000) / 1000);
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
+  };
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-black">
+        <div className="text-center space-y-4">
+          <Loader2 className="w-8 h-8 animate-spin text-green-500 mx-auto" />
+          <p className="text-gray-400">Loading playlist...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!data) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-black">
+        <div className="text-center space-y-4">
+          <Music className="w-12 h-12 text-gray-600 mx-auto" />
+          <h1 className="text-2xl font-bold text-white">Playlist Not Found</h1>
+          <Link href="/playlists" className="text-green-400 hover:underline">
+            Browse Playlists
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-black via-zinc-900 to-black pb-20">
+      {/* Header */}
+      <div className="max-w-4xl mx-auto px-4 pt-8">
+        <Link
+          href="/playlists"
+          className="inline-flex items-center gap-2 text-gray-400 hover:text-white mb-6 text-sm"
+        >
+          <ArrowLeft className="w-4 h-4" /> Back to Playlists
+        </Link>
+
+        <div className="flex flex-col md:flex-row gap-6 items-start">
+          {/* Cover Image */}
+          <div className="w-48 h-48 rounded-xl overflow-hidden bg-zinc-800 flex-shrink-0 shadow-xl">
+            {data.playlist.cover_image ? (
+              <img
+                src={data.playlist.cover_image}
+                alt={data.playlist.name}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center">
+                <Music className="w-16 h-16 text-gray-600" />
+              </div>
+            )}
+          </div>
+
+          <div className="flex-1 space-y-3">
+            <h1 className="text-3xl font-extrabold text-white">
+              {data.playlist.name}
+            </h1>
+            <p className="text-gray-400">{data.playlist.description}</p>
+            <div className="flex items-center gap-4 text-sm text-gray-500">
+              <span className="flex items-center gap-1">
+                <Users className="w-4 h-4" />
+                {data.playlist.followers?.toLocaleString()} followers
+              </span>
+              <span>{data.total_tracks} tracks</span>
+              <span>Updated {new Date(data.synced_at).toLocaleDateString()}</span>
+            </div>
+            <Button
+              onClick={() => fetchData(true)}
+              disabled={syncing}
+              className="bg-green-600 hover:bg-green-700 text-white"
+            >
+              <RefreshCw
+                className={`w-4 h-4 mr-2 ${syncing ? "animate-spin" : ""}`}
+              />
+              {syncing ? "Syncing..." : "Sync from Spotify"}
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* Track List */}
+      <div className="max-w-4xl mx-auto px-4 mt-12">
+        <h2 className="text-xl font-bold text-white mb-6">Tracks</h2>
+
+        {data.tracks.length === 0 ? (
+          <div className="text-center py-12 bg-white/5 rounded-xl">
+            <Music className="w-12 h-12 mx-auto text-gray-600 mb-2" />
+            <p className="text-gray-400">
+              No tracks found. Click "Sync from Spotify" to fetch tracks.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-1">
+            {data.tracks.map((track, i) => (
+              <div
+                key={i}
+                className="flex items-center gap-4 p-3 rounded-lg hover:bg-white/5 transition-colors group"
+              >
+                <span className="w-8 text-center text-sm text-gray-500 font-medium">
+                  {i + 1}
+                </span>
+                {track.album_image ? (
+                  <img
+                    src={track.album_image}
+                    alt={track.name}
+                    className="w-12 h-12 rounded"
+                  />
+                ) : (
+                  <div className="w-12 h-12 rounded bg-zinc-800 flex items-center justify-center">
+                    <Music className="w-5 h-5 text-gray-600" />
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="text-white font-medium truncate">
+                    {track.name}
+                  </p>
+                  <p className="text-sm text-gray-400 truncate">
+                    {track.artists}
+                  </p>
+                </div>
+                <span className="text-sm text-gray-500">
+                  {formatDuration(track.duration)}
+                </span>
+                {track.spotify_url && (
+                  <a
+                    href={track.spotify_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <ExternalLink className="w-4 h-4 text-green-500" />
+                  </a>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Spotify Embed */}
+        {data.tracks.length > 0 && (
+          <div className="mt-12">
+            <h2 className="text-xl font-bold text-white mb-6">
+              Listen on Spotify
+            </h2>
+            <iframe
+              src={`https://open.spotify.com/embed/playlist/${
+                data.tracks[0]?.spotify_url?.match(/playlist\/([a-zA-Z0-9]+)/)?.[1] || ""
+              }?utm_source=generator&theme=0`}
+              width="100%"
+              height="352"
+              style={{ borderRadius: "12px", border: "none" }}
+              allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+              loading="lazy"
+            />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function Loader2(props: any) {
+  return (
+    <svg
+      {...props}
+      xmlns="http://www.w3.org/2000/svg"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+    </svg>
+  );
+}
+
+function Button({
+  children,
+  className,
+  ...props
+}: React.ButtonHTMLAttributes<HTMLButtonElement>) {
+  return (
+    <button className={`flex items-center px-4 py-2 rounded-md ${className}`} {...props}>
+      {children}
+    </button>
+  );
+}

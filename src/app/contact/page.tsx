@@ -7,8 +7,10 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Mail, CheckCircle, Loader2 } from "lucide-react";
 import { siteConfig } from "@/../config/site";
 import { useState } from "react";
+import { useToast } from "@/components/ui/toast";
 
 export default function ContactPage() {
+    const { toast } = useToast();
     const [name, setName] = useState("");
     const [email, setEmail] = useState("");
     const [subject, setSubject] = useState("");
@@ -18,7 +20,7 @@ export default function ContactPage() {
 
     const handleSubmit = async () => {
         if (!email || !subject || !message) {
-            alert("Please fill in all fields.");
+            toast("Please fill in all fields.", "error");
             return;
         }
         setLoading(true);
@@ -37,10 +39,10 @@ export default function ContactPage() {
                 setSubject("");
                 setMessage("");
             } else {
-                alert("Failed to send message. Please try again.");
+                toast("Failed to send message. Please try again.", "error");
             }
         } catch (e) {
-            alert("An error occurred.");
+            toast("An error occurred.", "error");
         } finally {
             setLoading(false);
         }

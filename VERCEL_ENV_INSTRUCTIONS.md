@@ -20,7 +20,7 @@ To fix the database connection AND payment processing in production, you must se
     *   **Value**: `https://gildytqinnntmtvbagxm.supabase.co`
 
 6.  **Add `NEXT_PUBLIC_SUPABASE_ANON_KEY`**:
-    *   **Value**: `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdpbGR5dHFpbm5udG10dmJhZ3htIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY3MDIzOTEsImV4cCI6MjA4MjI3ODM5MX0.9x7utKiltdD8zzwWWi_8D2PTW0Y17Pi9dHQ5eTnX7fg`
+    *   **Value**: `YOUR_SUPABASE_KEY`
 
 7.  **Add `NEXT_PUBLIC_PAYSTACK_KEY`**: (LIVE KEY)
     *   **Key**: `NEXT_PUBLIC_PAYSTACK_KEY`

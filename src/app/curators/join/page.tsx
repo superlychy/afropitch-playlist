@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useToast } from "@/components/ui/toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -39,7 +40,7 @@ export default function JoinCuratorsPage() {
             setIsSuccess(true);
         } catch (err) {
             console.error("Application failed:", err);
-            alert("Something went wrong. Please try again.");
+            toast("Something went wrong. Please try again.", "error");
         } finally {
             setIsSubmitting(false);
         }

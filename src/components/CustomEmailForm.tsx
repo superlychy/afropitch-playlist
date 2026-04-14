@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useToast } from "@/components/ui/toast";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,14 +32,14 @@ export function CustomEmailForm({ onClose }: CustomEmailFormProps) {
 
     const handleSend = async () => {
         if (!toEmail || !fromEmail || !subject || !message) {
-            alert("Please fill in all fields");
+            toast("Please fill in all fields.", "error");
             return;
         }
 
         // Validate email format
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(toEmail)) {
-            alert("Please enter a valid recipient email address");
+            toast("Please enter a valid email address.", "error");
             return;
         }
 
@@ -48,7 +49,7 @@ export function CustomEmailForm({ onClose }: CustomEmailFormProps) {
             // Get session token for authorization
             const { data: { session } } = await supabase.auth.getSession();
             if (!session) {
-                alert("You must be logged in to send emails");
+                toast("You must be logged in.", "error");
                 setSending(false);
                 return;
             }
@@ -101,7 +102,7 @@ export function CustomEmailForm({ onClose }: CustomEmailFormProps) {
 
         } catch (error: any) {
             console.error('Error sending email:', error);
-            alert(`Failed to send email: ${error.message}`);
+            toast(`Failed to send email: ${error.message}`, "error");
         } finally {
             setSending(false);
         }

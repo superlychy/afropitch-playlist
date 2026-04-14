@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import { useToast } from "@/components/ui/toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,6 +14,7 @@ import { supabase } from "@/lib/supabase";
 export default function PortalPage() {
     const router = useRouter();
     const { user, login, signup, logout } = useAuth();
+    const { toast } = useToast();
     const [activeTab, setActiveTab] = useState<"artist" | "curator">("artist");
     const [isSignup, setIsSignup] = useState(false);
 
@@ -68,19 +70,22 @@ export default function PortalPage() {
         }
     };
 
-    // Manual Refresh Handler for "I've confirmed my email"
+    // Check email confirmation without page reload
     const handleCheckConfirmation = async () => {
         setIsLoading(true);
         try {
-            // refreshSession() triggers onAuthStateChange in AuthContext
-            const { data, error } = await supabase.auth.refreshSession();
-
-            // Also check session directly as backup
             const { data: sessionData } = await supabase.auth.getSession();
 
             if (sessionData.session) {
-                // Session found! Reload to ensure fresh app state and context sync
-                window.location.reload();
+                // Session found! AuthContext will handle the rest
+                toast("Email confirmed! Redirecting...", "success");
+                // Small delay for context to sync, then navigate
+                setTimeout(() => {
+                    if (sessionData.session.user) {
+                        // Force profile fetch
+                        window.location.href = "/dashboard/artist";
+                    }
+                }, 500);
             } else {
                 setError("Email still pending verification. Please check your inbox (and spam folder).");
             }

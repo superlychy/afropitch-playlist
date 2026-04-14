@@ -41,7 +41,7 @@ BEGIN
       url := 'https://gildytqinnntmtvbagxm.supabase.co/functions/v1/notify-admin',
       headers := jsonb_build_object(
         'Content-Type', 'application/json',
-        'Authorization', 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdpbGR5dHFpbm5udG10dmJhZ3htIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NjcwMjM5MSwiZXhwIjoyMDgyMjc4MzkxfQ.L37HsKmzmvxUh1r8r5dYrRuy8i50akMfd5hpWOcv5ms'
+        'Authorization', 'Bearer YOUR_SUPABASE_KEY'
       ),
       body := jsonb_build_object(
         'event_type', 'USER_LOGIN',

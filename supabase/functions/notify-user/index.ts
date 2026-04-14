@@ -43,6 +43,10 @@ Deno.serve(async (req) => {
                 if (record.status !== payload.old_record?.status) {
                     await handleSubmissionUpdate(record);
                 }
+                // Notify if ranking was boosted
+                if (record.ranking_boosted_at !== payload.old_record?.ranking_boosted_at && record.ranking_boosted_at) {
+                    await handleRankingBoost(record);
+                }
             } else if (type === 'INSERT') {
                 await handleSubmissionInsert(record);
             }
@@ -209,6 +213,32 @@ async function handleSubmissionUpdate(record: any) {
         });
         await sendEmail(user.email, subject, html);
     }
+}
+
+async function handleRankingBoost(record: any) {
+    const user = await getUserEmail(record.artist_id);
+    if (!user || !user.email) return;
+
+    const { data: playlist } = await supabase.from('playlists').select('name').eq('id', record.playlist_id).single();
+    const playlistName = playlist?.name || 'AfroPitch Playlist';
+    const trackingLink = record.tracking_slug ? `${SITE_URL}/track/${record.tracking_slug}` : `${SITE_URL}/dashboard/artist`;
+
+    const subject = `Your song "${record.song_title}" is trending on ${playlistName} 🚀`;
+    const html = `
+        <div style="font-family: sans-serif; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 8px;">
+            <h2 style="color: #16a34a;">Great news!</h2>
+            <p>Your song <strong>${record.song_title}</strong> has just climbed up the rankings on <strong>${playlistName}</strong>.</p>
+            <p>We are pushing it to more listeners right now. Please keep sharing your tracking link to boost your ranking even higher and trend!</p>
+            <div style="text-align: center; margin-top: 30px;">
+                <a href="${trackingLink}" style="background:#16a34a;color:white;padding:14px 28px;text-decoration:none;border-radius:30px;font-weight:bold;font-size:16px;">View & Share Link</a>
+            </div>
+            <p style="font-size: 13px; color: #777; text-align: center; margin-top: 40px;">
+                &copy; ${new Date().getFullYear()} AfroPitch Playlist.
+            </p>
+        </div>
+    `;
+
+    await sendEmail(user.email, subject, html);
 }
 
 async function handleWithdrawalUpdate(record: any) {

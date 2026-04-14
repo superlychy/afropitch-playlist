@@ -31,10 +31,29 @@ export default function Home() {
     }
   ];
 
+  // FAQ Schema for Google Rich Results
+  const faqSchema = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": faqs.map((faq) => ({
+      "@type": "Question",
+      "name": faq.q,
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": faq.a,
+      },
+    })),
+  };
+
   return (
     <div className="flex flex-col items-center w-full">
+      {/* FAQ Schema */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }}
+      />
       {/* Hero Section */}
-      <section className="w-full relative overflow-hidden py-24 md:py-32 flex flex-col items-center text-center px-4">
+      <section className="w-full relative overflow-hidden py-24 md:py-32 flex flex-col items-center text-center px-4 animate-fade-in-up">
         {/* Abstract Background Effects */}
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[500px] bg-green-500/10 blur-[100px] rounded-full pointer-events-none" />
         <div className="absolute bottom-0 right-0 w-[800px] h-[400px] bg-orange-500/10 blur-[120px] rounded-full pointer-events-none" />
@@ -106,7 +125,7 @@ export default function Home() {
       </section>
 
       {/* Feature Highlight / Why Section (Restored & Enhanced) */}
-      <section className="py-24 px-4 max-w-7xl mx-auto grid md:grid-cols-2 gap-16 items-center">
+      <section className="py-24 px-4 max-w-7xl mx-auto grid md:grid-cols-2 gap-16 items-center animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
         <div className="space-y-6">
           <h2 className="text-3xl md:text-4xl font-bold">Why AfroPitch?</h2>
           <p className="text-gray-400 text-lg leading-relaxed">
@@ -154,8 +173,8 @@ export default function Home() {
             </p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-8">
-            <div className="p-6 rounded-2xl bg-white/5 border border-white/5 hover:border-green-500/30 transition-colors">
+          <div className="grid md:grid-cols-3 gap-8 stagger-children">
+            <div className="p-6 rounded-2xl bg-white/5 border border-white/5 hover:border-green-500/30 transition-all hover:-translate-y-2 duration-300 hover-card">
               <div className="h-12 w-12 rounded-full bg-green-500/10 flex items-center justify-center text-green-500 mb-4">
                 <CheckCircle2 className="w-6 h-6" />
               </div>
@@ -163,7 +182,7 @@ export default function Home() {
               <p className="text-gray-400">Strict vetting process. We only work with active, human curators who actually listen to your music.</p>
             </div>
 
-            <div className="p-6 rounded-2xl bg-white/5 border border-white/5 hover:border-green-500/30 transition-colors">
+            <div className="p-6 rounded-2xl bg-white/5 border border-white/5 hover:border-green-500/30 transition-all hover:-translate-y-2 duration-300 hover-card">
               <div className="h-12 w-12 rounded-full bg-green-500/10 flex items-center justify-center text-green-500 mb-4">
                 <CheckCircle2 className="w-6 h-6" />
               </div>
@@ -171,7 +190,7 @@ export default function Home() {
               <p className="text-gray-400">We protect our artists. If your song isn't playlisted after a paid submission, we have a refund policy.</p>
             </div>
 
-            <div className="p-6 rounded-2xl bg-white/5 border border-white/5 hover:border-green-500/30 transition-colors">
+            <div className="p-6 rounded-2xl bg-white/5 border border-white/5 hover:border-green-500/30 transition-all hover:-translate-y-2 duration-300 hover-card">
               <div className="h-12 w-12 rounded-full bg-green-500/10 flex items-center justify-center text-green-500 mb-4">
                 <CheckCircle2 className="w-6 h-6" />
               </div>
@@ -227,14 +246,40 @@ export default function Home() {
       {/* FAQ Section */}
       <section className="w-full py-24 px-4 bg-white/[0.02]">
         <div className="max-w-3xl mx-auto space-y-12">
-          <h2 className="text-3xl font-bold text-center">Frequently Asked Questions</h2>
-          <div className="space-y-4">
+          <h2 className="text-3xl font-bold text-center animate-fade-in-up">Frequently Asked Questions</h2>
+          <div className="space-y-4 stagger-children">
             {faqs.map((faq, index) => (
-              <div key={index} className="p-6 rounded-xl bg-white/5 border border-white/5 hover:border-white/10 transition-colors">
+              <div key={index} className="p-6 rounded-xl bg-white/5 border border-white/5 hover:border-white/10 transition-all hover:-translate-y-1 duration-200 animate-fade-in-up hover-card">
                 <h3 className="font-semibold text-lg mb-2 text-white">{faq.q}</h3>
                 <p className="text-gray-400">{faq.a}</p>
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* CTA Section */}
+      <section className="w-full py-24 px-4">
+        <div className="max-w-4xl mx-auto text-center space-y-8 animate-fade-in-up">
+          <h2 className="text-4xl md:text-5xl font-bold text-white">
+            Ready to Get Your Music <span className="text-green-400">Heard?</span>
+          </h2>
+          <p className="text-xl text-gray-400 max-w-2xl mx-auto">
+            Join thousands of African artists who trust AfroPitch to connect them with real curators.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+            <Link
+              href="/submit"
+              className="px-8 py-4 rounded-full bg-green-600 hover:bg-green-500 text-white font-bold text-lg transition-all duration-300 hover:scale-105 hover:shadow-[0_0_40px_rgba(22,163,74,0.4)] btn-glow"
+            >
+              Submit Your Music Now
+            </Link>
+            <Link
+              href="/pricing"
+              className="px-8 py-4 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-white font-medium text-lg transition-all duration-300 hover:scale-105"
+            >
+              View Pricing
+            </Link>
           </div>
         </div>
       </section>

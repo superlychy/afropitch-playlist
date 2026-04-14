@@ -3,8 +3,7 @@
 import { Suspense, useEffect, useRef } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
-// @ts-ignore
-import { v4 as uuidv4 } from "uuid";
+
 
 export function AnalyticsTracker() {
     return (
@@ -27,7 +26,7 @@ function AnalyticsLogic() {
     useEffect(() => {
         let sid = sessionStorage.getItem("afropitch_session_id");
         if (!sid) {
-            sid = uuidv4() as string;
+            sid = crypto.randomUUID();
             sessionStorage.setItem("afropitch_session_id", sid);
         }
         sessionId.current = sid || "";
