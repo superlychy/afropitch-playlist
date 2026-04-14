@@ -60,82 +60,96 @@ export async function POST(req: Request) {
     const spotifyPlaylistId = playlistMatch[1];
 
     // 3. Get Spotify access token
-    const tokenRes = await fetch("https://accounts.spotify.com/api/token", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        Authorization: `Basic ${Buffer.from(
-          `${process.env.SPOTIFY_CLIENT_ID}:${process.env.SPOTIFY_CLIENT_SECRET}`
-        ).toString("base64")}`,
-      },
-      body: "grant_type=client_credentials",
-    });
+    let spData: any = null;
+    let trackList: any[] = [];
+    let spError = null;
+    try {
+      const tokenRes = await fetch("https://accounts.spotify.com/api/token", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          Authorization: `Basic ${Buffer.from(
+            `${process.env.SPOTIFY_CLIENT_ID || ''}:${process.env.SPOTIFY_CLIENT_SECRET || ''}`
+          ).toString("base64")}`,
+        },
+        body: "grant_type=client_credentials",
+      });
 
-    if (!tokenRes.ok) {
-      return NextResponse.json(
-        { error: "Failed to authenticate with Spotify" },
-        { status: 500 }
+      if (!tokenRes.ok) {
+        throw new Error("Failed to authenticate with Spotify");
+      }
+
+      const { access_token } = await tokenRes.json();
+
+      // 4. Fetch playlist details from Spotify
+      const spRes = await fetch(
+        `https://api.spotify.com/v1/playlists/${spotifyPlaylistId}?fields=id,name,description,images,tracks(items(track(name,artists(name),external_urls(spotify),album(images),duration_ms,isrc))),followers(total)`,
+        { headers: { Authorization: `Bearer ${access_token}` } }
       );
+
+      if (!spRes.ok) {
+        const errText = await spRes.text();
+        throw new Error(`Spotify API error: ${errText}`);
+      }
+
+      spData = await spRes.json();
+      const tracks = spData.tracks?.items || [];
+      
+      // Map tracks to submissions (match by title/artist)
+      trackList = tracks
+        .filter((item: any) => item.track)
+        .map((item: any) => ({
+          name: item.track.name,
+          artists: item.track.artists.map((a: any) => a.name).join(", "),
+          spotify_url: item.track.external_urls?.spotify,
+          album_image: item.track.album?.images?.[0]?.url,
+          duration: item.track.duration_ms,
+          isrc: item.track.external_ids?.isrc,
+        }));
+
+      // 5. Update playlist metadata
+      await supabase
+        .from("playlists")
+        .update({
+          name: spData.name || playlist.name,
+          description: spData.description || "",
+          cover_image: spData.images?.[0]?.url || null,
+          followers: spData.followers?.total || 0,
+        })
+        .eq("id", playlist_id);
+    } catch(e) {
+      console.warn("Spotify sync failed, falling back to database.", e);
+      spError = e;
     }
 
-    const { access_token } = await tokenRes.json();
-
-    // 4. Fetch playlist details from Spotify
-    const spRes = await fetch(
-      `https://api.spotify.com/v1/playlists/${spotifyPlaylistId}?fields=id,name,description,images,tracks(items(track(name,artists(name),external_urls(spotify),album(images),duration_ms,isrc))),followers(total)`,
-      { headers: { Authorization: `Bearer ${access_token}` } }
-    );
-
-    if (!spRes.ok) {
-      const errText = await spRes.text();
-      return NextResponse.json(
-        { error: "Spotify API error", details: errText },
-        { status: 500 }
-      );
-    }
-
-    const spData = await spRes.json();
-    const tracks = spData.tracks?.items || [];
-
-    // 5. Update playlist metadata
-    await supabase
-      .from("playlists")
-      .update({
-        name: spData.name || playlist.name,
-        description: spData.description || "",
-        cover_image: spData.images?.[0]?.url || null,
-        followers: spData.followers?.total || 0,
-      })
-      .eq("id", playlist_id);
-
-    // 6. Fetch existing submissions for this playlist
+    // 6. Fetch existing submissions for this playlist fallback
     const { data: existingSubs } = await supabase
       .from("submissions")
       .select("id, song_title, artist_name, tracking_slug, clicks")
       .eq("playlist_id", playlist_id)
       .eq("status", "accepted");
 
-    // 7. Map tracks to submissions (match by title/artist)
-    const trackList = tracks
-      .filter((item: any) => item.track)
-      .map((item: any) => ({
-        name: item.track.name,
-        artists: item.track.artists.map((a: any) => a.name).join(", "),
-        spotify_url: item.track.external_urls?.spotify,
-        album_image: item.track.album?.images?.[0]?.url,
-        duration: item.track.duration_ms,
-        isrc: item.track.external_ids?.isrc,
+    // If Spotify failed, fallback to pulling tracks directly from our accepted submissions table
+    if(spError || trackList.length === 0) {
+      trackList = (existingSubs || []).map(sub => ({
+        name: sub.song_title,
+        artists: sub.artist_name || 'Accepted Artist',
+        spotify_url: sub.tracking_slug ? `/track/${sub.tracking_slug}` : spotifyUrl,
+        album_image: null,
+        duration: 0,
+        isrc: null
       }));
+    }
 
     // 8. Return tracks for the playlist page to display
     return NextResponse.json({
       success: true,
       playlist: {
         id: playlist.id,
-        name: spData.name || playlist.name,
-        description: spData.description,
-        cover_image: spData.images?.[0]?.url,
-        followers: spData.followers?.total,
+        name: spData?.name || playlist.name,
+        description: spData?.description || "Curated AfroPitch Playlist",
+        cover_image: spData?.images?.[0]?.url || null,
+        followers: spData?.followers?.total || 0,
       },
       tracks: trackList,
       total_tracks: trackList.length,
