@@ -995,7 +995,7 @@ export default function CuratorDashboard() {
                             onClick={() => setActiveTab('submissions')}
                             className={`px-4 py-2 rounded-md font-bold transition-colors ${activeTab === 'submissions' ? 'bg-green-600 text-white' : 'bg-zinc-800 text-gray-400 hover:text-white'}`}
                         >
-                            Incoming Submissions {stats.pending > 0 && <span className="ml-2 bg-white text-green-600 text-xs px-1.5 py-0.5 rounded-full">{stats.pending}</span>}
+                            Manage Submissions {stats.pending > 0 && <span className="ml-2 bg-white text-green-600 text-xs px-1.5 py-0.5 rounded-full">{stats.pending}</span>}
                         </button>
                         <button
                             onClick={() => setActiveTab('playlists')}
@@ -1021,13 +1021,13 @@ export default function CuratorDashboard() {
                         </Card>
                     </div>
 
-                    {/* Incoming Submissions */}
+                    {/* Manage Submissions */}
                     {activeTab === 'submissions' && (
                         <div className="space-y-6">
-                            <h3 className="font-bold text-white text-xl">Incoming Submissions</h3>
+                            <h3 className="font-bold text-white text-xl">Manage Submissions</h3>
                             <div className="space-y-4">
                                 {loadingReviews && <p className="text-gray-500">Loading...</p>}
-                                {!loadingReviews && reviews.length === 0 && <p className="text-gray-500">No pending submissions.</p>}
+                                {!loadingReviews && reviews.length === 0 && <p className="text-gray-500">No submissions found.</p>}
 
                                 {reviews.map(review => (
                                     <div key={review.id} className="bg-white/5 border border-white/5 rounded-lg overflow-hidden">
