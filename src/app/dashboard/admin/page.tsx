@@ -334,6 +334,9 @@ export default function AdminDashboard() {
                     created_at: new Date(p.created_at).toLocaleDateString()
                 })));
             }
+            
+            // Fetch Pending Songs for Admin Global Review
+            fetchGlobalPendingSongs();
 
             // 5. Fetch Top Campaigns (by clicks)
             const { data: topClicks } = await supabase
@@ -828,19 +831,17 @@ export default function AdminDashboard() {
         if (activeTab === 'submissions') fetchAllSubmissions();
     }, [activeTab]);
 
-    const handleSubmissionAction = async (submissionId: string, action: 'accepted' | 'declined') => {
+    const handleSubmissionAction = async (submissionId: string, action: 'accepted' | 'declined' | 'archived') => {
         const sub = playlistSongs.find(s => s.id === submissionId);
         if (!sub) return;
 
         let feedback = "Reviewed by Admin";
         if (action === 'declined') {
             const reason = prompt("Enter reason for rejection (optional):", "Does not fit playlist vibe");
+            if (reason === null) return; // cancelled
             if (reason) feedback = reason;
         }
 
-        if (!confirm(`Are you sure you want to ${action} this song?`)) return;
-
-        // Create tracking slug if accepted
         let trackingSlug = null;
         if (action === 'accepted') {
             const cleanTitle = (sub.song_title || 'track').replace(/[^a-z0-9]/gi, '-').toLowerCase();
@@ -1604,12 +1605,15 @@ export default function AdminDashboard() {
                                                         </a>
                                                     </div>
 
-                                                    <div className="grid grid-cols-2 gap-2 mt-auto">
-                                                        <Button size="sm" className="bg-green-600 hover:bg-green-700 h-9 text-xs font-bold" onClick={() => handleSubmissionAction(song.id, 'accepted')}>
-                                                            <CheckCircle className="w-3 h-3 mr-1.5" /> Accept
+                                                    <div className="grid grid-cols-3 gap-2 mt-auto">
+                                                        <Button size="sm" className="bg-green-600 hover:bg-green-700 h-9 text-xs font-bold px-1" onClick={() => handleSubmissionAction(song.id, 'accepted')}>
+                                                            <CheckCircle className="w-3 h-3 mr-1" /> Accept
                                                         </Button>
-                                                        <Button size="sm" variant="destructive" className="h-9 text-xs font-bold bg-red-600/80 hover:bg-red-600" onClick={() => handleSubmissionAction(song.id, 'declined')}>
-                                                            <XCircle className="w-3 h-3 mr-1.5" /> Decline
+                                                        <Button size="sm" variant="destructive" className="h-9 text-xs font-bold bg-red-600/80 hover:bg-red-600 px-1" onClick={() => handleSubmissionAction(song.id, 'declined')}>
+                                                            <XCircle className="w-3 h-3 mr-1" /> Decline
+                                                        </Button>
+                                                        <Button size="sm" className="h-9 text-xs font-bold bg-zinc-700 hover:bg-zinc-600 px-1" onClick={() => handleSubmissionAction(song.id, 'archived')}>
+                                                            Archive
                                                         </Button>
                                                     </div>
                                                 </div>
@@ -2155,6 +2159,7 @@ export default function AdminDashboard() {
                                                         <span className={`text-[10px] px-2 py-0.5 rounded-full uppercase font-bold tracking-wider ${
                                                             sub.status === 'accepted' ? 'bg-green-500/20 text-green-400' :
                                                             sub.status === 'declined' ? 'bg-red-500/20 text-red-400' :
+                                                            sub.status === 'archived' ? 'bg-gray-500/20 text-gray-400' :
                                                             'bg-yellow-500/20 text-yellow-400'
                                                         }`}>
                                                             {sub.status}

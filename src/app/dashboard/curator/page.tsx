@@ -737,15 +737,22 @@ export default function CuratorDashboard() {
         }
     }, [newPlaylistLink]);
 
-    const handleReviewAction = async (submissionId: string, action: 'accepted' | 'declined', feedback: string) => {
+    const handleReviewAction = async (submissionId: string, action: 'accepted' | 'declined' | 'archived', feedback: string) => {
         if (!user) return;
+
+        if (action === 'archived') {
+            const { error } = await supabase.from('submissions').update({ status: 'archived', feedback: 'Archived silently.' }).eq('id', submissionId);
+            if (error) toast("Error archiving: " + error.message, "error");
+            else fetchCuratorData();
+            return;
+        }
 
         // Create tracking slug if accepted
         let trackingSlug = null;
         if (action === 'accepted') {
             const sub = reviews.find(r => r.id === submissionId);
             if (sub) {
-                const cleanTitle = sub.song_title.replace(/[^a-z0-9]/gi, '-').toLowerCase();
+                const cleanTitle = (sub.song_title || 'track').replace(/[^a-z0-9]/gi, '-').toLowerCase();
                 trackingSlug = `${cleanTitle}-${Math.random().toString(36).substring(2, 7)}`;
             }
         }
@@ -1063,18 +1070,25 @@ export default function CuratorDashboard() {
                                                 review.status === 'pending' ? (
                                                     <div className="flex flex-col gap-2 min-w-[140px]">
                                                         <p className="text-right font-bold text-white mb-2">{pricingConfig.currency}{review.amount_paid}</p>
-                                                        <Button className="bg-green-600 hover:bg-green-700 w-full" onClick={() => handleReviewAction(review.id, 'accepted', 'Great track! Added to playlist.')}>
-                                                            <CheckCircle className="w-4 h-4 mr-2" /> Accept
+                                                        <Button className="bg-green-600 hover:bg-green-700 w-full text-xs h-9 px-2" onClick={() => handleReviewAction(review.id, 'accepted', 'Great track! Added to playlist.')}>
+                                                            <CheckCircle className="w-3.5 h-3.5 mr-1" /> Accept
                                                         </Button>
-                                                        <Button variant="destructive" className="w-full" onClick={() => openDeclineModal(review.id)}>
-                                                            <XCircle className="w-4 h-4 mr-2" /> Decline
+                                                        <Button variant="destructive" className="w-full text-xs h-9 px-2 bg-red-600 hover:bg-red-700" onClick={() => openDeclineModal(review.id)}>
+                                                            <XCircle className="w-3.5 h-3.5 mr-1" /> Decline
+                                                        </Button>
+                                                        <Button className="w-full text-xs h-9 px-2 bg-zinc-700 hover:bg-zinc-600 text-white" onClick={() => handleReviewAction(review.id, 'archived' as any, 'Archived.')}>
+                                                            Archive
                                                         </Button>
                                                     </div>
                                                 ) : (
                                                     <div className="flex flex-col items-end gap-2 min-w-[140px]">
                                                         <div className="text-right">
                                                             <p className="font-bold text-white mb-2">{pricingConfig.currency}{review.amount_paid}</p>
-                                                            <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold uppercase ${review.status === 'accepted' ? 'bg-green-500/20 text-green-500' : 'bg-red-500/20 text-red-500'}`}>
+                                                            <span className={`inline-block px-3 py-1 rounded-full text-[10px] font-bold uppercase ${
+                                                                review.status === 'accepted' ? 'bg-green-500/20 text-green-500' : 
+                                                                review.status === 'declined' ? 'bg-red-500/20 text-red-500' : 
+                                                                'bg-gray-500/20 text-gray-400'
+                                                                }`}>
                                                                 {review.status}
                                                             </span>
                                                         </div>
