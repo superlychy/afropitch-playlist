@@ -460,14 +460,17 @@ export default function ArtistDashboard() {
                         />
                       </div>
                       <div className="flex items-center gap-2">
-                        <div className="flex-1 bg-black/60 rounded px-2 py-1.5 text-[10px] text-gray-400 truncate select-all border border-white/5 font-mono">
-                          /track/{sub.tracking_slug}
+                        <div className="flex-1 bg-black/60 rounded px-2 py-1.5 text-[10px] sm:text-xs text-gray-300 truncate select-all border border-white/5 font-mono">
+                          https://afropitchplay.best/track/{sub.tracking_slug}
                         </div>
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="h-7 px-2 text-[10px] text-green-400 hover:text-green-300 shrink-0"
-                          onClick={() => navigator.clipboard.writeText(`${window.location.origin}/track/${sub.tracking_slug}`)}
+                          className="h-7 px-2 text-[10px] text-green-400 hover:text-green-300 shrink-0 border border-green-500/20"
+                          onClick={() => {
+                              navigator.clipboard.writeText(`https://afropitchplay.best/track/${sub.tracking_slug}`);
+                              toast("Tracking link copied!", "success");
+                          }}
                         >
                           Copy
                         </Button>
