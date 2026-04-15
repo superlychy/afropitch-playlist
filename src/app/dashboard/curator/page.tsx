@@ -614,7 +614,7 @@ export default function CuratorDashboard() {
     };
 
     const toggleRankingBoost = async (submissionId: string) => {
-        const sub = playlistSongs.find(s => s.id === submissionId);
+        const sub = playlistSongs.find(s => s.id === submissionId) || reviews.find(s => s.id === submissionId);
         if (!sub) return;
 
         const newVal = sub.ranking_boosted_at ? null : new Date().toISOString();
@@ -628,6 +628,7 @@ export default function CuratorDashboard() {
             toast("Error updating ranking: " + error.message, "error");
         } else {
             setPlaylistSongs(prev => prev.map(s => s.id === submissionId ? { ...s, ranking_boosted_at: newVal } : s));
+            setReviews(prev => prev.map(s => s.id === submissionId ? { ...s, ranking_boosted_at: newVal } : s));
             if (newVal) toast("Artist notified of ranking boost!", "success");
         }
     };
@@ -1070,11 +1071,27 @@ export default function CuratorDashboard() {
                                                         </Button>
                                                     </div>
                                                 ) : (
-                                                    <div className="text-right min-w-[140px]">
-                                                        <p className="font-bold text-white mb-2">{pricingConfig.currency}{review.amount_paid}</p>
-                                                        <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold uppercase ${review.status === 'accepted' ? 'bg-green-500/20 text-green-500' : 'bg-red-500/20 text-red-500'}`}>
-                                                            {review.status}
-                                                        </span>
+                                                    <div className="flex flex-col items-end gap-2 min-w-[140px]">
+                                                        <div className="text-right">
+                                                            <p className="font-bold text-white mb-2">{pricingConfig.currency}{review.amount_paid}</p>
+                                                            <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold uppercase ${review.status === 'accepted' ? 'bg-green-500/20 text-green-500' : 'bg-red-500/20 text-red-500'}`}>
+                                                                {review.status}
+                                                            </span>
+                                                        </div>
+                                                        {review.status === 'accepted' && (
+                                                            <div className="mt-2">
+                                                                {review.ranking_boosted_at && <span className="inline-block mb-2 text-center w-full text-[10px] bg-green-500 text-black px-2 py-1 rounded font-bold animate-pulse">Rising</span>}
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="outline"
+                                                                    className={`w-full gap-2 font-bold ${review.ranking_boosted_at ? 'bg-green-600 border-green-500 text-white hover:bg-green-700' : 'border-white/10 hover:border-green-500/50 hover:text-green-400'}`}
+                                                                    onClick={() => toggleRankingBoost(review.id)}
+                                                                    title={review.ranking_boosted_at ? "Remove Boost" : "Boost Ranking"}
+                                                                >
+                                                                    <Zap className="w-3.5 h-3.5" /> Zap
+                                                                </Button>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 )
                                             }

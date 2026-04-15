@@ -136,28 +136,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
-    // Multi-tab sync: recheck on focus
-    const handleFocus = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (session?.user) {
-        const currentUser = user;
-        if (!currentUser || currentUser.id !== session.user.id) {
-          await syncProfile(session, mounted);
-        }
-      } else if (user) {
-        setUser(null);
-        router.push("/portal");
-      }
-    };
-
-    window.addEventListener("focus", handleFocus);
-
     return () => {
       mounted = false;
       subscription.unsubscribe();
-      window.removeEventListener("focus", handleFocus);
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
