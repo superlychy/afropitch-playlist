@@ -65,7 +65,6 @@ export default function CuratorDashboard() {
         "Other (See notes)"
     ];
     const [withdrawAmount, setWithdrawAmount] = useState("");
-    const [withdrawReason, setWithdrawReason] = useState("");
     const [bankName, setBankName] = useState("");
     const [accountNumber, setAccountNumber] = useState("");
     const [accountName, setAccountName] = useState("");
@@ -382,11 +381,6 @@ export default function CuratorDashboard() {
             return;
         }
 
-        if (!withdrawReason.trim()) {
-            toast("Please provide a reason for the withdrawal.", "error");
-            setIsWithdrawing(false);
-            return;
-        }
 
         if (amount > user.balance) {
             toast("Insufficient funds.", "error");
@@ -400,8 +394,7 @@ export default function CuratorDashboard() {
             p_amount: amount,
             p_bank_name: bankName,
             p_account_number: accountNumber,
-            p_account_name: accountName,
-            p_reason: withdrawReason
+            p_account_name: accountName
         });
 
         if (error) {
@@ -418,7 +411,6 @@ export default function CuratorDashboard() {
 
             setShowWithdraw(false);
             setWithdrawAmount("");
-            setWithdrawReason("");
             // Ideally verify transaction list updates (if it uses real-time or if we trigger re-fetch)
         }
         setIsWithdrawing(false);
@@ -1378,15 +1370,6 @@ export default function CuratorDashboard() {
                                             <p className="text-xs text-gray-500">Available: {pricingConfig.currency}{user?.balance?.toLocaleString()}</p>
                                         </div>
 
-                                        <div className="space-y-2">
-                                            <Label>Reason for withdrawal</Label>
-                                            <Textarea
-                                                placeholder="e.g. Moving earnings to my bank account"
-                                                value={withdrawReason}
-                                                onChange={e => setWithdrawReason(e.target.value)}
-                                                className="bg-black/40 border-white/10 min-h-[70px]"
-                                            />
-                                        </div>
                                     </div>
                                     <div className="flex justify-end gap-2">
                                         <Button variant="ghost" onClick={() => setShowWithdraw(false)}>Cancel</Button>
