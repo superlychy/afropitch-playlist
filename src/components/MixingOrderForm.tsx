@@ -207,8 +207,10 @@ export function MixingOrderForm() {
         );
     }
 
+    const showStickyBar = !!user && valid && !placing && !done;
+
     return (
-        <div className="space-y-8">
+        <div className={`space-y-8 ${showStickyBar ? "pb-32" : ""}`}>
             {/* Package picker */}
             <div>
                 <h3 className="text-lg font-semibold text-white mb-4">
@@ -290,7 +292,7 @@ export function MixingOrderForm() {
             {/* Payment */}
             <div>
                 <h3 className="text-lg font-semibold text-white mb-4">
-                    3. Review &amp; pay (escrow)
+                    3. Place your order
                 </h3>
                 {!user ? (
                     <Card className="border-white/10 bg-white/5">
@@ -361,6 +363,30 @@ export function MixingOrderForm() {
                     )
                 )}
             </div>
+
+            {/* Sticky pay bar: the submit action is always visible, even on mobile,
+                so nobody has to hunt for the payment button below the fold. */}
+            {showStickyBar && selected && (
+                <div className="fixed bottom-0 inset-x-0 z-40 border-t border-white/10 bg-black/85 backdrop-blur-md pb-[env(safe-area-inset-bottom)]">
+                    <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-4">
+                        <div className="min-w-0 flex-1">
+                            <div className="text-white font-bold truncate">{selected.name}</div>
+                            <div className="text-xs text-gray-400">
+                                ₦{Number(selected.price_ngn).toLocaleString()} held in escrow · “{songTitle.trim()}”
+                            </div>
+                        </div>
+                        <div className="w-44 sm:w-56 shrink-0">
+                            <PayWithPaystack
+                                email={user.email}
+                                amount={Math.round(Number(selected.price_ngn)) * 100}
+                                userId={user.id}
+                                onSuccess={handlePaymentSuccess}
+                                onClose={() => {}}
+                            />
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
