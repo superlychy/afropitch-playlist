@@ -59,11 +59,19 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ ok: false, error: "Could not create the ticket." }, { status: 500 });
         }
 
-        await admin.from("support_messages").insert({
+        const { error: messageError } = await admin.from("support_messages").insert({
             ticket_id: ticket.id,
             sender_id: userId,
             message: fullMessage,
         });
+
+        if (messageError) {
+            // Ticket exists but the thread starter failed — log loudly, don't pretend all is well.
+            await admin.from("system_logs").insert({
+                event_type: "support_ticket_message_failed",
+                event_data: { ticket_id: ticket.id, error: messageError.message },
+            });
+        }
 
         return NextResponse.json({ ok: true, ticket_id: ticket.id });
     } catch (e: any) {
