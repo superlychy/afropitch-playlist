@@ -1,7 +1,7 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { Resend } from 'resend';
-import { getTransactionReceiptTemplate, getSongApprovedTemplate, getSongDeclinedTemplate, getSupportTicketTemplate, getCuratorApprovedTemplate, getCuratorRejectedTemplate } from './templates.ts';
+import { getTransactionReceiptTemplate, getSongApprovedTemplate, getSongDeclinedTemplate, getSupportTicketTemplate, getCuratorApprovedTemplate, getCuratorRejectedTemplate, getMixingMessageTemplate } from './templates.ts';
 
 const resend = new Resend(Deno.env.get('RESEND_API_KEY'));
 const supabase = createClient(
@@ -66,6 +66,8 @@ Deno.serve(async (req) => {
             }
         } else if (table === 'broadcasts' && type === 'INSERT') {
             await handleBroadcast(record);
+        } else if (table === 'mixing_messages' && type === 'INSERT') {
+            await handleMixingMessage(record);
         }
 
         return new Response(JSON.stringify({ message: "Notification processed" }), { status: 200, headers: { 'Content-Type': 'application/json' } });
@@ -304,6 +306,28 @@ async function handleCuratorApplicationUpdate(record: any) {
         await sendEmail(email, subject, html);
     }
 }
+async function handleMixingMessage(record: any) {
+    // record: { id, order_id, sender_id, body, created_at }
+    const { data: sender } = await supabase.from('profiles').select('id, role').eq('id', record.sender_id).single();
+    if (!sender) return;
+    const { data: order } = await supabase.from('mixing_orders').select('id, song_title, artist_id').eq('id', record.order_id).single();
+    if (!order) return;
+    // Email the artist only when the engineer (admin) replies.
+    // Artist -> admin messages are visible in the admin dashboard.
+    if (sender.role === 'admin' && order.artist_id !== record.sender_id) {
+        const artist = await getUserEmail(order.artist_id);
+        if (!artist || !artist.email) return;
+        const subject = `New message about your mix: ${order.song_title}`;
+        const html = getMixingMessageTemplate({
+            name: artist.full_name || 'Artist',
+            songTitle: order.song_title,
+            snippet: String(record.body || '').slice(0, 300),
+            dashboardLink: `${SITE_URL}/dashboard/artist`,
+        });
+        await sendEmail(artist.email, subject, html);
+    }
+}
+
 
 async function handleBroadcast(record: any) {
     console.log("📢 Starting Broadcast:", record.subject);

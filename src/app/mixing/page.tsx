@@ -46,6 +46,14 @@ const faqs = [
         a: "Upload your song to Google Drive (set sharing to “Anyone with the link”) and paste the link when ordering. Stems (WAV) give the best results, but a clean stereo bounce works for the Demo Polish package.",
     },
     {
+        q: "What are stems?",
+        a: "Stems are the separate parts of your song \u2014 lead vocals, backing vocals, drums, bass, instruments \u2014 each exported as its own audio file. They give the engineer control over every layer, which is the difference between a quick polish and a true professional mix.",
+    },
+    {
+        q: "How do I get my stems from my producer?",
+        a: "Just ask your producer to bounce each track as a separate WAV file, all starting from the same point (bar 1), with nothing on the master bus. Every producer knows how to do this \u2014 it takes a few minutes. The guide on this page walks you through exactly what to tell them.",
+    },
+    {
         q: "How will I review the mix?",
         a: "You'll get a 60-second preview right in your dashboard. It carries an AfroPitch voice tag played three times, so it can't be reused — the full, clean file is released only after you accept.",
     },
@@ -173,6 +181,51 @@ export default function MixingPage() {
                         </div>
                     ))}
                 </div>
+            </section>
+
+            {/* Stems explainer */}
+            <section className="mb-20 max-w-3xl mx-auto">
+                <h2 className="text-3xl font-bold text-white text-center mb-6">
+                    What are stems? And how do you get yours?
+                </h2>
+                <p className="text-gray-400 leading-relaxed mb-4">
+                    <span className="text-white font-semibold">Stems</span> are the
+                    individual parts of your song, each exported as its own audio
+                    file \u2014 for example: lead vocals, backing vocals, drums,
+                    bass, synths and effects. Instead of one finished bounce, your
+                    engineer gets every layer separately, so each one can be
+                    balanced, cleaned and placed properly. That is what turns a
+                    decent recording into a radio-ready mix.
+                </p>
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
+                    <h3 className="font-semibold text-white mb-4">
+                        How to get your stems from your producer
+                    </h3>
+                    <ol className="space-y-4 text-sm text-gray-400">
+                        {[
+                            ["Ask for \u201cstems\u201d by name", "Every producer knows this term. Just say: \u201cPlease bounce each track separately as WAV files.\u201d"],
+                            ["Everything starts at the same point", "Each file must start from bar 1 (00:00) \u2014 even if the instrument only enters later. That way everything lines up perfectly."],
+                            ["WAV, 24-bit, no master-bus effects", "Tell them to turn off any limiter or compressor on the master bus before bouncing. We need the raw tracks, not a squashed mix."],
+                            ["Label every file clearly", "\u201c01 Lead Vocal.wav\u201d, \u201c02 Backing Vocals.wav\u201d, \u201c03 Drums.wav\u201d\u2026 Clear names mean no guessing and a faster mix."],
+                            ["Zip it and share a Drive link", "Put all the WAVs in one folder, zip it, upload to Google Drive with \u201cAnyone with the link\u201d, and paste the link when you order."],
+                        ].map(([t, d], i) => (
+                            <li key={i} className="flex gap-3">
+                                <span className="shrink-0 w-6 h-6 rounded-full bg-green-500/15 text-green-400 text-xs font-bold flex items-center justify-center">
+                                    {i + 1}
+                                </span>
+                                <div>
+                                    <span className="text-white font-medium">{t}. </span>
+                                    {d}
+                                </div>
+                            </li>
+                        ))}
+                    </ol>
+                </div>
+                <p className="text-gray-500 text-sm mt-4 text-center">
+                    No stems? No problem \u2014 a clean stereo bounce works for the
+                    Demo Polish package. Full Mix and Mix + Master need stems to do
+                    the job properly.
+                </p>
             </section>
 
             {/* Order */}

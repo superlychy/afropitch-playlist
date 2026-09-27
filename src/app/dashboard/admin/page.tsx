@@ -16,7 +16,7 @@ import { AdminActivityFeed } from "@/components/AdminActivityFeed";
 import { AdminMessageForm } from "@/components/AdminMessageForm";
 import { CustomEmailForm } from "@/components/CustomEmailForm";
 import { AdminInbox } from "@/components/AdminInbox";
-import { AdminMixingQueue } from "@/components/AdminMixingQueue";
+import { AdminMixing } from "@/components/AdminMixing";
 
 // ----------------------------------------------------------------------
 // TYPES & MOCK DATA (Ideally move to types file)
@@ -2140,7 +2140,7 @@ export default function AdminDashboard() {
             {
                 activeTab === "mixing" && (
                     <div className="animate-in fade-in duration-300">
-                        <AdminMixingQueue />
+                        <AdminMixing />
                     </div>
                 )
             }

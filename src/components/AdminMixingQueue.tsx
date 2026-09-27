@@ -5,8 +5,9 @@ import { useToast } from "@/components/ui/toast";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { MixingChat } from "@/components/MixingChat";
 import { Input } from "@/components/ui/input";
-import { Loader2, ExternalLink, AudioWaveform } from "lucide-react";
+import { Loader2, ExternalLink, AudioWaveform, MessageCircle } from "lucide-react";
 
 interface MixingOrder {
     id: string;
@@ -38,6 +39,8 @@ export function AdminMixingQueue() {
     const [loading, setLoading] = useState(true);
     const [acting, setActing] = useState<string | null>(null);
     const [deliverId, setDeliverId] = useState<string | null>(null);
+    const [openChatFor, setOpenChatFor] = useState<string | null>(null);
+    const [unread, setUnread] = useState<Record<string, number>>({});
     const [previewLink, setPreviewLink] = useState("");
     const [fullLink, setFullLink] = useState("");
 
@@ -61,6 +64,13 @@ export function AdminMixingQueue() {
                 map[p.id] = p.full_name ? `${p.full_name} (${p.email})` : p.email;
             });
             setArtists(map);
+        }
+        const { data: { user: me } } = await supabase.auth.getUser();
+        if (me && list.length > 0) {
+            const { data: msgs } = await supabase.from("mixing_messages").select("order_id").in("order_id", list.map((o) => o.id)).neq("sender_id", me.id).eq("read_by_recipient", false);
+            const counts: Record<string, number> = {};
+            (msgs ?? []).forEach((m: { order_id: string }) => { counts[m.order_id] = (counts[m.order_id] || 0) + 1; });
+            setUnread(counts);
         }
         setLoading(false);
     }, []);
@@ -151,6 +161,31 @@ export function AdminMixingQueue() {
                                 </Button>
                             </div>
                         )}
+                    <div className="pt-3 border-t border-white/10">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                                const next = openChatFor === o.id ? null : o.id;
+                                setOpenChatFor(next);
+                                if (next === null) fetchAll();
+                            }}
+                            className="rounded-lg text-xs"
+                        >
+                            <MessageCircle className="w-3.5 h-3.5 mr-1" />
+                            {openChatFor === o.id ? "Hide messages" : "Messages"}
+                            {(unread[o.id] || 0) > 0 && (
+                                <span className="ml-2 inline-flex items-center justify-center min-w-5 h-5 px-1 rounded-full bg-green-500 text-black text-[10px] font-bold">
+                                    {unread[o.id]}
+                                </span>
+                            )}
+                        </Button>
+                        {openChatFor === o.id && (
+                            <div className="mt-3">
+                                <MixingChat orderId={o.id} />
+                            </div>
+                        )}
+                    </div>
                     </CardContent>
                 </Card>
             ))}

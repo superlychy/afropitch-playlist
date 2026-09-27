@@ -287,3 +287,41 @@ export const getCuratorRejectedTemplate = (data: {
 </body>
 </html>
 `;
+
+export const getMixingMessageTemplate = (data: {
+    name: string;
+    songTitle: string;
+    snippet: string;
+    dashboardLink: string;
+}) => `
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #0d0d0d; color: #ffffff; padding: 20px; }
+        .container { max-width: 600px; margin: 0 auto; background-color: #1a1a1a; border-radius: 10px; overflow: hidden; border: 1px solid #333; }
+        .header { background-color: #000; padding: 20px; text-align: center; border-bottom: 2px solid #22c55e; }
+        .content { padding: 30px; line-height: 1.6; color: #cccccc; }
+        .quote { background: #111; border-left: 3px solid #22c55e; padding: 12px 16px; margin: 20px 0; color: #eee; font-style: italic; }
+        .button { display: inline-block; background-color: #22c55e; color: #000; font-weight: bold; padding: 12px 24px; border-radius: 8px; text-decoration: none; margin-top: 10px; }
+        .footer { padding: 20px; text-align: center; font-size: 12px; color: #666; background-color: #111; border-top: 1px solid #333; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header"><h1>AfroPitch</h1></div>
+        <div class="content">
+            <h2>New message about your mix</h2>
+            <p>Hi ${data.name},</p>
+            <p>Your engineer replied about <strong>${data.songTitle}</strong>:</p>
+            <div class="quote">${data.snippet}</div>
+            <div style="text-align: center;">
+                <a href="${data.dashboardLink}" class="button">Open the conversation</a>
+            </div>
+        </div>
+        <div class="footer">
+            <p>&copy; ${new Date().getFullYear()} AfroPitch. Keep soaring.</p>
+        </div>
+    </div>
+</body>
+</html>`;
