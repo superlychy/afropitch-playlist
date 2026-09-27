@@ -36,7 +36,7 @@ interface Submission {
 }
 
 export default function ArtistDashboard() {
-  const { user, loadFunds, isLoading, logout, refreshUser } = useAuth();
+  const { user, loadFunds, deductFunds, isLoading, logout, refreshUser } = useAuth();
   const { toast } = useToast();
   const router = useRouter();
   const [amount, setAmount] = useState("");
@@ -63,6 +63,14 @@ export default function ArtistDashboard() {
   const [profileTwitter, setProfileTwitter] = useState("");
   const [profileWeb, setProfileWeb] = useState("");
   const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
+
+  // Withdraw State
+  const [showWithdraw, setShowWithdraw] = useState(false);
+  const [withdrawAmount, setWithdrawAmount] = useState("");
+  const [bankName, setBankName] = useState("");
+  const [accountNumber, setAccountNumber] = useState("");
+  const [accountName, setAccountName] = useState("");
+  const [isWithdrawing, setIsWithdrawing] = useState(false);
 
   // Support Modal State
   const [showSupport, setShowSupport] = useState(false);
@@ -98,8 +106,62 @@ export default function ArtistDashboard() {
       setProfileWeb(user.website || "");
       fetchSubmissions();
       fetchNotifications();
+      fetchBankDetails();
     }
   }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const fetchBankDetails = async () => {
+    if (!user) return;
+    const { data } = await supabase
+      .from("profiles")
+      .select("bank_name, account_number, account_name")
+      .eq("id", user.id)
+      .single();
+    if (data) {
+      setBankName(data.bank_name || "");
+      setAccountNumber(data.account_number || "");
+      setAccountName(data.account_name || "");
+    }
+  };
+
+  const handleWithdraw = async () => {
+    if (!user) return;
+    setIsWithdrawing(true);
+    const amount = parseFloat(withdrawAmount);
+
+    if (isNaN(amount) || amount <= 0) {
+      toast("Please enter a valid amount.", "error");
+      setIsWithdrawing(false);
+      return;
+    }
+
+    if (amount > user.balance) {
+      toast("Insufficient funds.", "error");
+      setIsWithdrawing(false);
+      return;
+    }
+
+    const { data, error } = await supabase.rpc("request_payout", {
+      p_user_id: user.id,
+      p_amount: amount,
+      p_bank_name: bankName,
+      p_account_number: accountNumber,
+      p_account_name: accountName,
+    });
+
+    if (error) {
+      console.error("Payout RPC Error:", error);
+      toast("Unable to process payout. Please try again or contact support.", "error");
+    } else if (data && !data.success) {
+      toast("Payout Failed: " + data.message, "error");
+    } else {
+      toast("Withdrawal requested! Processing within 1-24 hours.", "success");
+      if (deductFunds) deductFunds(amount);
+      setShowWithdraw(false);
+      setWithdrawAmount("");
+    }
+    setIsWithdrawing(false);
+  };
 
   const fetchNotifications = async () => {
     if (!user) return;
@@ -146,6 +208,9 @@ export default function ArtistDashboard() {
         instagram: profileIg,
         twitter: profileTwitter,
         website: profileWeb,
+        bank_name: bankName,
+        account_number: accountNumber,
+        account_name: accountName,
       })
       .eq("id", user.id);
 
@@ -543,6 +608,14 @@ export default function ArtistDashboard() {
                   </Button>
                 )}
               </div>
+              <Button
+                variant="outline"
+                className="w-full mt-3 border-green-500/30 text-green-400 hover:bg-green-500/10"
+                onClick={() => setShowWithdraw(true)}
+              >
+                <Wallet className="w-4 h-4 mr-2" /> Withdraw Funds
+              </Button>
+              <p className="text-[10px] text-center text-gray-500 mt-2">Minimum withdrawal: {pricingConfig.currency}5,000</p>
             </CardContent>
           </Card>
 
@@ -552,10 +625,66 @@ export default function ArtistDashboard() {
                 <History className="w-5 h-5 text-gray-400" /> Wallet History
               </h2>
             </div>
-            <TransactionsList userId={user.id} allowedTypes={["deposit", "refund"]} />
+            <TransactionsList userId={user.id} allowedTypes={["deposit", "refund", "withdrawal"]} />
           </div>
         </div>
       </div>
+
+      {/* Withdraw Modal */}
+      {showWithdraw && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-zinc-900 border border-white/10 p-6 rounded-lg w-full max-w-md space-y-4">
+            <h3 className="font-bold text-white text-lg">Request Payout</h3>
+
+            {(!bankName || !accountNumber) ? (
+              <div className="py-8 text-center space-y-4">
+                <div className="p-4 bg-yellow-500/10 rounded-full inline-block">
+                  <AlertCircle className="w-8 h-8 text-yellow-500" />
+                </div>
+                <p className="text-gray-300">Please add your bank details in settings before withdrawing.</p>
+                <Button className="w-full bg-white text-black" onClick={() => { setShowWithdraw(false); setShowProfile(true); }}>
+                  Go to Settings
+                </Button>
+              </div>
+            ) : (
+              <>
+                <div className="py-4 space-y-4">
+                  <div className="p-4 bg-white/5 rounded border border-white/10 text-sm">
+                    <p className="text-gray-400 text-xs mb-1">Transfer Destination</p>
+                    <p className="font-bold text-white">{bankName}</p>
+                    <p className="text-gray-300">{accountNumber} • {accountName}</p>
+                    <Button variant="link" className="text-green-500 text-xs h-auto p-0 mt-2" onClick={() => { setShowWithdraw(false); setShowProfile(true); }}>
+                      Change Account
+                    </Button>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Amount to Withdraw</Label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-3 text-gray-500">{pricingConfig.currency}</span>
+                      <Input
+                        type="number"
+                        placeholder="0.00"
+                        value={withdrawAmount}
+                        onChange={e => setWithdrawAmount(e.target.value)}
+                        className="pl-8 bg-black/40 border-white/10 text-white"
+                      />
+                    </div>
+                    <p className="text-xs text-gray-500">Available: {pricingConfig.currency}{user?.balance?.toLocaleString()}</p>
+                    <p className="text-xs text-gray-500">Minimum withdrawal: {pricingConfig.currency}5,000</p>
+                  </div>
+                </div>
+                <div className="flex justify-end gap-2">
+                  <Button variant="ghost" onClick={() => setShowWithdraw(false)}>Cancel</Button>
+                  <Button className="bg-green-600" onClick={handleWithdraw} disabled={isWithdrawing || !withdrawAmount}>
+                    {isWithdrawing ? "Processing..." : "Submit Request"}
+                  </Button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Support Modal - Mobile Optimized */}
       {showSupport && (
@@ -680,6 +809,23 @@ export default function ArtistDashboard() {
             <div className="space-y-2">
               <Label>Website / EPK</Label>
               <Input value={profileWeb} onChange={(e) => setProfileWeb(e.target.value)} placeholder="https://" />
+            </div>
+            <div className="pt-2 border-t border-white/10">
+              <p className="text-xs text-gray-500 mb-3">Bank details — used for withdrawals.</p>
+              <div className="space-y-2">
+                <Label>Bank Name</Label>
+                <Input value={bankName} onChange={(e) => setBankName(e.target.value)} placeholder="e.g. GTBank" />
+              </div>
+              <div className="grid grid-cols-2 gap-4 mt-3">
+                <div className="space-y-2">
+                  <Label>Account Number</Label>
+                  <Input value={accountNumber} onChange={(e) => setAccountNumber(e.target.value)} placeholder="0123456789" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Account Name</Label>
+                  <Input value={accountName} onChange={(e) => setAccountName(e.target.value)} placeholder="Full name" />
+                </div>
+              </div>
             </div>
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="ghost" onClick={() => setShowProfile(false)}>Cancel</Button>

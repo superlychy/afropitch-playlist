@@ -47,6 +47,7 @@ export default function AnalyticsPage() {
         total_sessions: number;
         unique_visitors: number;
         registered_users: number;
+        total_artists: number;
         total_clicks: number;
         total_page_views: number;
         longest_session_seconds: number;
@@ -200,6 +201,16 @@ export default function AnalyticsPage() {
                     <CardContent>
                         <div className="text-2xl font-bold text-purple-400">{num(summary?.registered_users)}</div>
                         <p className="text-xs text-gray-500">Logged-in visitors identified</p>
+                    </CardContent>
+                </Card>
+                <Card className="bg-fuchsia-600/10 border-fuchsia-500/20">
+                    <CardHeader className="flex flex-row items-center justify-between pb-2">
+                        <CardTitle className="text-sm font-medium text-gray-400">Total Artists</CardTitle>
+                        <User className="h-4 w-4 text-fuchsia-500" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold text-fuchsia-400">{num(summary?.total_artists)}</div>
+                        <p className="text-xs text-gray-500">Artist accounts on the platform</p>
                     </CardContent>
                 </Card>
                 <Card className="bg-orange-600/10 border-orange-500/20">
