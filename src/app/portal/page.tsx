@@ -29,6 +29,13 @@ export default function PortalPage() {
     // Password visibility
     const [showPassword, setShowPassword] = useState(false);
 
+    // Show a suspension notice if redirected here after a blocked login
+    useEffect(() => {
+        if (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("blocked") === "1") {
+            setError("Your account has been suspended. Please contact support if you believe this is a mistake.");
+        }
+    }, []);
+
     // Forgot Password Modal
     const [showForgotPassword, setShowForgotPassword] = useState(false);
     const [resetEmail, setResetEmail] = useState("");

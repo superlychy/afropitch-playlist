@@ -19,7 +19,7 @@ export function SongSearch({ value, onChange }: { value: string; onChange: (url:
   const [show, setShow] = useState(false);
   const [searchEnabled, setSearchEnabled] = useState(true);
   const [notConfigured, setNotConfigured] = useState(false);
-  const debounceRef = useRef<any>();
+  const debounceRef = useRef<any>(undefined);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {

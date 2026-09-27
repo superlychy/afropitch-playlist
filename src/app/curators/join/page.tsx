@@ -11,6 +11,7 @@ import { Headphones, CheckCircle, Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
 export default function JoinCuratorsPage() {
+    const { toast } = useToast();
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isSuccess, setIsSuccess] = useState(false);
 

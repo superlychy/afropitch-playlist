@@ -59,6 +59,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .single();
 
       if (profile && mounted) {
+        // Blocked accounts cannot stay signed in.
+        if ((profile as any).is_blocked) {
+          console.warn("Blocked account attempted to sign in:", profile.id);
+          await supabase.auth.signOut();
+          if (mounted) {
+            setUser(null);
+            setIsLoading(false);
+          }
+          router.push("/portal?blocked=1");
+          return;
+        }
         setUser({
           id: profile.id,
           name:

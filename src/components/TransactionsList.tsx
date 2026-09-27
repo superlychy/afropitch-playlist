@@ -37,6 +37,7 @@ export function TransactionsList({ userId, allowedTypes }: { userId?: string; al
     const [isLoading, setIsLoading] = useState(true);
     const [search, setSearch] = useState("");
     const [typeFilter, setTypeFilter] = useState("all");
+    const [summary, setSummary] = useState<Record<string, { count: number; total: number }>>({});
 
     const fetchTransactions = async () => {
         setIsLoading(true);
@@ -56,6 +57,18 @@ export function TransactionsList({ userId, allowedTypes }: { userId?: string; al
             console.error("TransactionsList fetch error:", error.message);
         }
         if (data) setTransactions(data as any);
+
+        // Admin view: totals across ALL transactions via RPC (the 200-row slice understates them)
+        if (!userId) {
+            const { data: sumData } = await supabase.rpc('transactions_summary');
+            if (sumData) {
+                const map: Record<string, { count: number; total: number }> = {};
+                for (const row of sumData as any[]) {
+                    map[row.tx_type] = { count: Number(row.tx_count), total: Number(row.total) };
+                }
+                setSummary(map);
+            }
+        }
         setIsLoading(false);
     };
 
@@ -79,9 +92,16 @@ export function TransactionsList({ userId, allowedTypes }: { userId?: string; al
         return matchesType && matchesSearch;
     });
 
-    const totalDeposits = visibleTransactions.filter(t => t.type === 'deposit').reduce((s, t) => s + Number(t.amount), 0);
-    const totalWithdrawals = visibleTransactions.filter(t => t.type === 'withdrawal').reduce((s, t) => s + Math.abs(Number(t.amount)), 0);
-    const totalPayments = visibleTransactions.filter(t => t.type === 'payment').reduce((s, t) => s + Math.abs(Number(t.amount)), 0);
+    // Admin summary uses RPC totals across all rows; the slice-based fallback is for user views.
+    const totalDeposits = userId
+        ? visibleTransactions.filter(t => t.type === 'deposit').reduce((s, t) => s + Number(t.amount), 0)
+        : (summary['deposit']?.total || 0);
+    const totalWithdrawals = userId
+        ? visibleTransactions.filter(t => t.type === 'withdrawal').reduce((s, t) => s + Math.abs(Number(t.amount)), 0)
+        : Math.abs(summary['withdrawal']?.total || 0);
+    const totalPayments = userId
+        ? visibleTransactions.filter(t => t.type === 'payment').reduce((s, t) => s + Math.abs(Number(t.amount)), 0)
+        : Math.abs(summary['payment']?.total || 0);
 
     if (isLoading) return (
         <div className="flex items-center gap-2 text-gray-500 text-sm py-6">

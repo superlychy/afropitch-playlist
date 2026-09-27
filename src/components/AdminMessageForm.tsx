@@ -17,6 +17,7 @@ interface AdminMessageFormProps {
 }
 
 export function AdminMessageForm({ userId, userEmail, userName, onClose }: AdminMessageFormProps) {
+    const { toast } = useToast();
     const [subject, setSubject] = useState("");
     const [message, setMessage] = useState("");
     const [sending, setSending] = useState(false);

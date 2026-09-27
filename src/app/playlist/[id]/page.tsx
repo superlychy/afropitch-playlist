@@ -21,6 +21,7 @@ interface PlaylistData {
     description: string;
     cover_image: string;
     followers: number;
+    playlist_link?: string | null;
   };
   tracks: Track[];
   total_tracks: number;

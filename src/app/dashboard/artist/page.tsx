@@ -514,6 +514,8 @@ export default function ArtistDashboard() {
                           ? "bg-green-500/20 text-green-500"
                           : sub.status === "declined" || sub.status === "rejected"
                           ? "bg-red-500/20 text-red-500"
+                          : sub.status === "archived"
+                          ? "bg-zinc-500/20 text-zinc-400"
                           : "bg-yellow-500/20 text-yellow-500"
                       }`}>
                         {sub.status}
@@ -557,14 +559,14 @@ export default function ArtistDashboard() {
                       </div>
                     </div>
                   )}
-                  {(sub.status === "declined" || sub.status === "rejected") && sub.feedback && (
+                  {(sub.status === "declined" || sub.status === "rejected" || sub.status === "archived") && sub.feedback && (
                     <div className="mt-3 p-2 bg-red-900/20 border border-red-500/20 rounded">
                       <p className="text-[10px] text-red-200">
                         <span className="font-bold text-red-400">Reason:</span> {sub.feedback}
                       </p>
                     </div>
                   )}
-                  {(sub.status === "declined" || sub.status === "rejected") && (
+                  {(sub.status === "declined" || sub.status === "rejected" || sub.status === "archived") && (
                     <div className="mt-3">
                       <Button
                         variant="outline"

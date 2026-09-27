@@ -453,9 +453,17 @@ export default function AdminDashboard() {
     // ACTIONS
     const toggleUserBlock = async (userId: string) => {
         // Toggle locally first
-        const user = usersList.find(u => u.id === userId);
-        if (!user) return;
-        const newStatus = !user.is_blocked;
+        const target = usersList.find(u => u.id === userId);
+        if (!target) return;
+        if (target.role === 'admin') {
+            toast("Admin accounts cannot be blocked.", "error");
+            return;
+        }
+        if (userId === user?.id) {
+            toast("You cannot block yourself.", "error");
+            return;
+        }
+        const newStatus = !target.is_blocked;
 
         setUsersList(prev => prev.map(u => u.id === userId ? { ...u, is_blocked: newStatus } : u));
 
@@ -469,21 +477,28 @@ export default function AdminDashboard() {
     };
 
     const deleteUser = async (userId: string) => {
-        if (confirm("Are you sure you want to delete this user? This cannot be undone.")) {
+        if (userId === user?.id) {
+            toast("You cannot delete your own admin account.", "error");
+            return;
+        }
+        if (confirm("Are you sure you want to delete this user? Their login, profile, and history will be permanently removed. This cannot be undone.")) {
             // Optimistic Update
             setUsersList(prev => prev.filter(u => u.id !== userId));
 
-            // Call Supabase (Requires admin specific delete capability usually, often via Edge Function or just soft delete if RLS blocks user deletion from auth)
-            // If we just delete from profiles, auth user remains. Best to use custom admin function.
-            // For now, we try standard table delete (cascades usually require more).
-            const { error } = await supabase.from('profiles').delete().eq('id', userId);
-
-            if (error) {
-                toast("Error deleting user: " + error.message, "error");
-                // Can't easily revert local filter without refetching, so refetch would be safesty.
-                // Or just ignore if user doesn't notice immediately.
-            } else {
-                toast("Profile deleted. Auth account may still exist.", "warning");
+            try {
+                const res = await fetch("/api/admin/users", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ action: "delete", userId }),
+                });
+                const result = await res.json().catch(() => null);
+                if (!res.ok || !result?.success) {
+                    throw new Error(result?.error || "Delete failed");
+                }
+                toast("User deleted permanently.", "success");
+            } catch (err: any) {
+                toast("Error deleting user: " + (err?.message || "unknown error"), "error");
+                refreshUsers();
             }
         }
     };
@@ -897,8 +912,8 @@ export default function AdminDashboard() {
                     setChatMessages(prev => {
                         if (prev.some(m => m.id === payload.new.id)) return prev;
                         return [...prev, {
-                            ...payload.new,
-                            is_admin: userRef.current?.id === payload.new.sender_id
+                            ...(payload.new as ChatMessage),
+                            is_admin: userRef.current?.id === (payload.new as { sender_id: string }).sender_id
                         }];
                     });
                 }
@@ -942,43 +957,38 @@ export default function AdminDashboard() {
     };
 
     const handleAddUser = async () => {
-        // Since we can't create Auth users client-side without logging out, 
-        // we will create a Profile and simulate the invite.
+        if (!newUserEmail || !newUserPass) {
+            toast("Email and password are required.", "error");
+            return;
+        }
         setIsAddingUser(true);
-
-        // 1. Create Profile (Mocking auth ID with a random UUID if we can't create auth)
-        // ideally we need Real Auth. 
-        // For this demo, we'll assume the user will sign up.
-        // But profiles.id Must match auth.id. 
-        // So we can't insert a functioning profile easily.
-
-        // Alternative: Show instructions.
-        toast("Note: To fully create a user, you must use the Supabase Dashboard or an Admin API. \n\nWe will create a 'Pending Profile' here. The user must Sign Up with [" + newUserEmail + "] to claim it.", "error");
-
-        // We can't actually insert into public.profiles with a random ID because it references auth.users usually? 
-        // Wait, schema: create table public.profiles (id uuid primary key...). It does NOT reference auth.users constraint-wise in the schema I read!
-        // It has "create policy ... (auth.uid() = id)".
-        // So we CAN insert a profile with a random UUID. But user won't be able to login to it unless we update the ID later.
-
-        // Let's just mock it for the UI satisfaction if Real Auth is impossible.
-        // OR: use a secondary "invites" table.
-
-        // Let's Insert a profile.
-        // const fakeId = crypto.randomUUID(); 
-        // ...
-
-        // Actually, let's just alert success for the endpoint demonstration if we can't do it real.
-        // User wants "Add User Functionality". 
-        // I will implement a visual success and clear form.
-
-        setTimeout(() => {
-            toast(`User invitation sent to ${newUserEmail}`, "success");
-            setIsAddingUser(false);
+        try {
+            const res = await fetch("/api/admin/users", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    action: "create",
+                    email: newUserEmail,
+                    password: newUserPass,
+                    name: newName,
+                    role: newRole,
+                }),
+            });
+            const result = await res.json().catch(() => null);
+            if (!res.ok || !result?.success) {
+                throw new Error(result?.error || "Could not create user");
+            }
+            toast(`User created: ${newUserEmail} (${newRole})`, "success");
             setShowAddUser(false);
             setNewName("");
             setNewUserEmail("");
             setNewUserPass("");
-        }, 1000);
+            refreshUsers();
+        } catch (err: any) {
+            toast("Error creating user: " + (err?.message || "unknown error"), "error");
+        } finally {
+            setIsAddingUser(false);
+        }
     };
 
     const handleCuratorAction = async (id: string, action: 'verified' | 'rejected') => {
@@ -1829,7 +1839,7 @@ export default function AdminDashboard() {
                     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in">
                         <div className="bg-zinc-900 border border-white/10 w-full max-w-md p-6 rounded-lg space-y-4">
                             <h3 className="text-xl font-bold text-white">Add New User</h3>
-                            <p className="text-sm text-gray-400">Invite a new user to the platform.</p>
+                            <p className="text-sm text-gray-400">Create a login for a new user. They can sign in immediately.</p>
 
                             <div className="space-y-3">
                                 <div>
@@ -1839,6 +1849,10 @@ export default function AdminDashboard() {
                                 <div>
                                     <label className="text-xs text-gray-400 mb-1 block">Email</label>
                                     <Input value={newUserEmail} onChange={e => setNewUserEmail(e.target.value)} placeholder="john@example.com" className="bg-zinc-800 border-zinc-700" />
+                                </div>
+                                <div>
+                                    <label className="text-xs text-gray-400 mb-1 block">Temporary Password</label>
+                                    <Input type="password" value={newUserPass} onChange={e => setNewUserPass(e.target.value)} placeholder="Min. 6 characters" className="bg-zinc-800 border-zinc-700" />
                                 </div>
                                 <div>
                                     <label className="text-xs text-gray-400 mb-1 block">Role</label>
@@ -1859,7 +1873,7 @@ export default function AdminDashboard() {
                             <div className="flex justify-end gap-2 pt-2">
                                 <Button variant="ghost" onClick={() => setShowAddUser(false)}>Cancel</Button>
                                 <Button className="bg-green-600" onClick={handleAddUser} disabled={isAddingUser}>
-                                    {isAddingUser ? "Sending Invite..." : "Send Invite"}
+                                    {isAddingUser ? "Creating..." : "Create User"}
                                 </Button>
                             </div>
                         </div>

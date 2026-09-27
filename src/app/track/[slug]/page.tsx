@@ -24,7 +24,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   if (!sub) return { title: 'AfroPitch - Link Not Found' };
 
-  const playlistName = Array.isArray(sub.playlist) ? sub.playlist[0]?.name : sub.playlist?.name;
+  const playlist = sub.playlist as { name: string } | { name: string }[] | null;
+  const playlistName = Array.isArray(playlist) ? playlist[0]?.name : playlist?.name;
   
   return {
     title: `🎵 ${sub.song_title} by ${sub.artist_name} | AfroPitch`,

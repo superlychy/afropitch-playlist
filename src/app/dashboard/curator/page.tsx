@@ -741,12 +741,8 @@ export default function CuratorDashboard() {
     const handleReviewAction = async (submissionId: string, action: 'accepted' | 'declined' | 'archived', feedback: string) => {
         if (!user) return;
 
-        if (action === 'archived') {
-            const { error } = await supabase.from('submissions').update({ status: 'archived', feedback: 'Archived silently.' }).eq('id', submissionId);
-            if (error) toast("Error archiving: " + error.message, "error");
-            else fetchCuratorData();
-            return;
-        }
+        // All actions (including archived) go through the secure RPC below so the
+        // money logic runs: archived refunds the artist, like a decline.
 
         // Create tracking slug if accepted
         let trackingSlug = null;

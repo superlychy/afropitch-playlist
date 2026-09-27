@@ -14,6 +14,7 @@ interface CustomEmailFormProps {
 }
 
 export function CustomEmailForm({ onClose }: CustomEmailFormProps) {
+    const { toast } = useToast();
     const [toEmail, setToEmail] = useState("");
     const [fromEmail, setFromEmail] = useState("contact@afropitchplay.best");
     const [subject, setSubject] = useState("");
