@@ -370,11 +370,16 @@ export default function AdminDashboard() {
             let totalSubmissionFees = 0;
             let platformRevenue = 0;
             let curatorEarnings = 0;
+            // Any admin-owned playlist keeps 100% (matches process_submission_review,
+            // which checks the playlist owner's role, not the logged-in admin).
+            const adminIds = new Set(
+                (users || []).filter((u: any) => u.role === 'admin').map((u: any) => u.id)
+            );
             financeSubs?.forEach((s: any) => {
                 if (s.status === 'declined' || s.status === 'rejected') return;
                 const amt = Number(s.amount_paid || 0);
                 totalSubmissionFees += amt;
-                const isAdminPlaylist = s.playlist?.curator_id === user?.id;
+                const isAdminPlaylist = !!s.playlist?.curator_id && adminIds.has(s.playlist.curator_id);
                 if (isAdminPlaylist) {
                     platformRevenue += amt; // Admin keeps 100%
                 } else {
@@ -531,7 +536,7 @@ export default function AdminDashboard() {
     };
 
     const deletePlaylist = async (id: string) => {
-        if (!confirm("Are you sure you want to delete this playlist? This action cannot be undone.")) return;
+        if (!confirm("Are you sure you want to delete this playlist? This will also permanently delete ALL of its submissions, click history, and earnings records. This action cannot be undone.")) return;
 
         const { error } = await supabase.from('playlists').delete().eq('id', id);
 
@@ -565,13 +570,16 @@ export default function AdminDashboard() {
                 // Optimistic update
                 setWithdrawals(prev => prev.map(w => w.id === id ? { ...w, status: 'rejected' } : w));
 
-                const { error } = await supabase.rpc('reject_withdrawal', {
+                const { data, error } = await supabase.rpc('reject_withdrawal', {
                     p_withdrawal_id: id,
                     p_reason: 'Rejected by Admin'
                 });
 
                 if (error) {
                     throw error;
+                }
+                if (data && data.success === false) {
+                    throw new Error(data.message || "Withdrawal was not rejected.");
                 }
 
                 toast("Withdrawal rejected and funds refunded to user's wallet.", "success");
@@ -749,14 +757,12 @@ export default function AdminDashboard() {
 
             const data = await res.json();
             if (data.name) { // api returns { name, ... } or { error }
-                // Update Supabase
+                // Update Supabase (name, cover, followers only — never clobber
+                // the curated description with a generated string)
                 const { error } = await supabase.from('playlists').update({
                     name: data.name,
                     cover_image: data.coverImage,
                     followers: data.followers,
-                    description: data.songsCount > 0
-                        ? `Playlist · Afropitch Play · ${data.songsCount} items · ${data.followers.toLocaleString()} saves`
-                        : `Playlist · Afropitch Play · ${data.followers.toLocaleString()} saves`
                 }).eq('id', playlist.id);
 
                 if (error) throw error;
@@ -797,7 +803,6 @@ export default function AdminDashboard() {
             // User: "accept or reject". So at least pending.
             .order('created_at', { ascending: false });
 
-        if (data) setPlaylistSongs(data);
         if (data) setPlaylistSongs(data);
         setIsLoadingSongs(false);
     };
@@ -865,14 +870,21 @@ export default function AdminDashboard() {
             });
 
             if (error) throw error;
+            if (data && data.success === false) throw new Error(data.message || "Review was not applied.");
 
             const successMsg = action === 'accepted'
                 ? "Song accepted! Artist notified and link tracking generated."
-                : "Song rejected. Refund processed to artist wallet.";
+                : action === 'archived'
+                    ? "Submission archived. Refund processed to artist wallet."
+                    : "Song rejected. Refund processed to artist wallet.";
             toast(successMsg, "success");
 
             // Update local state
             setPlaylistSongs(prev => prev.map(s => s.id === submissionId ? { ...s, status: action } : s));
+            // Keep the pending badge in sync without a reload
+            if (sub.status === 'pending') {
+                setPendingSubmissionsCount(prev => Math.max(0, prev - 1));
+            }
         } catch (err: any) {
             console.error("Submission Action Error:", err);
             toast(`Error processing submission: ${err.message}`, "error");
@@ -948,10 +960,15 @@ export default function AdminDashboard() {
 
         if (error) {
             toast("Failed to send: " + error.message, "error");
-            // Remove optimistic? nah, just alert.
+            // Remove the optimistic message so the chat doesn't show unsent text
+            setChatMessages(prev => prev.filter(m => m.id !== optimMsg.id));
         } else {
-            // Also update ticket status to 'open' if it was closed? Or maybe 'replied'?
-            // Optionally update last_message on ticket view locally
+            // Reopen the ticket if the admin replied to a closed one
+            if (activeTicket.status === 'closed') {
+                await supabase.from('support_tickets').update({ status: 'open' }).eq('id', activeTicket.id);
+                setTickets(prev => prev.map(t => t.id === activeTicket.id ? { ...t, status: 'open' } : t));
+                setActiveTicket({ ...activeTicket, status: 'open' });
+            }
         }
         setSendingMsg(false);
     };
@@ -1655,8 +1672,9 @@ export default function AdminDashboard() {
                                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
                                         {allPlaylists
                                             .filter(p => {
-                                                if (playlistFilter === 'admin') return p.curator_id === user?.id;
-                                                if (playlistFilter === 'user') return p.curator_id !== user?.id;
+                                                const adminIds = new Set(usersList.filter(u => u.role === 'admin').map(u => u.id));
+                                                if (playlistFilter === 'admin') return adminIds.has(p.curator_id);
+                                                if (playlistFilter === 'user') return !adminIds.has(p.curator_id);
                                                 return true;
                                             })
                                             .filter(p => !playlistSearch || p.name.toLowerCase().includes(playlistSearch.toLowerCase()))
@@ -1786,7 +1804,7 @@ export default function AdminDashboard() {
                                                 if (!activeTicket) return;
                                                 const { error } = await supabase.from('support_tickets').update({ status: 'closed' }).eq('id', activeTicket.id);
                                                 if (!error) {
-                                                    toast("Ticket closed.", "error");
+                                                    toast("Ticket closed.", "success");
                                                     setTickets(prev => prev.map(t => t.id === activeTicket.id ? { ...t, status: 'closed' } : t));
                                                     setActiveTicket(prev => prev ? { ...prev, status: 'closed' } : null);
                                                     setShowChat(false);
