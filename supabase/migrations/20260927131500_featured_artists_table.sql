@@ -6,7 +6,7 @@
 
 CREATE TABLE IF NOT EXISTS public.featured_artists (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  week_start date,
+  week_start date NOT NULL,
   artist_id uuid REFERENCES public.profiles(id) ON DELETE SET NULL,
   submission_id uuid REFERENCES public.submissions(id) ON DELETE SET NULL,
   headline text NOT NULL DEFAULT '',
