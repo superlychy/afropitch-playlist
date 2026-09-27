@@ -189,3 +189,96 @@ export const getSupportTicketTemplate = (data: {
     </div>
 </body>
 </html>`;
+
+export const getCuratorApprovedTemplate = (data: {
+    name: string;
+    playlistLink: string;
+    signupLink: string;
+}) => `
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #0d0d0d; color: #ffffff; padding: 20px; }
+        .container { max-width: 600px; margin: 0 auto; background-color: #1a1a1a; border-radius: 10px; overflow: hidden; border: 1px solid #333; }
+        .header { background-color: #000; padding: 20px; text-align: center; border-bottom: 2px solid #22c55e; }
+        .content { padding: 30px; line-height: 1.6; color: #cccccc; }
+        .success-box { background-color: rgba(34, 197, 94, 0.1); border: 1px solid #22c55e; padding: 15px; border-radius: 5px; margin: 20px 0; text-align: center; }
+        .tip-box { background-color: #2a2a2a; border-left: 4px solid #f59e0b; padding: 15px; margin-top: 20px; font-size: 14px; }
+        .button { display: inline-block; padding: 12px 24px; background-color: #22c55e; color: #000; text-decoration: none; border-radius: 5px; font-weight: bold; margin-top: 20px; }
+        .footer { padding: 20px; text-align: center; font-size: 12px; color: #666; background-color: #111; border-top: 1px solid #333; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header"><h1>AfroPitch</h1></div>
+        <div class="content">
+            <h2>You're In! Curator Application Approved \u{1F389}</h2>
+            <p>Hi ${data.name},</p>
+            <p>We're thrilled to welcome you to AfroPitch as a curator! Your application has been <strong>approved</strong>.</p>
+
+            <div class="success-box">
+                <h3 style="margin: 0; color: #fff;">Application Approved</h3>
+                <p style="margin: 5px 0 0 0; font-size: 12px; color: #22c55e;">${data.playlistLink}</p>
+            </div>
+
+            <p>One quick step to activate everything &mdash; create your curator account:</p>
+
+            <div style="text-align: center;">
+                <a href="${data.signupLink}" class="button">Create Your Curator Account</a>
+            </div>
+
+            <p>Once your account is set up, here's what happens next:</p>
+
+            <div class="tip-box">
+                <strong>\u{1F680} GET STARTED AS A CURATOR:</strong>
+                <ul style="margin: 10px 0; padding-left: 20px;">
+                    <li><strong>Complete your profile:</strong> Head to your curator dashboard and make sure your playlists are listed and looking sharp.</li>
+                    <li><strong>Receive submissions:</strong> Artists will start pitching their songs to your playlists.</li>
+                    <li><strong>Review &amp; earn:</strong> Listen, accept the tracks you love, and earn on every submission you review.</li>
+                </ul>
+            </div>
+        </div>
+        <div class="footer">
+            <p>&copy; ${new Date().getFullYear()} AfroPitch. Keep soaring.</p>
+        </div>
+    </div>
+</body>
+</html>
+`;
+
+export const getCuratorRejectedTemplate = (data: {
+    name: string;
+    dashboardLink: string;
+}) => `
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #0d0d0d; color: #ffffff; padding: 20px; }
+        .container { max-width: 600px; margin: 0 auto; background-color: #1a1a1a; border-radius: 10px; overflow: hidden; border: 1px solid #333; }
+        .header { background-color: #000; padding: 20px; text-align: center; border-bottom: 2px solid #f59e0b; }
+        .content { padding: 30px; line-height: 1.6; color: #cccccc; }
+        .button { display: inline-block; padding: 12px 24px; background-color: #22c55e; color: #000; text-decoration: none; border-radius: 5px; font-weight: bold; margin-top: 20px; }
+        .footer { padding: 20px; text-align: center; font-size: 12px; color: #666; background-color: #111; border-top: 1px solid #333; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header"><h1>AfroPitch</h1></div>
+        <div class="content">
+            <h2>Update on Your Curator Application</h2>
+            <p>Hi ${data.name},</p>
+            <p>Thanks for applying to become a curator on AfroPitch. After reviewing your application, we weren't able to approve it this time.</p>
+            <p>You're welcome to reapply in the future with an updated playlist or profile. If you have questions, just reply to this email.</p>
+            <div style="text-align: center;">
+                <a href="${data.dashboardLink}" class="button">Visit AfroPitch</a>
+            </div>
+        </div>
+        <div class="footer">
+            <p>&copy; ${new Date().getFullYear()} AfroPitch. Keep soaring.</p>
+        </div>
+    </div>
+</body>
+</html>
+`;

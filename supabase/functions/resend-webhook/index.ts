@@ -47,6 +47,14 @@ serve(async (req) => {
             title = "New Email Received 📬";
             color = 5763719;
 
+            // Log to database for Muse's inbound-email watcher
+            const { error: logError } = await supabase.from('inbound_emails').insert({
+                sender_from: typeof payload.from === 'string' ? payload.from : JSON.stringify(payload.from),
+                subject: payload.subject,
+                body_text: (payload.text || payload.html || 'No Content').substring(0, 5000),
+            });
+            if (logError) console.error('Failed to log inbound email:', logError);
+
             fields.push({ name: "From", value: payload.from, inline: true });
             fields.push({ name: "Subject", value: payload.subject, inline: false });
 

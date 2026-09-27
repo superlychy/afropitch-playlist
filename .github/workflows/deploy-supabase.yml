@@ -24,4 +24,6 @@ jobs:
           version: latest
 
       - name: Deploy Edge Functions
-        run: supabase functions deploy notify-user --project-ref $PROJECT_ID
+        run: |
+          supabase functions deploy notify-user --project-ref $PROJECT_ID
+          supabase functions deploy resend-webhook --project-ref $PROJECT_ID

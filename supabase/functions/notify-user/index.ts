@@ -1,7 +1,7 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { Resend } from 'resend';
-import { getTransactionReceiptTemplate, getSongApprovedTemplate, getSongDeclinedTemplate, getSupportTicketTemplate } from './templates.ts';
+import { getTransactionReceiptTemplate, getSongApprovedTemplate, getSongDeclinedTemplate, getSupportTicketTemplate, getCuratorApprovedTemplate, getCuratorRejectedTemplate } from './templates.ts';
 
 const resend = new Resend(Deno.env.get('RESEND_API_KEY'));
 const supabase = createClient(
@@ -59,6 +59,10 @@ Deno.serve(async (req) => {
             // Simplicity: Notify if status changed to 'open' (reply) or 'closed'
             if (record.status !== payload.old_record?.status) {
                 await handleSupportUpdate(record);
+            }
+        } else if (table === 'curator_applications' && type === 'UPDATE') {
+            if (record.status !== payload.old_record?.status) {
+                await handleCuratorApplicationUpdate(record);
             }
         } else if (table === 'broadcasts' && type === 'INSERT') {
             await handleBroadcast(record);
@@ -276,6 +280,29 @@ async function handleSupportUpdate(record: any) {
     });
 
     await sendEmail(user.email, subject, html);
+}
+
+async function handleCuratorApplicationUpdate(record: any) {
+    const email = record.email;
+    if (!email) return;
+    const name = record.name || 'Curator';
+
+    if (record.status === 'approved') {
+        const subject = `You're In! Your AfroPitch curator application was approved \u{1F389}`;
+        const html = getCuratorApprovedTemplate({
+            name,
+            playlistLink: record.playlist_link || '',
+            signupLink: `${SITE_URL}/signup`,
+        });
+        await sendEmail(email, subject, html);
+    } else if (record.status === 'rejected') {
+        const subject = `Update on your AfroPitch curator application`;
+        const html = getCuratorRejectedTemplate({
+            name,
+            dashboardLink: SITE_URL,
+        });
+        await sendEmail(email, subject, html);
+    }
 }
 
 async function handleBroadcast(record: any) {
