@@ -2165,6 +2165,11 @@ export default function AdminDashboard() {
                                                             {sub.status}
                                                         </span>
                                                         {sub.ranking_boosted_at && <span className="text-[10px] bg-green-500 text-black px-1.5 py-0.5 rounded font-bold animate-pulse">Rising</span>}
+                                                        {sub.status === 'accepted' && (
+                                                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400 font-bold" title="Tracking link clicks">
+                                                                {(sub.clicks ?? 0).toLocaleString()} clicks
+                                                            </span>
+                                                        )}
                                                     </div>
                                                     <span className="text-white font-bold truncate">{sub.song_title}</span>
                                                     <span className="text-sm text-gray-400 truncate">By {sub.artist?.full_name || 'Unknown'}</span>

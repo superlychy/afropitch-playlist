@@ -49,9 +49,11 @@ serve(async (req) => {
 
             // Log to database for Muse's inbound-email watcher
             const { error: logError } = await supabase.from('inbound_emails').insert({
-                sender_from: typeof payload.from === 'string' ? payload.from : JSON.stringify(payload.from),
-                subject: payload.subject,
-                body_text: (payload.text || payload.html || 'No Content').substring(0, 5000),
+                from_email: typeof payload.from === 'string' ? payload.from : JSON.stringify(payload.from),
+                to_email: Array.isArray(payload.to) ? (payload.to[0] || 'unknown') : (payload.to || 'unknown'),
+                subject: payload.subject || '',
+                body_text: (payload.text || '').substring(0, 5000),
+                body_html: (payload.html || '').substring(0, 5000),
             });
             if (logError) console.error('Failed to log inbound email:', logError);
 
