@@ -19,6 +19,15 @@ import { Check, Loader2, Link as LinkIcon, CheckCircle2 } from "lucide-react";
 
 const PayWithPaystack = dynamic(() => import("@/components/PaystackButton"), {
     ssr: false,
+    // Never leave an invisible hole if the payment chunk is slow or fails.
+    loading: () => (
+        <button
+            disabled
+            className="w-full bg-gray-600 text-white text-base sm:text-lg py-4 sm:py-6 font-bold rounded-xl flex items-center justify-center gap-2"
+        >
+            Loading payment…
+        </button>
+    ),
 });
 
 interface MixingPackage {
