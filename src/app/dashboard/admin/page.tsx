@@ -271,34 +271,22 @@ export default function AdminDashboard() {
             setPendingSubmissionsCount(subCount || 0);
 
 
-            // 2. Fetch Withdrawals
-            const { data: withdraws, error: withdrawError } = await supabase
+            // 2. Fetch Withdrawals (with user names joined)
+            const { data: withdrawsJoined } = await supabase
                 .from('withdrawals')
-                .select('*') // You might want to join profiles to get names: .select('*, profiles(full_name)')
+                .select('*, profiles(full_name)')
                 .order('created_at', { ascending: false });
 
-            if (withdraws) {
-                // For now, mapping manually if not joined, or assuming we fetch names. 
-                // Let's stick to basic fetching. The table has user_id, we might need to fetch names if not joined.
-                // For simplicity in this step, we'll map what we have.
-                // To get names properly, we should actually join.
-                // Refetching with join:
-                const { data: withdrawsJoined } = await supabase
-                    .from('withdrawals')
-                    .select('*, profiles(full_name)')
-                    .order('created_at', { ascending: false });
-
-                if (withdrawsJoined) {
-                    setWithdrawals(withdrawsJoined.map((w: any) => ({
-                        id: w.id,
-                        user_id: w.user_id,
-                        user_name: w.profiles?.full_name || 'Unknown',
-                        amount: w.amount,
-                        status: w.status,
-                        bank_details: `${w.bank_name} - ${w.account_number}`,
-                        date: new Date(w.created_at).toLocaleDateString()
-                    })));
-                }
+            if (withdrawsJoined) {
+                setWithdrawals(withdrawsJoined.map((w: any) => ({
+                    id: w.id,
+                    user_id: w.user_id,
+                    user_name: w.profiles?.full_name || 'Unknown',
+                    amount: w.amount,
+                    status: w.status,
+                    bank_details: `${w.bank_name} - ${w.account_number}${w.account_name ? ` (${w.account_name})` : ''}`,
+                    date: new Date(w.created_at).toLocaleDateString()
+                })));
             }
 
             // 3. Fetch Tickets
