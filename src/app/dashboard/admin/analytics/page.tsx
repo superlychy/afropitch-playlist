@@ -43,12 +43,24 @@ export default function AnalyticsPage() {
     const [rawVisits, setRawVisits] = useState<Visit[]>([]);
     const [groupedVisits, setGroupedVisits] = useState<GroupedVisit[]>([]);
     const [loading, setLoading] = useState(true);
-    const [activeUsers, setActiveUsers] = useState(0);
+    const [summary, setSummary] = useState<{
+        total_sessions: number;
+        unique_visitors: number;
+        registered_users: number;
+        total_clicks: number;
+        total_page_views: number;
+        longest_session_seconds: number;
+        active_now: number;
+    } | null>(null);
 
     const refreshAnalytics = async () => {
         setLoading(true);
 
-        // Fetch visits alongside profile data if user_id exists
+        // True totals across ALL sessions (not just the latest 300 shown below)
+        const { data: summaryData } = await supabase.rpc('analytics_summary');
+        if (summaryData) setSummary(summaryData as any);
+
+        // Fetch recent visits for the visitor table (latest 300)
         const { data, error } = await supabase
             .from('analytics_visits')
             .select('*, profiles(full_name, email, role)')
@@ -115,7 +127,6 @@ export default function AnalyticsPage() {
             })).sort((a, b) => new Date(b.last_seen_at).getTime() - new Date(a.last_seen_at).getTime());
 
             setGroupedVisits(groupedArray);
-            setActiveUsers(groupedArray.filter(g => g.is_online).length);
         }
         setLoading(false);
     };
@@ -144,7 +155,7 @@ export default function AnalyticsPage() {
         return '🖥 Desktop';
     };
 
-    const registeredCount = groupedVisits.filter(g => g.user_id).length;
+    const num = (n: number | undefined | null) => (n ?? 0).toLocaleString();
 
     return (
         <div className="space-y-6">
@@ -167,7 +178,7 @@ export default function AnalyticsPage() {
                         <Activity className="h-4 w-4 text-green-500" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold text-green-400">{activeUsers}</div>
+                        <div className="text-2xl font-bold text-green-400">{num(summary?.active_now)}</div>
                         <p className="text-xs text-gray-500">Online in last 5 mins</p>
                     </CardContent>
                 </Card>
@@ -177,7 +188,7 @@ export default function AnalyticsPage() {
                         <Monitor className="h-4 w-4 text-blue-500" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold text-white">{groupedVisits.length}</div>
+                        <div className="text-2xl font-bold text-white">{num(summary?.unique_visitors)}</div>
                         <p className="text-xs text-gray-500">Total unique IPs logged</p>
                     </CardContent>
                 </Card>
@@ -187,7 +198,7 @@ export default function AnalyticsPage() {
                         <User className="h-4 w-4 text-purple-500" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold text-purple-400">{registeredCount}</div>
+                        <div className="text-2xl font-bold text-purple-400">{num(summary?.registered_users)}</div>
                         <p className="text-xs text-gray-500">Logged-in visitors identified</p>
                     </CardContent>
                 </Card>
@@ -197,8 +208,8 @@ export default function AnalyticsPage() {
                         <MousePointer className="h-4 w-4 text-orange-500" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold text-white">{rawVisits.reduce((a, v) => a + (v.clicks || 0), 0)}</div>
-                        <p className="text-xs text-gray-500">Across {rawVisits.length} sessions</p>
+                        <div className="text-2xl font-bold text-white">{num(summary?.total_clicks)}</div>
+                        <p className="text-xs text-gray-500">Across {num(summary?.total_sessions)} sessions</p>
                     </CardContent>
                 </Card>
                 <Card className="bg-zinc-900 border-white/10">
@@ -208,7 +219,7 @@ export default function AnalyticsPage() {
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold text-white">
-                            {formatDuration(Math.max(...rawVisits.map(v => v.duration_seconds || 0), 0))}
+                            {formatDuration(summary?.longest_session_seconds || 0)}
                         </div>
                         <p className="text-xs text-gray-500">Single longest visit</p>
                     </CardContent>
