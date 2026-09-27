@@ -55,6 +55,7 @@ export function AdminFeatured() {
     // per-draft edits
     const [edits, setEdits] = useState<Record<string, { headline: string; story: string; slug: string }>>({});
     const [saving, setSaving] = useState<string | null>(null);
+    const [uploadingPhoto, setUploadingPhoto] = useState<string | null>(null);
 
     const load = async () => {
         setLoading(true);
@@ -185,6 +186,29 @@ export function AdminFeatured() {
         }
         toast("Saved.", "success");
         load();
+    };
+
+    const uploadPhoto = async (f: Feature, file: File | undefined | null) => {
+        if (!file) return;
+        if (!/^image\/(jpeg|png|webp)$/.test(file.type)) {
+            toast("Please choose a JPG, PNG or WebP photo.", "error");
+            return;
+        }
+        setUploadingPhoto(f.id);
+        try {
+            const fd = new FormData();
+            fd.append("file", file, file.name);
+            fd.append("feature_id", f.id);
+            const res = await fetch("/api/featured/upload-photo", { method: "POST", body: fd });
+            const json = await res.json().catch(() => null);
+            if (!json?.ok) throw new Error(json?.error || "Upload failed.");
+            toast("Photo updated.", "success");
+            load();
+        } catch (e: any) {
+            toast(e?.message || "Upload failed.", "error");
+        } finally {
+            setUploadingPhoto(null);
+        }
     };
 
     const setStatus = async (f: Feature, status: string) => {
@@ -372,11 +396,21 @@ export function AdminFeatured() {
                                                     ))}
                                                 </div>
                                             )}
-                                            {f.photo_url && (
-                                                <p className="text-xs text-gray-500 break-all">
-                                                    Photo: <a href={f.photo_url} target="_blank" rel="noreferrer" className="text-yellow-400 hover:underline">{f.photo_url}</a>
-                                                </p>
-                                            )}
+                                            <div className="flex items-center gap-3">
+                                                {f.photo_url && (
+                                                    <img src={f.photo_url} alt="" className="w-16 h-16 rounded-xl object-cover border border-white/10" />
+                                                )}
+                                                <label className="cursor-pointer text-xs bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg px-3 py-2 text-gray-300 transition-all">
+                                                    {uploadingPhoto === f.id ? "Uploading…" : (f.photo_url ? "Replace photo" : "Upload photo")}
+                                                    <input
+                                                        type="file"
+                                                        accept="image/jpeg,image/png,image/webp"
+                                                        className="hidden"
+                                                        disabled={uploadingPhoto === f.id}
+                                                        onChange={(e) => { uploadPhoto(f, e.target.files?.[0]); e.target.value = ""; }}
+                                                    />
+                                                </label>
+                                            </div>
 
                                             <div className="grid sm:grid-cols-2 gap-4">
                                                 <div>

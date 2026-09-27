@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { CheckCircle2, Loader2, Star } from "lucide-react";
+import { CheckCircle2, Loader2, Star, ImagePlus } from "lucide-react";
 
 interface QuestionnaireData {
     artist_name: string | null;
@@ -55,6 +55,52 @@ export function FeaturedQuestionnaireForm({
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [done, setDone] = useState(false);
+    const [uploading, setUploading] = useState(false);
+    const [uploadError, setUploadError] = useState<string | null>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    // Shrink the photo in the browser before upload so files stay tiny.
+    const compressImage = async (file: File): Promise<Blob> => {
+        const img = await createImageBitmap(file);
+        const maxDim = 1200;
+        const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        const ctx = canvas.getContext("2d");
+        if (!ctx) throw new Error("Could not process the photo.");
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        const blob = await new Promise<Blob | null>((res) =>
+            canvas.toBlob(res, "image/jpeg", 0.82)
+        );
+        if (!blob) throw new Error("Could not process the photo.");
+        return blob;
+    };
+
+    const handlePhotoFile = async (f: File | undefined | null) => {
+        if (!f) return;
+        setUploadError(null);
+        if (!/^image\/(jpeg|png|webp)$/.test(f.type)) {
+            setUploadError("Please choose a JPG, PNG or WebP photo.");
+            return;
+        }
+        setUploading(true);
+        try {
+            const blob = await compressImage(f);
+            const fd = new FormData();
+            fd.append("file", blob, "photo.jpg");
+            fd.append("token", token);
+            const res = await fetch("/api/featured/upload-photo", { method: "POST", body: fd });
+            const json = await res.json().catch(() => null);
+            if (!json?.ok) throw new Error(json?.error || "Upload failed. Please try again.");
+            setPhotoUrl(json.url);
+        } catch (e: any) {
+            setUploadError(e?.message || "Upload failed. You can paste a link instead.");
+        } finally {
+            setUploading(false);
+            if (fileInputRef.current) fileInputRef.current.value = "";
+        }
+    };
 
     const songLabel = initial.song_title ? `“${initial.song_title}”` : "your song";
     const questions = QUESTIONS.map((q) =>
@@ -163,10 +209,45 @@ export function FeaturedQuestionnaireForm({
                 <CardHeader className="pb-3">
                     <CardTitle className="text-white text-base font-semibold">Your photo <span className="text-gray-500 font-normal text-sm">(optional)</span></CardTitle>
                     <CardDescription>
-                        Paste a link to a clear photo of you — an Instagram post, a Google Drive link, anything public.
+                        Upload a clear photo of you — it appears on your public feature page.
                     </CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="space-y-3">
+                    {photoUrl && photoUrl.startsWith("http") && (
+                        <img
+                            src={photoUrl}
+                            alt="Your photo preview"
+                            className="w-28 h-28 rounded-xl object-cover border border-white/10"
+                        />
+                    )}
+                    <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        className="hidden"
+                        onChange={(e) => handlePhotoFile(e.target.files?.[0])}
+                    />
+                    <Button
+                        type="button"
+                        variant="outline"
+                        disabled={uploading}
+                        onClick={() => fileInputRef.current?.click()}
+                        className="w-full border-white/15 text-white hover:bg-white/10 rounded-xl"
+                    >
+                        {uploading ? (
+                            <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Uploading…</>
+                        ) : (
+                            <><ImagePlus className="w-4 h-4 mr-2" /> {photoUrl ? "Replace photo" : "Upload a photo"}</>
+                        )}
+                    </Button>
+                    {uploadError && (
+                        <p className="text-xs text-red-400">{uploadError}</p>
+                    )}
+                    <div className="flex items-center gap-3">
+                        <div className="flex-1 h-px bg-white/10" />
+                        <span className="text-xs text-gray-500">or paste a link</span>
+                        <div className="flex-1 h-px bg-white/10" />
+                    </div>
                     <input
                         value={photoUrl}
                         onChange={(e) => setPhotoUrl(e.target.value)}
