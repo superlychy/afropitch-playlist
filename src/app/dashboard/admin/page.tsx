@@ -557,7 +557,7 @@ export default function AdminDashboard() {
                     throw error;
                 }
 
-                toast("Withdrawal rejected and funds refunded to user's wallet.", "error");
+                toast("Withdrawal rejected and funds refunded to user's wallet.", "success");
 
             } else {
                 // Approve Logic
@@ -570,7 +570,7 @@ export default function AdminDashboard() {
                     throw error;
                 }
 
-                toast("Withdrawal approved. Please process the bank transfer manually.", "error");
+                toast("Withdrawal approved. Please process the bank transfer manually.", "success");
             }
         } catch (error: any) {
             console.error(`Error ${action}ing withdrawal:`, error);
@@ -852,7 +852,7 @@ export default function AdminDashboard() {
             const successMsg = action === 'accepted'
                 ? "Song accepted! Artist notified and link tracking generated."
                 : "Song rejected. Refund processed to artist wallet.";
-            toast(successMsg, "error");
+            toast(successMsg, "success");
 
             // Update local state
             setPlaylistSongs(prev => prev.map(s => s.id === submissionId ? { ...s, status: action } : s));
