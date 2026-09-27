@@ -335,22 +335,27 @@ export default function ArtistDashboard() {
 
       console.log("✅ Payment success. User:", currentUser.id, "Amount:", val, "Ref:", paystackRef);
 
-      const { data: result, error } = await supabase.rpc("process_deposit", {
-        p_user_id: currentUser.id,
-        p_amount: val,
-        p_reference: paystackRef,
-        p_description: `Wallet Deposit: ${paystackRef}`,
-      });
-
-      if (error) {
-        console.error("process_deposit RPC error:", {
-          error,
+      // Verify server-side with Paystack and credit the wallet. The amount
+      // credited comes from Paystack's verification, never from the client.
+      let result: any = null;
+      try {
+        const res = await fetch("/api/payment/status", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ reference: paystackRef }),
+        });
+        result = await res.json().catch(() => null);
+        if (!res.ok || !result?.success) {
+          throw new Error(result?.error || `Verification failed (HTTP ${res.status})`);
+        }
+      } catch (error: any) {
+        console.error("Payment verification error:", {
+          error: error?.message,
           userId: currentUser.id,
-          amount: val,
           reference: paystackRef,
           timestamp: new Date().toISOString()
         });
-        
+
         // Log to system logs for admin review
         await supabase.from("system_logs").insert({
           event_type: "payment_failed",
@@ -358,20 +363,20 @@ export default function ArtistDashboard() {
             user_id: currentUser.id,
             amount: val,
             reference: paystackRef,
-            error: error.message,
+            error: error?.message,
             timestamp: new Date().toISOString()
           }
         });
-        
+
         toast(`Payment received but failed to credit. Ref: ${paystackRef}. Contact support.`, "error");
         paystackLockRef.current = false;
         return;
       }
 
-      if (result?.success === false) {
+      if (result?.alreadyProcessed) {
         toast("This payment was already processed. Refreshing balance...", "warning");
       } else {
-        toast(`₦${val.toLocaleString()} loaded to your wallet! ✅`, "success");
+        toast(`₦${Number(result?.amount || 0).toLocaleString()} loaded to your wallet! ✅`, "success");
       }
 
       // Clear the payment form immediately

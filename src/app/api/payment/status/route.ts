@@ -6,6 +6,12 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+// Verifies a Paystack transaction server-side, then credits the wallet.
+// The amount and the account credited both come from Paystack's verification
+// response — never from the client — so a forged callback cannot mint money.
+const PAYSTACK_SECRET =
+  process.env.PAYSTACK_SECRET_KEY || process.env.PAYSTACK_WEBHOOK_SECRET || "";
+
 /**
  * GET /api/payment/status
  * Check payment status and verify if deposit was credited
@@ -88,26 +94,83 @@ export async function GET(req: Request) {
 
 /**
  * POST /api/payment/status
- * Manually verify and credit a payment (admin only)
- * 
+ * Verify a Paystack payment server-side and credit the matching wallet.
+ *
  * Body:
  * - reference: Paystack transaction reference
- * - userId: User ID
- * - amount: Payment amount in Naira
+ *
+ * The verified amount (kobo -> naira) and the customer email come from
+ * Paystack. The wallet credited is the AfroPitch profile whose email matches
+ * the Paystack customer email. Client-supplied amounts are never trusted.
  */
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { reference, userId, amount } = body;
+    const { reference } = body || {};
 
-    if (!reference || !userId || !amount) {
+    if (!reference || typeof reference !== "string") {
       return NextResponse.json(
-        { error: "Missing required fields: reference, userId, amount" },
+        { error: "Missing required field: reference" },
         { status: 400 }
       );
     }
 
-    // Check if already processed
+    if (!PAYSTACK_SECRET) {
+      return NextResponse.json(
+        { error: "verification_unavailable" },
+        { status: 503 }
+      );
+    }
+
+    // 1. Verify the transaction with Paystack directly.
+    const verifyRes = await fetch(
+      `https://api.paystack.co/transaction/verify/${encodeURIComponent(reference)}`,
+      { headers: { Authorization: `Bearer ${PAYSTACK_SECRET}` } }
+    );
+    const verifyJson = await verifyRes.json().catch(() => null);
+    if (!verifyJson?.status || verifyJson?.data?.status !== "success") {
+      return NextResponse.json(
+        { success: false, error: "Payment could not be verified with Paystack." },
+        { status: 402 }
+      );
+    }
+
+    const paidNgn = Math.round(Number(verifyJson.data.amount || 0) / 100);
+    const currency = verifyJson.data.currency || "NGN";
+    const customerEmail = verifyJson.data?.customer?.email || "";
+
+    if (currency !== "NGN" || paidNgn <= 0) {
+      return NextResponse.json(
+        { success: false, error: "Invalid verified payment." },
+        { status: 402 }
+      );
+    }
+
+    // 2. Find the AfroPitch account that owns this payment email.
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("id, balance")
+      .ilike("email", customerEmail)
+      .limit(1)
+      .single();
+
+    if (!profile) {
+      console.error("[Payment Status API] Verified payment has no matching profile:", {
+        reference,
+        customerEmail,
+        amount: paidNgn,
+      });
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Payment verified but no AfroPitch account matches the payment email. Contact support with your reference.",
+          reference,
+        },
+        { status: 404 }
+      );
+    }
+
+    // 3. Idempotency: already credited (e.g. by the webhook)?
     const { data: existing } = await supabase
       .from("transactions")
       .select("id")
@@ -116,46 +179,56 @@ export async function POST(req: Request) {
       .single();
 
     if (existing) {
+      const { data: fresh } = await supabase
+        .from("profiles")
+        .select("balance")
+        .eq("id", profile.id)
+        .single();
       return NextResponse.json({
         success: true,
-        message: "Payment already processed",
-        transactionId: existing.id
+        alreadyProcessed: true,
+        amount: paidNgn,
+        balance: fresh?.balance,
+        transactionId: existing.id,
       });
     }
 
-    // Process deposit using RPC
+    // 4. Credit the verified amount.
     const { data: result, error } = await supabase.rpc("process_deposit", {
-      p_user_id: userId,
-      p_amount: amount,
+      p_user_id: profile.id,
+      p_amount: paidNgn,
       p_reference: reference,
-      p_description: `Manual verification: ${reference}`
+      p_description: `Wallet Deposit: ${reference}`,
     });
 
-    if (error) {
+    if (error || result?.success === false) {
+      console.error("[Payment Status API] process_deposit failed:", {
+        error: error?.message,
+        result,
+        reference,
+      });
       return NextResponse.json(
-        { error: error.message },
+        { success: false, error: error?.message || result?.message || "Failed to credit wallet." },
         { status: 500 }
       );
     }
 
-    // Get updated balance
-    const { data: profile } = await supabase
+    const { data: updated } = await supabase
       .from("profiles")
       .select("balance")
-      .eq("id", userId)
+      .eq("id", profile.id)
       .single();
 
     return NextResponse.json({
       success: true,
-      message: "Payment credited successfully",
-      newBalance: profile?.balance,
-      reference
+      alreadyProcessed: false,
+      amount: paidNgn,
+      balance: updated?.balance,
     });
-
   } catch (err: any) {
-    console.error("[Payment Status API - POST] Error:", err);
+    console.error("[Payment Status API] Error:", err);
     return NextResponse.json(
-      { error: err.message || "Internal error" },
+      { success: false, error: err.message || "Internal error" },
       { status: 500 }
     );
   }
