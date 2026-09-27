@@ -42,6 +42,7 @@ interface WithdrawalRequest {
     amount: number;
     status: 'pending' | 'approved' | 'rejected';
     bank_details: string;
+    reason: string;
     date: string;
 }
 
@@ -285,6 +286,7 @@ export default function AdminDashboard() {
                     amount: w.amount,
                     status: w.status,
                     bank_details: `${w.bank_name} - ${w.account_number}${w.account_name ? ` (${w.account_name})` : ''}`,
+                    reason: w.reason || '',
                     date: new Date(w.created_at).toLocaleDateString()
                 })));
             }
@@ -1498,6 +1500,7 @@ export default function AdminDashboard() {
                                                 </p>
                                                 <p className="text-sm text-gray-400">Requested by <span className="text-white">{w.user_name}</span> • {w.date}</p>
                                                 <p className="text-xs text-gray-500 mt-1 font-mono">{w.bank_details}</p>
+                                                {w.reason && <p className="text-xs text-gray-400 mt-1"><span className="text-gray-500">Reason:</span> {w.reason}</p>}
                                             </div>
                                         </div>
                                         {w.status === 'pending' && (
