@@ -46,6 +46,118 @@ interface SupportTicket {
   profiles?: { full_name: string; email: string };
 }
 
+interface ThreadMessage {
+  id: string;
+  message: string;
+  created_at: string;
+  from_admin: boolean;
+}
+
+// Inline conversation thread + reply composer for a support ticket.
+// Replaces the old "Open Chat" button, which dispatched an event nothing listened to.
+function TicketThread({ ticketId }: { ticketId: string }) {
+  const { toast } = useToast();
+  const [messages, setMessages] = useState<ThreadMessage[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [reply, setReply] = useState("");
+  const [sending, setSending] = useState(false);
+
+  const loadThread = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      const res = await fetch(`/api/support/thread?ticket_id=${ticketId}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      const data = await res.json();
+      if (data.ok) setMessages(data.messages || []);
+    } catch {
+      // keep existing messages on failure
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadThread();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ticketId]);
+
+  const sendReply = async () => {
+    if (!reply.trim() || sending) return;
+    setSending(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      const res = await fetch("/api/support/reply", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ ticket_id: ticketId, message: reply.trim() }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setReply("");
+        toast("Reply sent — the visitor gets it by email.", "success");
+        loadThread();
+      } else {
+        toast(data.error || "Could not send reply.", "error");
+      }
+    } catch {
+      toast("Could not send reply.", "error");
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <div className="mt-3 pt-3 border-t border-white/10 space-y-3" onClick={(e) => e.stopPropagation()}>
+      {loading ? (
+        <p className="text-xs text-gray-500">Loading conversation…</p>
+      ) : messages.length === 0 ? (
+        <p className="text-xs text-gray-500">No messages yet.</p>
+      ) : (
+        <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+          {messages.map((m) => (
+            <div
+              key={m.id}
+              className={`rounded-xl px-3 py-2 text-sm max-w-[90%] ${
+                m.from_admin
+                  ? "ml-auto bg-green-600/20 border border-green-500/30 text-gray-100"
+                  : "bg-white/5 border border-white/10 text-gray-300"
+              }`}
+            >
+              <p className="whitespace-pre-wrap">{m.message}</p>
+              <p className={`text-[10px] mt-1 ${m.from_admin ? "text-green-400/70" : "text-gray-500"}`}>
+                {m.from_admin ? "You" : "Visitor"} · {new Date(m.created_at).toLocaleString()}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="flex gap-2">
+        <Textarea
+          value={reply}
+          onChange={(e) => setReply(e.target.value)}
+          placeholder="Type your reply…"
+          rows={2}
+          className="bg-black/40 border-white/10 text-sm"
+        />
+        <Button
+          size="sm"
+          onClick={sendReply}
+          disabled={sending || !reply.trim()}
+          className="bg-green-600 hover:bg-green-500 text-white shrink-0"
+        >
+          <Send className="w-3 h-3 mr-1" /> {sending ? "Sending…" : "Reply"}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 export function AdminInbox() {
   const { toast } = useToast();
   const [emails, setEmails] = useState<Email[]>([]);
@@ -394,21 +506,7 @@ export function AdminInbox() {
                 {expandedId === ticket.id && (
                   <div className="mt-3 pt-3 border-t border-white/10 space-y-2">
                     <p className="text-sm text-gray-300">{ticket.message}</p>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="text-green-400 border-green-500/30"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        // Open in admin support chat
-                        const evt = new CustomEvent("open-admin-chat", {
-                          detail: { ticket },
-                        });
-                        window.dispatchEvent(evt);
-                      }}
-                    >
-                      Open Chat
-                    </Button>
+                    <TicketThread ticketId={ticket.id} />
                   </div>
                 )}
               </CardContent>
