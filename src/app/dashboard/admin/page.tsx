@@ -1079,7 +1079,7 @@ export default function AdminDashboard() {
                 console.error("Broadcast Error:", error);
                 toast("Error sending broadcast: " + error.message, "error");
             } else {
-                toast("Broadcast queued successfully! Users will receive it shortly.", "error");
+                toast("Broadcast queued successfully! Users will receive it shortly.", "success");
                 setBroadcastSubject("");
                 setBroadcastMessage("");
             }

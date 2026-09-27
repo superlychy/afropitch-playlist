@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { createHmac, timingSafeEqual } from "crypto";
 import { Resend } from "resend";
 
 const supabase = createClient(
@@ -7,6 +8,59 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 const resend = new Resend(process.env.RESEND_API_KEY);
+
+async function requireAdmin(req: Request) {
+  // The frontend sends the session as a Bearer token (not cookies) for this route.
+  const header = req.headers.get("authorization") || "";
+  const token = header.startsWith("Bearer ") ? header.slice(7) : null;
+  if (!token) return false;
+  const {
+    data: { user },
+  } = await supabase.auth.getUser(token);
+  if (!user) return false;
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+  return profile?.role === "admin";
+}
+
+/**
+ * Verify a Resend (Svix) webhook signature.
+ * Resend signs with: v1,<base64 hmac-sha256(svix-id.svix-timestamp.rawBody)>
+ * using the endpoint's signing secret (whsec_...).
+ */
+function verifyResendSignature(
+  rawBody: string,
+  headers: Headers,
+  secret: string
+): boolean {
+  try {
+    const svixId = headers.get("svix-id");
+    const svixTimestamp = headers.get("svix-timestamp");
+    const svixSignature = headers.get("svix-signature");
+    if (!svixId || !svixTimestamp || !svixSignature) return false;
+
+    // Reject stale webhooks (5 minute tolerance)
+    const ts = parseInt(svixTimestamp, 10);
+    if (isNaN(ts) || Math.abs(Date.now() / 1000 - ts) > 300) return false;
+
+    const key = Buffer.from(secret.replace(/^whsec_/, ""), "base64");
+    const signedContent = `${svixId}.${svixTimestamp}.${rawBody}`;
+    const expected = createHmac("sha256", key).update(signedContent).digest("base64");
+
+    return svixSignature.split(" ").some((sig) => {
+      const parts = sig.split(",");
+      if (parts.length !== 2 || parts[0] !== "v1") return false;
+      const a = Buffer.from(parts[1]);
+      const b = Buffer.from(expected);
+      return a.length === b.length && timingSafeEqual(a, b);
+    });
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Resend Inbound Email Webhook.
@@ -19,7 +73,18 @@ const resend = new Resend(process.env.RESEND_API_KEY);
  */
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
+    // Verify this really came from Resend (Svix signature). Fail closed.
+    const webhookSecret = process.env.RESEND_WEBHOOK_SECRET;
+    const rawBody = await req.text();
+    if (
+      !webhookSecret ||
+      !verifyResendSignature(rawBody, req.headers, webhookSecret)
+    ) {
+      console.warn("[Admin Emails] Rejected unverified inbound webhook");
+      return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
+    }
+
+    const body = JSON.parse(rawBody);
 
     // Resend inbound webhook payload
     const {
@@ -140,6 +205,11 @@ export async function POST(req: Request) {
  */
 export async function GET(req: Request) {
   try {
+    // Admin-only: this returns full inbound email bodies and addresses.
+    if (!(await requireAdmin(req))) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const { searchParams } = new URL(req.url);
     const limit = parseInt(searchParams.get("limit") || "50");
     const offset = parseInt(searchParams.get("offset") || "0");

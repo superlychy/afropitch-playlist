@@ -19,6 +19,7 @@ export function MixingChat({ orderId }: { orderId: string }) {
   const [nameMap, setNameMap] = useState<Record<string, string>>({});
   const [isAdmin, setIsAdmin] = useState(false);
   const [draft, setDraft] = useState("");
+  const [sendError, setSendError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -80,6 +81,7 @@ export function MixingChat({ orderId }: { orderId: string }) {
     const body = draft.trim();
     if (!body || !user || sending) return;
     setSending(true);
+    setSendError(null);
     const { error } = await supabase.from("mixing_messages").insert({
       order_id: orderId,
       sender_id: user.id,
@@ -90,6 +92,8 @@ export function MixingChat({ orderId }: { orderId: string }) {
       setDraft("");
       await load();
       bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    } else {
+      setSendError("Message failed to send. Please try again.");
     }
   };
 
@@ -144,6 +148,9 @@ export function MixingChat({ orderId }: { orderId: string }) {
           {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
         </Button>
       </div>
+      {sendError && (
+        <p className="mt-2 text-xs text-red-400">{sendError}</p>
+      )}
     </div>
   );
 }

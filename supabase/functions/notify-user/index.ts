@@ -398,38 +398,91 @@ async function handleMixingRefund(record: any, old: any) {
     }
 }
 
+function b64urlEncodeStr(s: string): string {
+    const bytes = new TextEncoder().encode(s);
+    let bin = "";
+    for (const b of bytes) bin += String.fromCharCode(b);
+    return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+async function signUnsubscribeToken(email: string, secret: string): Promise<string> {
+    const normalized = email.trim().toLowerCase();
+    const key = await crypto.subtle.importKey(
+        "raw",
+        new TextEncoder().encode(secret),
+        { name: "HMAC", hash: "SHA-256" },
+        false,
+        ["sign"]
+    );
+    const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(normalized));
+    const sigBytes = new Uint8Array(sig);
+    let bin = "";
+    for (const b of sigBytes) bin += String.fromCharCode(b);
+    const sigB64 = btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+    return `${b64urlEncodeStr(normalized)}.${sigB64}`;
+}
+
 async function handleBroadcast(record: any) {
     console.log("📢 Starting Broadcast:", record.subject);
 
-    if (record.channel === 'in_app') {
-        console.log("Skipping email for in-app only broadcast.");
-        return;
+    const channel = record.channel || 'both';
+    const wantsEmail = channel === 'email' || channel === 'both';
+    const wantsInApp = channel === 'in_app' || channel === 'both';
+
+    // 1. Recipients come from the profiles table (source of truth for role),
+    //    not auth user_metadata. Page through in batches of 1000.
+    const recipients: any[] = [];
+    let page = 0;
+    while (true) {
+        const { data, error } = await supabase
+            .from('profiles')
+            .select('id, email, role, full_name')
+            .not('email', 'is', null)
+            .range(page * 1000, page * 1000 + 999);
+        if (error) {
+            console.error("Failed to list profiles for broadcast:", error);
+            return;
+        }
+        if (!data || data.length === 0) break;
+        recipients.push(...data);
+        if (data.length < 1000) break;
+        page++;
     }
 
-    // 1. Fetch All Users (Page through if needed, but for now max 1000)
-    const { data: { users }, error } = await supabase.auth.admin.listUsers({ per_page: 1000 });
+    console.log(`Found ${recipients.length} profiles.`);
 
-    if (error || !users) {
-        console.error("Failed to list users for broadcast:", error);
-        return;
-    }
+    // 2. Unsubscribed addresses never get broadcast email.
+    const { data: unsubRows } = await supabase
+        .from('email_unsubscribes')
+        .select('email');
+    const unsubscribed = new Set(
+        (unsubRows || []).map((r: any) => (r.email || "").trim().toLowerCase())
+    );
 
-    console.log(`Found ${users.length} users.`);
+    // 3. Secret for signed per-recipient unsubscribe links (best effort).
+    let unsubSecret: string | null = null;
+    try {
+        const { data } = await supabase.rpc('get_unsubscribe_secret');
+        if (data) unsubSecret = data as string;
+    } catch { /* footer link omitted */ }
 
     // 2. Iterate and Send
     const targetRole = record.target_role || 'all';
     let sentCount = 0;
+    let inAppCount = 0;
+    let skippedUnsub = 0;
 
-    for (const u of users) {
-        if (!u.email) continue;
+    for (const p of recipients) {
+        const email = (p.email || "").trim();
+        if (!email) continue;
 
-        // Filter by role
-        const userRole = u.user_metadata?.role || (u.email.includes("curator") ? "curator" : "artist");
+        // Filter by role from the profiles table
+        const userRole = p.role || 'artist';
         if (targetRole !== 'all' && userRole !== targetRole) {
             continue;
         }
 
-        const userName = u.user_metadata?.full_name || u.email.split('@')[0] || 'User';
+        const userName = p.full_name || email.split('@')[0] || 'User';
         const subject = record.subject.replace(/{{name}}/g, userName).replace(/{{username}}/g, userName);
 
         // Process message body for placeholders
@@ -437,32 +490,67 @@ async function handleBroadcast(record: any) {
             .replace(/{{name}}/g, userName)
             .replace(/{{username}}/g, userName);
 
-        // Convert newlines to breaks if it looks like plain text
-        if (!messageBody.includes('<p>') && !messageBody.includes('<div>')) {
-            messageBody = messageBody.replace(/\n/g, '<br/>');
+        if (wantsInApp) {
+            const { error: notifError } = await supabase.from('notifications').insert({
+                user_id: p.id,
+                title: subject,
+                message: messageBody,
+                is_read: false,
+            });
+            if (notifError) {
+                console.error(`In-app notification failed for ${email}:`, notifError.message);
+            } else {
+                inAppCount++;
+            }
         }
 
-        const html = `
+        if (wantsEmail) {
+            if (unsubscribed.has(email.toLowerCase())) {
+                skippedUnsub++;
+                continue;
+            }
+
+            // Convert newlines to breaks if it looks like plain text
+            let htmlBody = messageBody;
+            if (!htmlBody.includes('<p>') && !htmlBody.includes('<div>')) {
+                htmlBody = htmlBody.replace(/\n/g, '<br/>');
+            }
+
+            let unsubFooter = "";
+            let listUnsubHeaders: Record<string, string> = {};
+            if (unsubSecret) {
+                const token = await signUnsubscribeToken(email, unsubSecret);
+                const unsubUrl = `${SITE_URL}/unsubscribe?token=${encodeURIComponent(token)}`;
+                unsubFooter = `<p style="font-size: 12px; color: #777; text-align: center;"><a href="${unsubUrl}">Unsubscribe</a></p>`;
+                listUnsubHeaders = {
+                    "List-Unsubscribe": `<${unsubUrl}>`,
+                    "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+                };
+            }
+
+            const html = `
             <div style="font-family: sans-serif; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 8px;">
                 <h2 style="color: #16a34a;">${subject}</h2>
-                <div style="font-size: 16px; line-height: 1.5;">${messageBody}</div>
+                <div style="font-size: 16px; line-height: 1.5;">${htmlBody}</div>
                 <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
                 <p style="font-size: 12px; color: #777; text-align: center;">
                     You received this message from AfroPitch Admin.<br/>
                     &copy; ${new Date().getFullYear()} AfroPitch Playlist.
                 </p>
+                ${unsubFooter}
             </div>
         `;
 
-        await sendEmail(u.email, subject, html);
-        sentCount++;
-        // Rate limit
-        await new Promise(r => setTimeout(r, 200));
+            await sendEmail(email, subject, html, listUnsubHeaders);
+            sentCount++;
+            // Rate limit
+            await new Promise(r => setTimeout(r, 200));
+        }
     }
-    console.log(`✅ Broadcast complete. Sent to ${sentCount} users (Target: ${targetRole}).`);
+    console.log(`✅ Broadcast complete. Email sent: ${sentCount} (skipped ${skippedUnsub} unsubscribed), in-app: ${inAppCount} (Target: ${targetRole}).`);
 }
 
-async function sendEmail(to: string, subject: string, html: string) {
+async function sendEmail(to: string, subject: string, html: string, headers?: Record<string, string>) {
     console.log(`📧 Sending email to ${to}: ${subject}`);
     try {
         const { data, error } = await resend.emails.send({
@@ -470,6 +558,7 @@ async function sendEmail(to: string, subject: string, html: string) {
             to: [to],
             subject: subject,
             html: html,
+            ...(headers && Object.keys(headers).length > 0 ? { headers } : {}),
         });
 
         if (error) {
