@@ -59,7 +59,7 @@ const faqs = [
     },
     {
         q: "How long does a mix take?",
-        a: "Demo Polish takes about 3 days, Full Mix about 7 days, and Mix + Master about 10 days. You'll see live status updates in your dashboard.",
+        a: "Demo Polish takes about 3 days, Full Mix about 5 days, and Mix + Master about 7 days. You'll see live status updates in your dashboard.",
     },
     {
         q: "Will a better mix help my song get playlisted?",

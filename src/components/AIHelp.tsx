@@ -37,7 +37,7 @@ const FAQ_DATA = [
     {
         question: "How does the mixing service work?",
         keywords: ["mix", "master", "mixing", "mastering", "stems", "engineer", "polish"],
-        answer: `Our engineers mix and master your song for you:\n• Demo Polish — ${CUR}35,000 (~3 days)\n• Full Mix — ${CUR}65,000 (~7 days)\n• Mix + Master — ${CUR}100,000 (~10 days)\n\nPick a package on the Mixing page, share your Google Drive link, and pay securely. Your money is held in escrow until you approve the final mix — you'll review a watermarked preview first.`
+        answer: `Our engineers mix and master your song for you:\n• Demo Polish — ${CUR}35,000 (~3 days)\n• Full Mix — ${CUR}65,000 (~5 days)\n• Mix + Master — ${CUR}100,000 (~7 days)\n\nPick a package on the Mixing page, share your Google Drive link, and pay securely. Your money is held in escrow until you approve the final mix — you'll review a watermarked preview first.`
     },
     {
         question: "Is my payment safe? (Escrow)",
