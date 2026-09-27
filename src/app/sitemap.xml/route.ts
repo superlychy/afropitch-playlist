@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
 
 export async function GET() {
   const baseUrl = "https://afropitchplay.best";
@@ -24,6 +25,25 @@ export async function GET() {
     { url: "/verify", priority: "0.5", changefreq: "monthly" },
     { url: "/reset-password", priority: "0.5", changefreq: "monthly" },
   ];
+
+  // Published featured-artist pages (SEO: one URL per artist)
+  try {
+    const sb = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+    const { data } = await sb
+      .from("featured_artists")
+      .select("slug")
+      .eq("status", "published")
+      .not("slug", "is", null);
+    for (const row of data ?? []) {
+      const slug = (row as { slug: string }).slug;
+      if (slug) routes.push({ url: `/featured/${slug}`, priority: "0.7", changefreq: "monthly" });
+    }
+  } catch {
+    // sitemap still serves the static routes if the DB lookup fails
+  }
 
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"

@@ -66,6 +66,17 @@ export function MixingOrderForm() {
 
     const valid = songTitle.trim().length > 1 && /^https?:\/\//.test(fileLink.trim()) && !!selected;
 
+    // When the form becomes submittable, bring the payment step into view
+    // (it sits below the song-details section, easy to miss on mobile).
+    const paySectionRef = useRef<HTMLDivElement>(null);
+    const wasValidRef = useRef(false);
+    useEffect(() => {
+        if (valid && !wasValidRef.current && user) {
+            paySectionRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+        wasValidRef.current = valid;
+    }, [valid, user]);
+
     const handlePaymentSuccess = useCallback(
         async (reference: any) => {
             if (lockRef.current) return;
@@ -219,7 +230,7 @@ export function MixingOrderForm() {
             {/* Payment */}
             <div>
                 <h3 className="text-lg font-semibold text-white mb-4">
-                    3. Secure payment (escrow)
+                    3. Review &amp; pay (escrow)
                 </h3>
                 {!user ? (
                     <Card className="border-white/10 bg-white/5">
@@ -235,16 +246,39 @@ export function MixingOrderForm() {
                         </CardContent>
                     </Card>
                 ) : !valid ? (
-                    <p className="text-sm text-gray-500">
-                        Pick a package, add your song title and a valid Drive link to continue.
-                    </p>
+                    <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+                        <p className="text-sm text-gray-300 font-medium mb-2">
+                            Almost there — finish these to unlock payment:
+                        </p>
+                        <ul className="text-sm text-gray-500 space-y-1.5">
+                            {!selected && <li>• Choose a package in step 1</li>}
+                            {songTitle.trim().length <= 1 && <li>• Add your song title in step 2</li>}
+                            {!/^https?:\/\//.test(fileLink.trim()) && (
+                                <li>• Paste your Google Drive link in step 2 (it must start with https://)</li>
+                            )}
+                        </ul>
+                    </div>
                 ) : placing ? (
                     <div className="flex items-center gap-2 text-gray-300">
                         <Loader2 className="w-5 h-5 animate-spin" /> Creating your order…
                     </div>
                 ) : (
                     selected && (
-                        <div className="flex flex-col items-start gap-3">
+                        <div ref={paySectionRef} className="rounded-2xl border border-green-500/25 bg-green-950/10 p-5 space-y-4 scroll-mt-24">
+                            <div className="space-y-1.5 text-sm">
+                                <div className="flex justify-between gap-4">
+                                    <span className="text-gray-500">Package</span>
+                                    <span className="text-white font-medium text-right">{selected.name}</span>
+                                </div>
+                                <div className="flex justify-between gap-4">
+                                    <span className="text-gray-500">Song</span>
+                                    <span className="text-white font-medium text-right truncate max-w-[60%]">{songTitle.trim()}</span>
+                                </div>
+                                <div className="flex justify-between gap-4 border-t border-white/10 pt-2">
+                                    <span className="text-gray-500">Total (held in escrow)</span>
+                                    <span className="text-white font-bold">₦{Number(selected.price_ngn).toLocaleString()}</span>
+                                </div>
+                            </div>
                             <PayWithPaystack
                                 email={user.email}
                                 amount={Math.round(Number(selected.price_ngn)) * 100}
@@ -253,7 +287,7 @@ export function MixingOrderForm() {
                                 onClose={() => {}}
                             />
                             <p className="text-xs text-gray-500 max-w-md">
-                                Your ₦{Number(selected.price_ngn).toLocaleString()} is held
+                                Paying places your order immediately. Your ₦{Number(selected.price_ngn).toLocaleString()} is held
                                 in escrow — it only goes to the engineer when you accept
                                 the finished mix. Not happy? It comes straight back to
                                 your wallet.
