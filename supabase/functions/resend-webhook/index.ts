@@ -1,10 +1,59 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+function b64ToBytes(b64: string): Uint8Array {
+    const bin = atob(b64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return bytes;
+}
+
+/** Verify a Resend (Svix) webhook signature. Fail closed. */
+async function verifySvixSignature(req: Request, rawBody: string, secret: string | undefined): Promise<boolean> {
+    try {
+        if (!secret) return false;
+        const svixId = req.headers.get("svix-id");
+        const svixTimestamp = req.headers.get("svix-timestamp");
+        const svixSignature = req.headers.get("svix-signature");
+        if (!svixId || !svixTimestamp || !svixSignature) return false;
+
+        const ts = parseInt(svixTimestamp, 10);
+        if (isNaN(ts) || Math.abs(Date.now() / 1000 - ts) > 300) return false;
+
+        const keyBytes = b64ToBytes(secret.replace(/^whsec_/, ""));
+        const key = await crypto.subtle.importKey("raw", keyBytes, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+        const signed = new TextEncoder().encode(`${svixId}.${svixTimestamp}.${rawBody}`);
+        const sigBuf = await crypto.subtle.sign("HMAC", key, signed);
+        const sigBytes = new Uint8Array(sigBuf);
+        let bin = "";
+        for (const b of sigBytes) bin += String.fromCharCode(b);
+        const expected = btoa(bin);
+
+        return svixSignature.split(" ").some((entry) => {
+            const parts = entry.split(",");
+            if (parts.length !== 2 || parts[0] !== "v1" || parts[1].length !== expected.length) return false;
+            // timing-safe compare
+            let diff = 0;
+            for (let i = 0; i < expected.length; i++) diff |= parts[1].charCodeAt(i) ^ expected.charCodeAt(i);
+            return diff === 0;
+        });
+    } catch {
+        return false;
+    }
+}
+
 serve(async (req) => {
     // Basic Request Handling
     if (req.method !== 'POST') {
         return new Response("Method Not Allowed", { status: 405 });
+    }
+
+    // Verify this really came from Resend (Svix signature). Fail closed.
+    const rawBody = await req.text();
+    const webhookSecret = Deno.env.get('RESEND_WEBHOOK_SECRET');
+    if (!(await verifySvixSignature(req, rawBody, webhookSecret))) {
+        console.warn("Rejected unverified resend-webhook call");
+        return new Response("Invalid signature", { status: 401 });
     }
 
     // 1. Initialize Supabase Client (Service Role)
@@ -23,7 +72,7 @@ serve(async (req) => {
     const DISCORD_WEBHOOK_URL = webhookUrl as string;
 
     try {
-        const payload = await req.json();
+        const payload = JSON.parse(rawBody);
         const type = payload.type;
         const data = payload.data || {};
 
