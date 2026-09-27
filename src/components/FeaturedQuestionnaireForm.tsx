@@ -13,8 +13,16 @@ interface QuestionnaireData {
     bio: string | null;
     qa: { q: string; a: string }[] | null;
     photo_url: string | null;
+    socials: Record<string, string> | null;
     questionnaire_completed_at: string | null;
 }
+
+const SOCIAL_FIELDS = [
+    { key: "instagram", label: "Instagram", placeholder: "https://instagram.com/yourhandle or @yourhandle" },
+    { key: "tiktok", label: "TikTok", placeholder: "https://tiktok.com/@yourhandle or @yourhandle" },
+    { key: "x", label: "X (Twitter)", placeholder: "https://x.com/yourhandle or @yourhandle" },
+    { key: "spotify", label: "Spotify", placeholder: "Link to your Spotify artist page" },
+];
 
 const QUESTIONS = [
     {
@@ -52,6 +60,12 @@ export function FeaturedQuestionnaireForm({
         return map;
     });
     const [photoUrl, setPhotoUrl] = useState(initial.photo_url ?? "");
+    const [socials, setSocials] = useState<Record<string, string>>(() => {
+        const s = initial.socials ?? {};
+        const map: Record<string, string> = {};
+        for (const f of SOCIAL_FIELDS) map[f.key] = s[f.key] ?? "";
+        return map;
+    });
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [done, setDone] = useState(false);
@@ -113,6 +127,13 @@ export function FeaturedQuestionnaireForm({
             setError("Please write a little more for your bio — at least a couple of sentences so fans get to know you.");
             return;
         }
+        const filledSocials = Object.fromEntries(
+            Object.entries(socials).map(([k, v]) => [k, v.trim()]).filter(([, v]) => v.length > 0)
+        );
+        if (Object.keys(filledSocials).length === 0) {
+            setError("Please add at least one social link so fans can find and follow you.");
+            return;
+        }
         setSaving(true);
         const qa = questions
             .map((q) => ({ q: q.label, a: (answers[q.key] ?? "").trim() }))
@@ -122,6 +143,7 @@ export function FeaturedQuestionnaireForm({
             p_bio: bio.trim(),
             p_qa: qa,
             p_photo_url: photoUrl.trim(),
+            p_socials: filledSocials,
         });
         setSaving(false);
         if (error || !data) {
@@ -204,6 +226,28 @@ export function FeaturedQuestionnaireForm({
                     </CardContent>
                 </Card>
             ))}
+
+            <Card className="border-white/10 bg-white/5">
+                <CardHeader className="pb-3">
+                    <CardTitle className="text-white text-base font-semibold">Your socials <span className="text-gray-500 font-normal text-sm">(at least one)</span></CardTitle>
+                    <CardDescription>
+                        Add at least one social link so fans can find and follow you. They'll appear on your feature page.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                    {SOCIAL_FIELDS.map((f) => (
+                        <div key={f.key}>
+                            <label className="text-xs text-gray-400 block mb-1">{f.label}</label>
+                            <input
+                                value={socials[f.key] ?? ""}
+                                onChange={(e) => setSocials((s) => ({ ...s, [f.key]: e.target.value }))}
+                                placeholder={f.placeholder}
+                                className="w-full rounded-xl bg-black/40 border border-white/10 px-4 py-2.5 text-white placeholder:text-gray-600 focus:outline-none focus:border-yellow-500/60 text-sm"
+                            />
+                        </div>
+                    ))}
+                </CardContent>
+            </Card>
 
             <Card className="border-white/10 bg-white/5">
                 <CardHeader className="pb-3">

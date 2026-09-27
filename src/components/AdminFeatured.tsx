@@ -18,6 +18,7 @@ interface Feature {
     qa: { q: string; a: string }[] | null;
     photo_url: string | null;
     cover_art_url: string | null;
+    socials: Record<string, string> | null;
     slug: string | null;
     status: string;
     questionnaire_token: string | null;
@@ -397,7 +398,7 @@ export function AdminFeatured() {
                                                     ))}
                                                 </div>
                                             )}
-                                            <div className="flex items-center gap-3">
+                                            <div className="flex items-center gap-3 flex-wrap">
                                                 {(f.photo_url || f.cover_art_url) && (
                                                     <div className="relative">
                                                         <img src={f.photo_url ?? f.cover_art_url ?? ""} alt="" className="w-16 h-16 rounded-xl object-cover border border-white/10" />
@@ -416,6 +417,12 @@ export function AdminFeatured() {
                                                         onChange={(e) => { uploadPhoto(f, e.target.files?.[0]); e.target.value = ""; }}
                                                     />
                                                 </label>
+                                                {f.socials && Object.entries(f.socials).filter(([, v]) => v).map(([k, v]) => (
+                                                    <a key={k} href={/^https?:\/\//i.test(v as string) ? (v as string) : `https://${v}`} target="_blank" rel="noopener noreferrer"
+                                                        className="text-xs bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-green-300 hover:border-green-500/40 inline-flex items-center gap-1">
+                                                        <ExternalLink className="w-3 h-3" /> {k}
+                                                    </a>
+                                                ))}
                                             </div>
 
                                             <div className="grid sm:grid-cols-2 gap-4">

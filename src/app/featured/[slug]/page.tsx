@@ -15,6 +15,7 @@ interface Feature {
     qa: { q: string; a: string }[] | null;
     photo_url: string | null;
     cover_art_url: string | null;
+    socials: Record<string, string> | null;
     artist_id: string | null;
     artist_name: string | null;
     song_title: string | null;
@@ -24,7 +25,7 @@ async function getFeature(slug: string): Promise<Feature | null> {
     const supabase = await createClient();
     const { data } = await supabase
         .from("featured_artists")
-        .select("id, slug, week_start, headline, story, bio, qa, photo_url, cover_art_url, artist_id, submission_id")
+        .select("id, slug, week_start, headline, story, bio, qa, photo_url, cover_art_url, socials, artist_id, submission_id")
         .eq("slug", slug)
         .eq("status", "published")
         .maybeSingle();
@@ -101,6 +102,27 @@ export default async function FeaturedArtistPage({
 
     const name = feature.artist_name ?? "Featured Artist";
     const image = feature.photo_url ?? feature.cover_art_url;
+
+    // Normalize socials: "@handle" becomes a full profile URL.
+    const socialLinks: { label: string; url: string }[] = [];
+    const socials = feature.socials ?? {};
+    const norm = (key: string, base: string) => {
+        const raw = (socials[key] ?? "").trim();
+        if (!raw) return;
+        if (/^https?:\/\//i.test(raw)) return { label: key, url: raw };
+        const handle = raw.replace(/^@/, "");
+        return { label: key, url: `${base}${handle}` };
+    };
+    const labels: Record<string, string> = { instagram: "Instagram", tiktok: "TikTok", x: "X", spotify: "Spotify" };
+    for (const [key, base] of [["instagram", "https://instagram.com/"], ["tiktok", "https://tiktok.com/@"], ["x", "https://x.com/"], ["spotify", ""]] as const) {
+        if (key === "spotify") {
+            const raw = (socials.spotify ?? "").trim();
+            if (raw && /^https?:\/\//i.test(raw)) socialLinks.push({ label: "Spotify", url: raw });
+            continue;
+        }
+        const link = norm(key, base);
+        if (link) socialLinks.push({ label: labels[key], url: link.url });
+    }
     const weekLabel = feature.week_start
         ? new Date(feature.week_start + "T00:00:00").toLocaleDateString(undefined, {
               month: "long",
@@ -143,6 +165,21 @@ export default async function FeaturedArtistPage({
                     <h1 className="text-4xl sm:text-5xl font-extrabold text-white">{name}</h1>
                     {feature.headline && (
                         <p className="text-xl text-yellow-200/90 font-medium max-w-xl mx-auto">{feature.headline}</p>
+                    )}
+                    {socialLinks.length > 0 && (
+                        <div className="flex flex-wrap justify-center gap-2 pt-1">
+                            {socialLinks.map((s) => (
+                                <a
+                                    key={s.label}
+                                    href={s.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-xs font-semibold px-4 py-2 rounded-full border border-white/15 bg-white/5 text-gray-200 hover:border-yellow-500/50 hover:text-yellow-300 transition-colors"
+                                >
+                                    {s.label}
+                                </a>
+                            ))}
+                        </div>
                     )}
                     {weekLabel && (
                         <p className="text-sm text-gray-500 inline-flex items-center gap-1.5">
