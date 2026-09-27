@@ -9,19 +9,6 @@ function admin() {
     );
 }
 
-async function tokenFrom(req: NextRequest): Promise<string | null> {
-    // One-click unsubscribe (Gmail etc.) POSTs to the List-Unsubscribe URL
-    // with the token in the query string; the web form sends JSON.
-    const q = req.nextUrl.searchParams.get("token");
-    if (q) return q;
-    try {
-        const body = await req.json();
-        return typeof body?.token === "string" ? body.token : null;
-    } catch {
-        return null;
-    }
-}
-
 // GET verifies a token and returns the masked email (no mutation).
 export async function GET(req: NextRequest) {
     const token = req.nextUrl.searchParams.get("token");
@@ -40,18 +27,22 @@ export async function GET(req: NextRequest) {
 
 // POST unsubscribes (or resubscribes) the address behind a valid token.
 export async function POST(req: NextRequest) {
-    const token = await tokenFrom(req);
+    // Read the body once: one-click unsubscribe (Gmail etc.) POSTs to the
+    // List-Unsubscribe URL with the token in the query string and no body;
+    // the web form sends JSON.
+    let bodyToken: string | null = null;
+    let action = "unsubscribe";
+    try {
+        const body = await req.json();
+        if (typeof body?.token === "string") bodyToken = body.token;
+        if (body?.action === "resubscribe") action = "resubscribe";
+    } catch {
+        /* no body */
+    }
+    const token = req.nextUrl.searchParams.get("token") ?? bodyToken;
     if (!token) return NextResponse.json({ ok: false }, { status: 400 });
     const email = await verifyUnsubscribeToken(token);
     if (!email) return NextResponse.json({ ok: false }, { status: 400 });
-
-    let action = "unsubscribe";
-    try {
-        const body = await req.clone().json();
-        if (body?.action === "resubscribe") action = "resubscribe";
-    } catch {
-        /* one-click POST has no body */
-    }
 
     const db = admin();
     if (action === "resubscribe") {
