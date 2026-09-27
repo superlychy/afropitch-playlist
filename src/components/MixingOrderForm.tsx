@@ -103,22 +103,73 @@ export function MixingOrderForm() {
             setPlacing(true);
             const submissionId =
                 sessionStorage.getItem("mixing_submission_id") || null;
-            const { error } = await supabase.rpc("create_mixing_order", {
-                p_song_title: songTitle.trim(),
-                p_file_link: fileLink.trim(),
-                p_package_id: selected.id,
-                p_reference: paystackRef,
-                p_submission_id: submissionId,
-            });
-            setPlacing(false);
 
-            if (error) {
-                toast(
-                    "Payment received — order failed: " + error.message + ". Contact support.",
-                    "error"
-                );
-                lockRef.current = false;
-                return;
+            // Preferred path: server-side Paystack verification, then order creation.
+            // Falls back to the direct RPC (today's behavior) only when server
+            // verification isn't configured yet or the API route is unreachable.
+            let orderCreated = false;
+            try {
+                const res = await fetch("/api/mixing/confirm-order", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        reference: paystackRef,
+                        song_title: songTitle.trim(),
+                        file_link: fileLink.trim(),
+                        package_id: selected.id,
+                        submission_id: submissionId,
+                    }),
+                });
+                const json = await res.json().catch(() => null);
+                if (json?.ok) {
+                    orderCreated = true;
+                } else if (json?.error && json.error !== "verification_unavailable") {
+                    throw new Error(json.error);
+                }
+            } catch (e: any) {
+                if (e?.message && !/failed to fetch|networkerror/i.test(e.message)) {
+                    toast(
+                        "Payment received — order failed: " + e.message + ". Contact support.",
+                        "error"
+                    );
+                    setPlacing(false);
+                    lockRef.current = false;
+                    return;
+                }
+                // else: fall through to legacy path
+            }
+
+            if (!orderCreated) {
+                // Legacy path: create the order directly. Log it so unverified
+                // orders are visible until PAYSTACK_SECRET_KEY is configured.
+                fetch("/api/log-error", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        kind: "mixing_unverified_order",
+                        message: `Mixing order created without server verification: ${paystackRef}`,
+                        url: "/mixing",
+                    }),
+                }).catch(() => {});
+                const { error } = await supabase.rpc("create_mixing_order", {
+                    p_song_title: songTitle.trim(),
+                    p_file_link: fileLink.trim(),
+                    p_package_id: selected.id,
+                    p_reference: paystackRef,
+                    p_submission_id: submissionId,
+                });
+                setPlacing(false);
+
+                if (error) {
+                    toast(
+                        "Payment received — order failed: " + error.message + ". Contact support.",
+                        "error"
+                    );
+                    lockRef.current = false;
+                    return;
+                }
+            } else {
+                setPlacing(false);
             }
             sessionStorage.removeItem("mixing_submission_id");
             setDone(true);

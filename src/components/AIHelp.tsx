@@ -1,22 +1,26 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { MessageSquare, X, Send, Bot, User, HelpCircle, ChevronRight } from "lucide-react";
+import { MessageSquare, X, Send, Bot, User, HelpCircle, ChevronRight, TicketPlus, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
+import { useAuth } from "@/context/AuthContext";
 import { pricingConfig } from "@/../config/pricing";
-import { siteConfig } from "@/../config/site";
+
+type Msg = {
+    role: "assistant" | "user";
+    text: string;
+    isOptions?: boolean;
+    isTicketPrompt?: boolean;
+};
 
 // Standard FAQ Data
 const FAQ_DATA = [
     {
         question: "How much does it cost?",
-        keywords: ["price", "cost", "pay", "money", "much"],
-        answer: `We offer transparent pricing:
-• Standard Review: ${pricingConfig.currency}3,000 (3-7 days)
-• Express Review: ${pricingConfig.currency}5,000 (48 hours)
-• Exclusive Pitching: ${pricingConfig.currency}13,500 (VIP Placement)`
+        keywords: ["price", "cost", "pay", "money", "much", "fee"],
+        answer: `We offer transparent pricing:\n• Standard Review: ${pricingConfig.currency}3,000 (3-7 days)\n• Express Review: ${pricingConfig.currency}5,000 (48 hours)\n• Exclusive Pitching: ${pricingConfig.currency}13,500 (VIP Placement)`
     },
     {
         question: "Do you offer refunds?",
@@ -42,17 +46,31 @@ const FAQ_DATA = [
         question: "How do I withdraw my earnings?",
         keywords: ["withdraw", "payout", "earnings", "bank"],
         answer: "Go to Dashboard > Withdrawals. You can request a payout to your local bank account once your balance exceeds the minimum threshold."
+    },
+    {
+        question: "How does the mixing service work?",
+        keywords: ["mix", "master", "mixing", "mastering", "stems", "engineer"],
+        answer: "Our engineers mix and master your song for you. Pick a package on the Mixing page, pay securely, and your money is held in escrow until you approve the final mix. You'll get a watermarked preview to review first — nothing is released until you say so."
     }
 ];
 
 export function AIHelp() {
+    const { user } = useAuth();
     const [isOpen, setIsOpen] = useState(false);
-    const [messages, setMessages] = useState<{ role: "assistant" | "user"; text: string; isOptions?: boolean }[]>([
+    const [messages, setMessages] = useState<Msg[]>([
         { role: "assistant", text: "Hi! How can we help you today? Select a topic below or type your question." },
         { role: "assistant", text: "", isOptions: true }
     ]);
     const [input, setInput] = useState("");
     const [isTyping, setIsTyping] = useState(false);
+
+    // Ticket form state
+    const [showTicketForm, setShowTicketForm] = useState(false);
+    const [ticketName, setTicketName] = useState("");
+    const [ticketEmail, setTicketEmail] = useState("");
+    const [ticketSubject, setTicketSubject] = useState("");
+    const [ticketMessage, setTicketMessage] = useState("");
+    const [ticketSending, setTicketSending] = useState(false);
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -62,41 +80,79 @@ export function AIHelp() {
 
     useEffect(() => {
         scrollToBottom();
-    }, [messages, isTyping, isOpen]);
+    }, [messages, isTyping, isOpen, showTicketForm]);
 
-    const getAnswer = (query: string): string => {
+    const pushAssistant = (text: string, extra?: Partial<Msg>) =>
+        setMessages(prev => [...prev, { role: "assistant", text, ...extra }]);
+
+    const getAnswer = (query: string): string | null => {
         const lower = query.toLowerCase();
-
-        // 1. Exact/Fuzzy Keyword Match
         const match = FAQ_DATA.find(item => item.keywords.some(k => lower.includes(k)));
         if (match) return match.answer;
-
-        // 2. Greetings
-        if (lower.match(/\b(hi|hello|hey)\b/)) return "Hello! Please select a question from the list or ask about pricing, refunds, or curators.";
-
-        // 3. Fallback
-        return `I can't answer that specific question yet. Please email our support team at ${siteConfig.contact.email} for personal assistance.`;
+        if (lower.match(/\b(hi|hello|hey)\b/)) return "Hello! Please select a question from the list or ask about pricing, refunds, curators, or mixing.";
+        return null;
     };
 
     const handleSend = async (textOverride?: string) => {
-        const textToSend = textOverride || input;
-        if (!textToSend.trim()) return;
+        const textToSend = (textOverride || input).trim();
+        if (!textToSend) return;
 
-        // Add user message
         setMessages(prev => [...prev, { role: "user", text: textToSend }]);
         setInput("");
+        setShowTicketForm(false);
         setIsTyping(true);
 
-        // Simulate Response
         setTimeout(() => {
             const answer = getAnswer(textToSend);
-            setMessages(prev => [...prev, { role: "assistant", text: answer }]);
             setIsTyping(false);
+            if (answer) {
+                pushAssistant(answer);
+            } else {
+                // Dead-end fallback replaced with a real support ticket path
+                setTicketSubject(textToSend.slice(0, 120));
+                pushAssistant(
+                    "I don't have an answer for that yet — but I can open a support ticket and our team will get back to you by email.",
+                    { isTicketPrompt: true }
+                );
+            }
         }, 600);
     };
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (e.key === "Enter") handleSend();
+    };
+
+    const submitTicket = async () => {
+        if (!ticketSubject.trim() || !ticketMessage.trim()) return;
+        if (!user && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(ticketEmail.trim())) return;
+        setTicketSending(true);
+        try {
+            const res = await fetch("/api/support/ticket", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    subject: ticketSubject.trim(),
+                    message: ticketMessage.trim(),
+                    name: ticketName.trim(),
+                    email: ticketEmail.trim(),
+                }),
+            });
+            const json = await res.json().catch(() => null);
+            setTicketSending(false);
+            if (json?.ok) {
+                const replyTo = user ? "" : ` and we'll reply to ${ticketEmail.trim()}`;
+                setShowTicketForm(false);
+                setTicketName(""); setTicketEmail(""); setTicketSubject(""); setTicketMessage("");
+                pushAssistant(
+                    `Done — your support ticket is open${replyTo}. Our team usually responds within a day.`
+                );
+            } else {
+                pushAssistant(`Couldn't open the ticket: ${json?.error || "please try again"}.`);
+            }
+        } catch {
+            setTicketSending(false);
+            pushAssistant("Couldn't open the ticket right now — please try again in a moment.");
+        }
     };
 
     return (
@@ -123,7 +179,6 @@ export function AIHelp() {
                     <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar bg-white/[0.02]">
                         {messages.map((m, i) => (
                             <div key={i} className={`flex flex-col ${m.role === "user" ? "items-end" : "items-start"} animate-in slide-in-from-bottom-2 duration-300`}>
-                                {/* Message Bubble */}
                                 {m.text && (
                                     <div className={`flex gap-2 max-w-[85%] ${m.role === "user" ? "flex-row-reverse" : "flex-row"}`}>
                                         <div className={`w-6 h-6 rounded-full flex-shrink-0 flex items-center justify-center mt-1 ${m.role === "user" ? "bg-white/10" : "bg-green-500/10"}`}>
@@ -140,7 +195,6 @@ export function AIHelp() {
                                     </div>
                                 )}
 
-                                {/* Options List (Only for specific assistant messages) */}
                                 {m.isOptions && (
                                     <div className="mt-2 ml-8 space-y-2 w-[80%]">
                                         {FAQ_DATA.map((faq) => (
@@ -155,8 +209,70 @@ export function AIHelp() {
                                         ))}
                                     </div>
                                 )}
+
+                                {m.isTicketPrompt && (
+                                    <div className="mt-2 ml-8 w-[80%]">
+                                        <button
+                                            onClick={() => setShowTicketForm(true)}
+                                            className="w-full text-left text-xs bg-green-500/10 hover:bg-green-500/20 border border-green-500/30 rounded-lg p-2.5 transition-all text-green-300 flex justify-between items-center"
+                                        >
+                                            <span className="flex items-center gap-2"><TicketPlus className="w-3.5 h-3.5" /> Open a support ticket</span>
+                                            <ChevronRight className="w-3 h-3" />
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         ))}
+
+                        {showTicketForm && (
+                            <div className="rounded-xl border border-green-500/30 bg-zinc-900/80 p-3 space-y-2 animate-in slide-in-from-bottom-2">
+                                <p className="text-xs font-bold text-white">Open a support ticket</p>
+                                {!user && (
+                                    <>
+                                        <Input
+                                            value={ticketName}
+                                            onChange={(e) => setTicketName(e.target.value)}
+                                            placeholder="Your name"
+                                            className="bg-black/50 border-white/10 h-9 text-xs rounded-lg"
+                                        />
+                                        <Input
+                                            value={ticketEmail}
+                                            onChange={(e) => setTicketEmail(e.target.value)}
+                                            placeholder="Email for our reply"
+                                            type="email"
+                                            className="bg-black/50 border-white/10 h-9 text-xs rounded-lg"
+                                        />
+                                    </>
+                                )}
+                                <Input
+                                    value={ticketSubject}
+                                    onChange={(e) => setTicketSubject(e.target.value)}
+                                    placeholder="Subject"
+                                    className="bg-black/50 border-white/10 h-9 text-xs rounded-lg"
+                                />
+                                <textarea
+                                    value={ticketMessage}
+                                    onChange={(e) => setTicketMessage(e.target.value)}
+                                    placeholder="Describe the issue…"
+                                    rows={3}
+                                    className="w-full bg-black/50 border border-white/10 rounded-lg text-xs p-2 text-white"
+                                />
+                                <div className="flex gap-2">
+                                    <Button
+                                        size="sm"
+                                        disabled={ticketSending || !ticketSubject.trim() || !ticketMessage.trim() || (!user && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(ticketEmail.trim()))}
+                                        onClick={submitTicket}
+                                        className="bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs"
+                                    >
+                                        {ticketSending && <Loader2 className="w-3 h-3 mr-1 animate-spin" />}
+                                        Send ticket
+                                    </Button>
+                                    <Button size="sm" variant="ghost" onClick={() => setShowTicketForm(false)} className="text-xs text-gray-500 rounded-lg">
+                                        Cancel
+                                    </Button>
+                                </div>
+                            </div>
+                        )}
 
                         {isTyping && (
                             <div className="flex justify-start animate-in fade-in">

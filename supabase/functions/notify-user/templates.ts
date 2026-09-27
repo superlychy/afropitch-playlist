@@ -325,3 +325,146 @@ export const getMixingMessageTemplate = (data: {
     </div>
 </body>
 </html>`;
+
+export const getMixingRefundRequestTemplate = (data: {
+    songTitle: string;
+    packageName: string;
+    amount: string;
+    artistName: string;
+    reason: string;
+    dashboardLink: string;
+}) => `
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #0d0d0d; color: #ffffff; padding: 20px; }
+        .container { max-width: 600px; margin: 0 auto; background-color: #1a1a1a; border-radius: 10px; overflow: hidden; border: 1px solid #333; }
+        .header { background-color: #000; padding: 20px; text-align: center; border-bottom: 2px solid #f59e0b; }
+        .content { padding: 30px; line-height: 1.6; color: #cccccc; }
+        .quote { background: #111; border-left: 3px solid #f59e0b; padding: 12px 16px; margin: 20px 0; color: #eee; font-style: italic; }
+        .button { display: inline-block; background-color: #f59e0b; color: #000; font-weight: bold; padding: 12px 24px; border-radius: 8px; text-decoration: none; margin-top: 10px; }
+        .footer { padding: 20px; text-align: center; font-size: 12px; color: #666; background-color: #111; border-top: 1px solid #333; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header"><h1>AfroPitch</h1></div>
+        <div class="content">
+            <h2>Refund requested</h2>
+            <p><strong>${data.artistName}</strong> requested a refund of <strong>${data.amount}</strong> for:</p>
+            <p><strong>${data.songTitle}</strong> (${data.packageName})</p>
+            <div class="quote">${data.reason}</div>
+            <p>No money has moved. Review and approve or decline it in the admin dashboard (Mixing tab).</p>
+            <div style="text-align: center;">
+                <a href="${data.dashboardLink}" class="button">Review refund request</a>
+            </div>
+        </div>
+        <div class="footer">
+            <p>&copy; ${new Date().getFullYear()} AfroPitch. Keep soaring.</p>
+        </div>
+    </div>
+</body>
+</html>`;
+
+export const getMixingRefundDeniedTemplate = (data: {
+    name: string;
+    songTitle: string;
+    dashboardLink: string;
+}) => `
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #0d0d0d; color: #ffffff; padding: 20px; }
+        .container { max-width: 600px; margin: 0 auto; background-color: #1a1a1a; border-radius: 10px; overflow: hidden; border: 1px solid #333; }
+        .header { background-color: #000; padding: 20px; text-align: center; border-bottom: 2px solid #22c55e; }
+        .content { padding: 30px; line-height: 1.6; color: #cccccc; }
+        .button { display: inline-block; background-color: #22c55e; color: #000; font-weight: bold; padding: 12px 24px; border-radius: 8px; text-decoration: none; margin-top: 10px; }
+        .footer { padding: 20px; text-align: center; font-size: 12px; color: #666; background-color: #111; border-top: 1px solid #333; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header"><h1>AfroPitch</h1></div>
+        <div class="content">
+            <h2>Update on your refund request</h2>
+            <p>Hi ${data.name},</p>
+            <p>Your refund request for <strong>${data.songTitle}</strong> was reviewed and declined, so your order stays active and your payment remains held in escrow.</p>
+            <p>If something is wrong with your mix, reply to the engineer in the order chat and we'll sort it out.</p>
+            <div style="text-align: center;">
+                <a href="${data.dashboardLink}" class="button">View your order</a>
+            </div>
+        </div>
+        <div class="footer">
+            <p>&copy; ${new Date().getFullYear()} AfroPitch. Keep soaring.</p>
+        </div>
+    </div>
+</body>
+</html>`;
+
+export const getSupportTicketReceivedTemplate = (data: {
+    name: string;
+    subject: string;
+    dashboardLink: string;
+}) => `
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #0d0d0d; color: #ffffff; padding: 20px; }
+        .container { max-width: 600px; margin: 0 auto; background-color: #1a1a1a; border-radius: 10px; overflow: hidden; border: 1px solid #333; }
+        .header { background-color: #000; padding: 20px; text-align: center; border-bottom: 2px solid #3b82f6; }
+        .content { padding: 30px; line-height: 1.6; color: #cccccc; }
+        .footer { padding: 20px; text-align: center; font-size: 12px; color: #666; background-color: #111; border-top: 1px solid #333; }
+        .button { display: inline-block; padding: 10px 20px; background-color: #3b82f6; color: #fff; text-decoration: none; border-radius: 5px; font-weight: bold; margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header"><h1>AfroPitch Support</h1></div>
+        <div class="content">
+            <p>Hi ${data.name},</p>
+            <p>We've received your support ticket <strong>"${data.subject}"</strong>. Our team will get back to you shortly.</p>
+            <a href="${data.dashboardLink}" class="button">View Ticket</a>
+        </div>
+        <div class="footer">&copy; 2026 AfroPitch.</div>
+    </div>
+</body>
+</html>`;
+
+export const getSupportTicketAdminTemplate = (data: {
+    subject: string;
+    from: string;
+    snippet: string;
+    dashboardLink: string;
+}) => `
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #0d0d0d; color: #ffffff; padding: 20px; }
+        .container { max-width: 600px; margin: 0 auto; background-color: #1a1a1a; border-radius: 10px; overflow: hidden; border: 1px solid #333; }
+        .header { background-color: #000; padding: 20px; text-align: center; border-bottom: 2px solid #f59e0b; }
+        .content { padding: 30px; line-height: 1.6; color: #cccccc; }
+        .quote { background: #111; border-left: 3px solid #f59e0b; padding: 12px 16px; margin: 20px 0; color: #eee; font-style: italic; }
+        .button { display: inline-block; padding: 10px 20px; background-color: #f59e0b; color: #000; text-decoration: none; border-radius: 5px; font-weight: bold; margin-top: 20px; }
+        .footer { padding: 20px; text-align: center; font-size: 12px; color: #666; background-color: #111; border-top: 1px solid #333; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header"><h1>AfroPitch</h1></div>
+        <div class="content">
+            <h2>New support ticket</h2>
+            <p><strong>From:</strong> ${data.from}</p>
+            <p><strong>Subject:</strong> ${data.subject}</p>
+            <div class="quote">${data.snippet}</div>
+            <div style="text-align: center;">
+                <a href="${data.dashboardLink}" class="button">Open inbox</a>
+            </div>
+        </div>
+        <div class="footer">&copy; 2026 AfroPitch.</div>
+    </div>
+</body>
+</html>`;

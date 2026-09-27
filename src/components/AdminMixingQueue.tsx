@@ -19,6 +19,8 @@ interface MixingOrder {
     file_link: string;
     preview_link: string | null;
     full_link: string | null;
+    refund_requested_at: string | null;
+    refund_request_reason: string | null;
     created_at: string;
 }
 
@@ -48,7 +50,7 @@ export function AdminMixingQueue() {
         setLoading(true);
         const { data } = await supabase
             .from("mixing_orders")
-            .select("id, artist_id, song_title, package_name, amount, status, file_link, preview_link, full_link, created_at")
+            .select("id, artist_id, song_title, package_name, amount, status, file_link, preview_link, full_link, refund_requested_at, refund_request_reason, created_at")
             .order("created_at", { ascending: false })
             .limit(100);
         const list = (data || []) as MixingOrder[];
@@ -97,6 +99,15 @@ export function AdminMixingQueue() {
         const reason = window.prompt("Refund reason (shown in the transaction record):", "admin refund") || "admin refund";
         run(id, "refund_mix", { p_order_id: id, p_reason: reason }, "Refunded to artist wallet.");
     };
+    const resolveRefund = (id: string, approve: boolean) => {
+        if (approve) {
+            if (!window.confirm("Approve this refund? The escrowed amount goes back to the artist's wallet.")) return;
+            run(id, "resolve_mix_refund", { p_order_id: id, p_approve: true, p_note: "refund request approved" }, "Refund approved and sent to artist wallet.");
+        } else {
+            const note = window.prompt("Decline reason (the artist gets an email):", "declined") || "declined";
+            run(id, "resolve_mix_refund", { p_order_id: id, p_approve: false, p_note: note }, "Refund request declined.");
+        }
+    };
 
     if (loading) return <p className="text-gray-500">Loading mixing orders…</p>;
 
@@ -133,6 +144,24 @@ export function AdminMixingQueue() {
                         </a>
                         {o.preview_link && (
                             <p className="text-[11px] text-gray-500 truncate">Preview: {o.preview_link}</p>
+                        )}
+                        {o.refund_requested_at && (
+                            <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-3 space-y-2">
+                                <p className="text-xs font-bold text-yellow-400">
+                                    ⚠ Refund requested · {new Date(o.refund_requested_at).toLocaleString()}
+                                </p>
+                                {o.refund_request_reason && (
+                                    <p className="text-xs text-gray-300 italic">“{o.refund_request_reason}”</p>
+                                )}
+                                <div className="flex flex-wrap gap-2">
+                                    <Button size="sm" disabled={acting === o.id} onClick={() => resolveRefund(o.id, true)} className="bg-yellow-500 hover:bg-yellow-400 text-black rounded-lg text-xs">
+                                        {acting === o.id ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : null} Approve refund
+                                    </Button>
+                                    <Button size="sm" variant="outline" disabled={acting === o.id} onClick={() => resolveRefund(o.id, false)} className="border-white/20 text-xs rounded-lg">
+                                        Decline
+                                    </Button>
+                                </div>
+                            </div>
                         )}
                         <div className="flex flex-wrap gap-2">
                             {o.status === "in_escrow" && (

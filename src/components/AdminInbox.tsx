@@ -41,6 +41,7 @@ interface SupportTicket {
   message: string;
   status: string;
   user_id: string;
+  contact_email?: string | null;
   created_at: string;
   profiles?: { full_name: string; email: string };
 }
@@ -386,7 +387,7 @@ export function AdminInbox() {
                     </p>
                     <p className="text-xs text-gray-400">
                       <User className="w-3 h-3 inline mr-1" />
-                      {ticket.profiles?.full_name || "Unknown User"}
+                      {ticket.profiles?.full_name || ticket.contact_email || "Website visitor"}
                     </p>
                   </div>
                 </div>

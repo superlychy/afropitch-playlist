@@ -1,7 +1,7 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { Resend } from 'resend';
-import { getTransactionReceiptTemplate, getSongApprovedTemplate, getSongDeclinedTemplate, getSupportTicketTemplate, getCuratorApprovedTemplate, getCuratorRejectedTemplate, getMixingMessageTemplate } from './templates.ts';
+import { getTransactionReceiptTemplate, getSongApprovedTemplate, getSongDeclinedTemplate, getSupportTicketTemplate, getSupportTicketReceivedTemplate, getSupportTicketAdminTemplate, getCuratorApprovedTemplate, getCuratorRejectedTemplate, getMixingMessageTemplate, getMixingRefundRequestTemplate, getMixingRefundDeniedTemplate } from './templates.ts';
 
 const resend = new Resend(Deno.env.get('RESEND_API_KEY'));
 const supabase = createClient(
@@ -54,6 +54,8 @@ Deno.serve(async (req) => {
             if (record.status !== payload.old_record?.status) {
                 await handleWithdrawalUpdate(record);
             }
+        } else if (table === 'support_tickets' && type === 'INSERT') {
+            await handleSupportInsert(record);
         } else if (table === 'support_tickets' && type === 'UPDATE') {
             // Notify on status change or response? Usually status change is a good proxy or explicit 'has_unread'
             // Simplicity: Notify if status changed to 'open' (reply) or 'closed'
@@ -68,6 +70,8 @@ Deno.serve(async (req) => {
             await handleBroadcast(record);
         } else if (table === 'mixing_messages' && type === 'INSERT') {
             await handleMixingMessage(record);
+        } else if (table === 'mixing_orders' && type === 'UPDATE') {
+            await handleMixingRefund(record, payload.old_record);
         }
 
         return new Response(JSON.stringify({ message: "Notification processed" }), { status: 200, headers: { 'Content-Type': 'application/json' } });
@@ -269,6 +273,38 @@ async function handleWithdrawalUpdate(record: any) {
     await sendEmail(user.email, subject, html);
 }
 
+async function handleSupportInsert(record: any) {
+    // Acknowledgement to the person who opened the ticket.
+    let toEmail: string | null = null;
+    let name = 'there';
+    let fromLabel = 'Website visitor';
+    if (record.user_id) {
+        const u = await getUserEmail(record.user_id);
+        if (u?.email) { toEmail = u.email; name = u.full_name || 'there'; fromLabel = `${name} (${u.email})`; }
+    } else if (record.contact_email) {
+        toEmail = record.contact_email;
+        const m = String(record.message || '').match(/^From:\s*(.+?)\s*</);
+        if (m) name = m[1];
+        fromLabel = `${name} (${toEmail})`;
+    }
+    if (toEmail) {
+        const html = getSupportTicketReceivedTemplate({
+            name,
+            subject: record.subject,
+            dashboardLink: record.user_id ? `${SITE_URL}/dashboard/artist` : SITE_URL,
+        });
+        await sendEmail(toEmail, `Support ticket received: ${record.subject}`, html);
+    }
+    // Notify the admin so chat tickets don't sit unseen.
+    const adminHtml = getSupportTicketAdminTemplate({
+        subject: record.subject,
+        from: fromLabel,
+        snippet: String(record.message || '').replace(/^From:.*\n\n/, '').slice(0, 400),
+        dashboardLink: `${SITE_URL}/dashboard/admin`,
+    });
+    await sendEmail('admin@afropitchplay.best', `New support ticket: ${record.subject}`, adminHtml);
+}
+
 async function handleSupportUpdate(record: any) {
     const user = await getUserEmail(record.user_id);
     if (!user || !user.email) return;
@@ -328,6 +364,39 @@ async function handleMixingMessage(record: any) {
     }
 }
 
+
+async function handleMixingRefund(record: any, old: any) {
+    // record: mixing_orders row after UPDATE
+    const requested = !old?.refund_requested_at && record.refund_requested_at;
+    const denied = old?.refund_requested_at && !record.refund_requested_at && record.status !== 'refunded';
+    // Approved refunds are announced by the 'refund' transaction receipt email.
+    if (!requested && !denied) return;
+
+    const artist = await getUserEmail(record.artist_id);
+    const artistName = artist?.full_name || 'Artist';
+
+    if (requested) {
+        const subject = `Refund requested: ${record.song_title} (${CURRENCY}${Number(record.amount).toLocaleString()})`;
+        const html = getMixingRefundRequestTemplate({
+            songTitle: record.song_title,
+            packageName: record.package_name,
+            amount: `${CURRENCY}${Number(record.amount).toLocaleString()}`,
+            artistName,
+            reason: record.refund_request_reason || 'No reason given.',
+            dashboardLink: `${SITE_URL}/dashboard/admin`,
+        });
+        await sendEmail('admin@afropitchplay.best', subject, html);
+    } else if (denied) {
+        if (!artist || !artist.email) return;
+        const subject = `Update on your refund request: ${record.song_title}`;
+        const html = getMixingRefundDeniedTemplate({
+            name: artist.full_name || 'Artist',
+            songTitle: record.song_title,
+            dashboardLink: `${SITE_URL}/dashboard/artist`,
+        });
+        await sendEmail(artist.email, subject, html);
+    }
+}
 
 async function handleBroadcast(record: any) {
     console.log("📢 Starting Broadcast:", record.subject);

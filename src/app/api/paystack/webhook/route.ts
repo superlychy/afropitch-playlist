@@ -1,26 +1,52 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import crypto from "crypto";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-// Paystack webhook secret (should be set in Vercel environment variables)
+// Paystack webhook secret (set in Vercel environment variables).
+// MONITOR MODE (2026-09-27): the signature is verified and the result is logged,
+// but events are never rejected yet. Once the secret is confirmed to be the real
+// Paystack secret key, this flips to hard enforcement (401 on mismatch).
 const PAYSTACK_WEBHOOK_SECRET = process.env.PAYSTACK_WEBHOOK_SECRET || "";
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
-    
-    // TODO: Implement signature verification when webhook secret is configured
-    // const signature = req.headers.get('x-paystack-signature');
-    // const hash = crypto.createHmac('sha512', PAYSTACK_WEBHOOK_SECRET)
-    //   .update(JSON.stringify(body))
-    //   .digest('hex');
-    // if (signature !== hash) {
-    //   return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
-    // }
+    const rawBody = await req.text();
+
+    if (PAYSTACK_WEBHOOK_SECRET) {
+      const signature = req.headers.get("x-paystack-signature") || "";
+      const expected = crypto
+        .createHmac("sha512", PAYSTACK_WEBHOOK_SECRET)
+        .update(rawBody)
+        .digest("hex");
+      const valid =
+        signature.length === expected.length &&
+        crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
+      if (valid) {
+        console.log("[Paystack Webhook] Signature valid");
+      } else {
+        // Monitor mode: log loudly, still process. Flip to 401 once the real
+        // secret key is confirmed.
+        console.error("[Paystack Webhook] Invalid signature (monitor mode — event still processed)");
+        await supabase.from("system_logs").insert({
+          event_type: "webhook_signature_invalid",
+          event_data: { timestamp: new Date().toISOString() },
+        });
+      }
+    } else {
+      console.warn("[Paystack Webhook] PAYSTACK_WEBHOOK_SECRET not set — skipping signature check");
+    }
+
+    let body: any;
+    try {
+      body = JSON.parse(rawBody);
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+    }
 
     console.log("[Paystack Webhook] Event received:", body.event);
 

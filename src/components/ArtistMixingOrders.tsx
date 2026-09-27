@@ -18,6 +18,7 @@ interface MixingOrder {
     status: string;
     preview_link: string | null;
     full_link: string | null;
+    refund_requested_at: string | null;
     created_at: string;
 }
 
@@ -48,6 +49,8 @@ export function ArtistMixingOrders() {
     const [loading, setLoading] = useState(true);
     const [acting, setActing] = useState<string | null>(null);
     const [openChatFor, setOpenChatFor] = useState<string | null>(null);
+    const [refundFor, setRefundFor] = useState<string | null>(null);
+    const [refundReason, setRefundReason] = useState("");
     const [unread, setUnread] = useState<Record<string, number>>({});
 
     const fetchOrders = useCallback(async () => {
@@ -55,7 +58,7 @@ export function ArtistMixingOrders() {
         setLoading(true);
         const { data } = await supabase
             .from("mixing_orders")
-            .select("id, song_title, package_name, amount, status, preview_link, full_link, created_at")
+            .select("id, song_title, package_name, amount, status, preview_link, full_link, refund_requested_at, created_at")
             .eq("artist_id", user.id)
             .order("created_at", { ascending: false });
         if (data) setOrders(data as MixingOrder[]);
@@ -82,13 +85,13 @@ export function ArtistMixingOrders() {
         else { toast("Mix accepted — full file unlocked!", "success"); fetchOrders(); }
     };
 
-    const refund = async (id: string) => {
-        if (!window.confirm("Request a refund? The escrowed amount goes straight back to your wallet.")) return;
+    const requestRefund = async (id: string) => {
+        if (!refundReason.trim()) { toast("Please tell us briefly why you're requesting a refund.", "error"); return; }
         setActing(id);
-        const { error } = await supabase.rpc("refund_mix", { p_order_id: id, p_reason: "artist requested refund" });
+        const { error } = await supabase.rpc("request_mix_refund", { p_order_id: id, p_reason: refundReason.trim() });
         setActing(null);
-        if (error) toast("Could not refund: " + error.message, "error");
-        else { toast("Refunded to your wallet.", "success"); fetchOrders(); }
+        if (error) toast("Could not request refund: " + error.message, "error");
+        else { toast("Refund requested — we'll review it shortly.", "success"); setRefundFor(null); setRefundReason(""); fetchOrders(); }
     };
 
     if (loading) return <p className="text-gray-500 text-sm">Loading mixing orders…</p>;
@@ -135,15 +138,46 @@ export function ArtistMixingOrders() {
                                             {acting === o.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4 mr-1" />}
                                             Accept mix & release payment
                                         </Button>
-                                        <Button
-                                            disabled={acting === o.id}
-                                            onClick={() => refund(o.id)}
-                                            variant="outline"
-                                            className="border-white/20 text-gray-300 rounded-xl text-sm"
-                                        >
-                                            Not happy — refund me
-                                        </Button>
+                                        {o.refund_requested_at ? (
+                                            <span className="inline-flex items-center text-xs text-yellow-400 border border-yellow-500/30 rounded-xl px-3 py-2">
+                                                Refund requested — awaiting review
+                                            </span>
+                                        ) : (
+                                            <Button
+                                                disabled={acting === o.id}
+                                                onClick={() => { setRefundFor(o.id); setRefundReason(""); }}
+                                                variant="outline"
+                                                className="border-white/20 text-gray-300 rounded-xl text-sm"
+                                            >
+                                                Not happy — request a refund
+                                            </Button>
+                                        )}
                                     </div>
+                                    {refundFor === o.id && !o.refund_requested_at && (
+                                        <div className="rounded-xl border border-white/10 bg-black/40 p-3 space-y-2">
+                                            <p className="text-xs text-gray-400">Why are you requesting a refund? Our team will review it.</p>
+                                            <textarea
+                                                value={refundReason}
+                                                onChange={(e) => setRefundReason(e.target.value)}
+                                                placeholder="e.g. The mix isn't what I asked for…"
+                                                rows={2}
+                                                className="w-full bg-black/40 border border-white/10 rounded-lg text-white text-xs p-2"
+                                            />
+                                            <div className="flex gap-2">
+                                                <Button
+                                                    size="sm"
+                                                    disabled={acting === o.id}
+                                                    onClick={() => requestRefund(o.id)}
+                                                    className="bg-yellow-500 hover:bg-yellow-400 text-black rounded-lg text-xs"
+                                                >
+                                                    {acting === o.id ? <Loader2 className="w-3 h-3 animate-spin" /> : "Send refund request"}
+                                                </Button>
+                                                <Button size="sm" variant="ghost" onClick={() => setRefundFor(null)} className="text-xs text-gray-500 rounded-lg">
+                                                    Cancel
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             )}
 
@@ -156,14 +190,43 @@ export function ArtistMixingOrders() {
                             )}
 
                             {(o.status === "in_escrow" || o.status === "in_progress") && (
-                                <Button
-                                    disabled={acting === o.id}
-                                    onClick={() => refund(o.id)}
-                                    variant="ghost"
-                                    className="text-xs text-gray-500 hover:text-gray-300 h-auto p-0"
-                                >
-                                    Cancel order & refund to wallet
-                                </Button>
+                                o.refund_requested_at ? (
+                                    <p className="text-xs text-yellow-400">Refund requested — awaiting review.</p>
+                                ) : (
+                                    <Button
+                                        disabled={acting === o.id}
+                                        onClick={() => { setRefundFor(refundFor === o.id ? null : o.id); setRefundReason(""); }}
+                                        variant="ghost"
+                                        className="text-xs text-gray-500 hover:text-gray-300 h-auto p-0"
+                                    >
+                                        Request a refund
+                                    </Button>
+                                )
+                            )}
+                            {refundFor === o.id && !o.refund_requested_at && o.status !== "delivered" && (
+                                <div className="rounded-xl border border-white/10 bg-black/40 p-3 space-y-2">
+                                    <p className="text-xs text-gray-400">Why are you requesting a refund? Our team will review it.</p>
+                                    <textarea
+                                        value={refundReason}
+                                        onChange={(e) => setRefundReason(e.target.value)}
+                                        placeholder="e.g. I need to cancel this order…"
+                                        rows={2}
+                                        className="w-full bg-black/40 border border-white/10 rounded-lg text-white text-xs p-2"
+                                    />
+                                    <div className="flex gap-2">
+                                        <Button
+                                            size="sm"
+                                            disabled={acting === o.id}
+                                            onClick={() => requestRefund(o.id)}
+                                            className="bg-yellow-500 hover:bg-yellow-400 text-black rounded-lg text-xs"
+                                        >
+                                            {acting === o.id ? <Loader2 className="w-3 h-3 animate-spin" /> : "Send refund request"}
+                                        </Button>
+                                        <Button size="sm" variant="ghost" onClick={() => setRefundFor(null)} className="text-xs text-gray-500 rounded-lg">
+                                            Cancel
+                                        </Button>
+                                    </div>
+                                </div>
                             )}
                             <div className="pt-3 border-t border-white/10">
                                 <Button
