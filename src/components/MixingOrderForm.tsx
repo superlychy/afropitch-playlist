@@ -352,6 +352,11 @@ export function MixingOrderForm() {
                                 the finished mix. Not happy? It comes straight back to
                                 your wallet.
                             </p>
+                            <p className="text-xs text-gray-500 max-w-md">
+                                Paying from outside Nigeria? International Visa and
+                                Mastercard payments are accepted — your bank handles
+                                the currency conversion.
+                            </p>
                         </div>
                     )
                 )}
