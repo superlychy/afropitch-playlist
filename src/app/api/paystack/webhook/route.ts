@@ -7,38 +7,39 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-// Paystack webhook secret (set in Vercel environment variables).
-// MONITOR MODE (2026-09-27): the signature is verified and the result is logged,
-// but events are never rejected yet. Once the secret is confirmed to be the real
-// Paystack secret key, this flips to hard enforcement (401 on mismatch).
-const PAYSTACK_WEBHOOK_SECRET = process.env.PAYSTACK_WEBHOOK_SECRET || "";
+// Paystack webhook signature secret.
+// PAYSTACK_SECRET_KEY (the live secret key — verified 2026-09-27) is preferred;
+// PAYSTACK_WEBHOOK_SECRET is kept as a fallback during transition.
+// HARD ENFORCEMENT: requests with an invalid signature are rejected with 401
+// and logged to system_logs. Paystack signs webhooks with the secret key
+// (SHA-512 HMAC of the raw request body).
+const WEBHOOK_SIGNING_SECRET =
+  process.env.PAYSTACK_SECRET_KEY || process.env.PAYSTACK_WEBHOOK_SECRET || "";
 
 export async function POST(req: Request) {
   try {
     const rawBody = await req.text();
 
-    if (PAYSTACK_WEBHOOK_SECRET) {
+    if (!WEBHOOK_SIGNING_SECRET) {
+      console.warn("[Paystack Webhook] No signing secret set — skipping signature check");
+    } else {
       const signature = req.headers.get("x-paystack-signature") || "";
       const expected = crypto
-        .createHmac("sha512", PAYSTACK_WEBHOOK_SECRET)
+        .createHmac("sha512", WEBHOOK_SIGNING_SECRET)
         .update(rawBody)
         .digest("hex");
       const valid =
         signature.length === expected.length &&
         crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
-      if (valid) {
-        console.log("[Paystack Webhook] Signature valid");
-      } else {
-        // Monitor mode: log loudly, still process. Flip to 401 once the real
-        // secret key is confirmed.
-        console.error("[Paystack Webhook] Invalid signature (monitor mode — event still processed)");
+      if (!valid) {
+        console.error("[Paystack Webhook] Invalid signature — rejected");
         await supabase.from("system_logs").insert({
-          event_type: "webhook_signature_invalid",
+          event_type: "webhook_signature_rejected",
           event_data: { timestamp: new Date().toISOString() },
         });
+        return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
       }
-    } else {
-      console.warn("[Paystack Webhook] PAYSTACK_WEBHOOK_SECRET not set — skipping signature check");
+      console.log("[Paystack Webhook] Signature valid");
     }
 
     let body: any;
