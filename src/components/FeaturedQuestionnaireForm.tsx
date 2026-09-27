@@ -210,6 +210,7 @@ export function FeaturedQuestionnaireForm({
                     <CardTitle className="text-white text-base font-semibold">Your photo <span className="text-gray-500 font-normal text-sm">(optional)</span></CardTitle>
                     <CardDescription>
                         Upload a clear photo of you — it appears on your public feature page.
+                        Skip this and we'll use your song's cover art instead.
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3">

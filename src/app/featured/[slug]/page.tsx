@@ -14,6 +14,7 @@ interface Feature {
     bio: string | null;
     qa: { q: string; a: string }[] | null;
     photo_url: string | null;
+    cover_art_url: string | null;
     artist_id: string | null;
     artist_name: string | null;
     song_title: string | null;
@@ -23,7 +24,7 @@ async function getFeature(slug: string): Promise<Feature | null> {
     const supabase = await createClient();
     const { data } = await supabase
         .from("featured_artists")
-        .select("id, slug, week_start, headline, story, bio, qa, photo_url, artist_id, submission_id")
+        .select("id, slug, week_start, headline, story, bio, qa, photo_url, cover_art_url, artist_id, submission_id")
         .eq("slug", slug)
         .eq("status", "published")
         .maybeSingle();
@@ -65,6 +66,8 @@ export async function generateMetadata({
         feature.bio?.slice(0, 160) ??
         feature.headline ??
         `${name} is AfroPitch's Featured Artist of the Week — discover their story, sound, and music.`;
+    // Artist photo if uploaded, otherwise the song's cover art (set when the draft is created).
+    const image = feature.photo_url ?? feature.cover_art_url;
 
     return {
         title: `${name} — Featured Artist of the Week | AfroPitch`,
@@ -75,13 +78,13 @@ export async function generateMetadata({
             description,
             url: `${siteUrl}/featured/${feature.slug}`,
             type: "article",
-            ...(feature.photo_url ? { images: [{ url: feature.photo_url }] } : {}),
+            ...(image ? { images: [{ url: image }] } : {}),
         },
         twitter: {
             card: "summary_large_image",
             title: `${name} — Featured Artist of the Week | AfroPitch`,
             description,
-            ...(feature.photo_url ? { images: [feature.photo_url] } : {}),
+            ...(image ? { images: [image] } : {}),
         },
         alternates: { canonical: `${siteUrl}/featured/${feature.slug}` },
     };
@@ -97,6 +100,7 @@ export default async function FeaturedArtistPage({
     if (!feature) notFound();
 
     const name = feature.artist_name ?? "Featured Artist";
+    const image = feature.photo_url ?? feature.cover_art_url;
     const weekLabel = feature.week_start
         ? new Date(feature.week_start + "T00:00:00").toLocaleDateString(undefined, {
               month: "long",
@@ -110,7 +114,7 @@ export default async function FeaturedArtistPage({
         "@type": "MusicGroup",
         name,
         description: feature.bio ?? feature.headline ?? undefined,
-        image: feature.photo_url ?? undefined,
+        image: image ?? undefined,
         ...(feature.song_title
             ? { track: { "@type": "MusicRecording", name: feature.song_title, byArtist: { "@type": "MusicGroup", name } } }
             : {}),
@@ -128,10 +132,10 @@ export default async function FeaturedArtistPage({
                     <div className="inline-block rounded-full border border-yellow-500/30 bg-yellow-950/30 px-4 py-1.5 text-sm text-yellow-300">
                         ⭐ Featured Artist of the Week
                     </div>
-                    {feature.photo_url && (
+                    {image && (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
-                            src={feature.photo_url}
+                            src={image}
                             alt={name}
                             className="w-40 h-40 rounded-full object-cover mx-auto border-2 border-yellow-500/40 shadow-xl shadow-yellow-500/10"
                         />

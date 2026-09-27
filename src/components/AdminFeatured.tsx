@@ -17,6 +17,7 @@ interface Feature {
     bio: string | null;
     qa: { q: string; a: string }[] | null;
     photo_url: string | null;
+    cover_art_url: string | null;
     slug: string | null;
     status: string;
     questionnaire_token: string | null;
@@ -397,8 +398,13 @@ export function AdminFeatured() {
                                                 </div>
                                             )}
                                             <div className="flex items-center gap-3">
-                                                {f.photo_url && (
-                                                    <img src={f.photo_url} alt="" className="w-16 h-16 rounded-xl object-cover border border-white/10" />
+                                                {(f.photo_url || f.cover_art_url) && (
+                                                    <div className="relative">
+                                                        <img src={f.photo_url ?? f.cover_art_url ?? ""} alt="" className="w-16 h-16 rounded-xl object-cover border border-white/10" />
+                                                        {!f.photo_url && f.cover_art_url && (
+                                                            <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 text-[9px] bg-black/80 text-yellow-300 px-1.5 py-0.5 rounded whitespace-nowrap">song cover</span>
+                                                        )}
+                                                    </div>
                                                 )}
                                                 <label className="cursor-pointer text-xs bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg px-3 py-2 text-gray-300 transition-all">
                                                     {uploadingPhoto === f.id ? "Uploading…" : (f.photo_url ? "Replace photo" : "Upload photo")}
