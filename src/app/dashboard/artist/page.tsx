@@ -9,12 +9,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Wallet, Plus, CreditCard, History, Settings, HelpCircle, Send, LogOut, XCircle, ChevronLeft, Bell } from "lucide-react";
 import { pricingConfig } from "@/../config/pricing";
-import { Copy, ExternalLink, BarChart3, TrendingUp, AlertCircle, Star } from "lucide-react";
+import { Copy, ExternalLink, BarChart3, TrendingUp, AlertCircle, Star, AudioWaveform } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import dynamic from "next/dynamic";
 import { TransactionsList } from "@/components/TransactionsList";
+import { ArtistMixingOrders } from "@/components/ArtistMixingOrders";
 
 const PayWithPaystack = dynamic(() => import("@/components/PaystackButton"), { ssr: false });
 
@@ -484,10 +485,24 @@ export default function ArtistDashboard() {
                       </p>
                     </div>
                   )}
+                  {(sub.status === "declined" || sub.status === "rejected") && (
+                    <div className="mt-3">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="border-green-500/40 text-green-400 hover:bg-green-500 hover:text-black rounded-xl text-xs"
+                        onClick={() => router.push(`/mixing?song=${encodeURIComponent(sub.song_title)}&submission=${sub.id}`)}
+                      >
+                        <AudioWaveform className="w-3.5 h-3.5 mr-1" /> Get it professionally mixed
+                      </Button>
+                    </div>
+                  )}
                 </div>
               ))}</div>
           )}
         </div>
+
+        <ArtistMixingOrders />
 
         {/* Wallet Column - Mobile First */}
         <div className="space-y-4 sm:space-y-6" id="wallet-card">

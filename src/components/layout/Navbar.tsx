@@ -15,6 +15,7 @@ export function Navbar() {
         { name: "Playlists", href: "/playlists" },
         { name: "Pricing", href: "/pricing" },
         { name: "Mixing", href: "/mixing" },
+        { name: "Featured", href: "/featured" },
         { name: "Trust", href: "/trust" },
         { name: "Contact", href: "/contact" },
     ];

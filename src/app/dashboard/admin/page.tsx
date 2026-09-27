@@ -16,6 +16,7 @@ import { AdminActivityFeed } from "@/components/AdminActivityFeed";
 import { AdminMessageForm } from "@/components/AdminMessageForm";
 import { CustomEmailForm } from "@/components/CustomEmailForm";
 import { AdminInbox } from "@/components/AdminInbox";
+import { AdminMixingQueue } from "@/components/AdminMixingQueue";
 
 // ----------------------------------------------------------------------
 // TYPES & MOCK DATA (Ideally move to types file)
@@ -79,7 +80,7 @@ interface TopPlaylist {
     total_clicks: number;
 }
 
-const VALID_TABS = ["overview", "analytics", "users", "withdrawals", "transactions", "support", "playlists", "submissions", "applications", "broadcast", "inbox"] as const;
+const VALID_TABS = ["overview", "analytics", "users", "withdrawals", "transactions", "support", "playlists", "submissions", "mixing", "applications", "broadcast", "inbox"] as const;
 type AdminTab = typeof VALID_TABS[number];
 
 export default function AdminDashboard() {
@@ -1130,7 +1131,7 @@ export default function AdminDashboard() {
                     </div>
                     <div className="flex items-center gap-4">
                         <div className="flex bg-white/5 p-1 rounded-lg border border-white/10 overflow-x-auto max-w-full scrollbar-hide">
-                            {["overview", "analytics", "users", "withdrawals", "transactions", "support", "playlists", "submissions", "applications", "inbox", "broadcast"].map((tab) => {
+                            {["overview", "analytics", "users", "withdrawals", "transactions", "support", "playlists", "submissions", "mixing", "applications", "inbox", "broadcast"].map((tab) => {
                                 let count = 0;
                                 if (tab === 'withdrawals') count = pendingWithdrawalsCount;
                                 if (tab === 'support') count = openTicketsCount;
@@ -2131,6 +2132,15 @@ export default function AdminDashboard() {
                                 </div>
                             </CardContent>
                         </Card>
+                    </div>
+                )
+            }
+
+            {/* MIXING ORDERS VIEW */}
+            {
+                activeTab === "mixing" && (
+                    <div className="animate-in fade-in duration-300">
+                        <AdminMixingQueue />
                     </div>
                 )
             }

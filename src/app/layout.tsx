@@ -7,6 +7,7 @@ import { AIHelp } from "@/components/AIHelp";
 import { AnalyticsTracker } from "@/components/AnalyticsTracker";
 import { AuthProvider } from "@/context/AuthContext";
 import { UserActivityTracker } from "@/components/UserActivityTracker";
+import { ErrorReporter } from "@/components/ErrorReporter";
 import { ToastProvider } from "@/components/ui/toast";
 
 export const metadata: Metadata = {
@@ -69,6 +70,7 @@ export default function RootLayout({
             <AIHelp />
             <AnalyticsTracker />
             <UserActivityTracker />
+            <ErrorReporter />
           </ToastProvider>
         </AuthProvider>
         <script

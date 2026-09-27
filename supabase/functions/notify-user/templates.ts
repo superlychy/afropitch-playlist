@@ -150,6 +150,11 @@ export const getSongDeclinedTemplate = (data: {
 
             <p class="refund-notice">Amount Refunded: ${data.refundAmount}</p>
             <p>This has been credited back to your wallet instantly. You can use it to submit to other playlists that might be a better fit.</p>
+            <div style="margin: 25px 0; padding: 20px; background-color: #0f2a1a; border: 1px solid #22c55e; border-radius: 8px; text-align: center;">
+                <p style="color: #ffffff; font-weight: bold; margin: 0 0 8px 0;">Was the mix holding your song back?</p>
+                <p style="color: #cccccc; font-size: 14px; margin: 0 0 15px 0;">Get it professionally mixed by an AfroPitch engineer. Your payment sits in escrow &mdash; only released when you love the mix.</p>
+                <a href="https://afropitchplay.best/mixing" style="display: inline-block; background-color: #22c55e; color: #000000; font-weight: bold; padding: 12px 24px; border-radius: 8px; text-decoration: none;">Get it professionally mixed</a>
+            </div>
 
         </div>
         <div class="footer">&copy; 2026 AfroPitch.<br><a href="${data.dashboardLink}" style="color: #666;">View Wallet</a></div>
