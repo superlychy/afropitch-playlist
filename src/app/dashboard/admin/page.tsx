@@ -7,7 +7,7 @@ import { useToast } from "@/components/ui/toast";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { BarChart3, TrendingUp, Music, Users, Trophy, DollarSign, ShieldAlert, CheckCircle, XCircle, MessageSquare, LogOut, Bell, Plus, Search, Loader2, Send, RefreshCw, Zap } from "lucide-react";
+import { BarChart3, TrendingUp, Music, Users, Trophy, DollarSign, ShieldAlert, CheckCircle, XCircle, MessageSquare, LogOut, Bell, Plus, Search, Loader2, Send, RefreshCw, Zap, Eye } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { TransactionsList } from "@/components/TransactionsList";
 import { pricingConfig } from "@/../config/pricing";
@@ -115,6 +115,7 @@ export default function AdminDashboard() {
     const [pendingCurators, setPendingCurators] = useState<any[]>([]); // Registered curators awaiting verification
     const [pendingSubmissionsCount, setPendingSubmissionsCount] = useState(0);
     const [curatorApplications, setCuratorApplications] = useState<any[]>([]); // External public applicants
+    const [viewApplication, setViewApplication] = useState<{ kind: 'curator' | 'external', data: any } | null>(null); // Details modal
     const [withdrawals, setWithdrawals] = useState<WithdrawalRequest[]>([]);
     const [tickets, setTickets] = useState<SupportTicket[]>([]);
 
@@ -2099,6 +2100,9 @@ export default function AdminDashboard() {
                                                 </div>
                                             </div>
                                             <div className="flex items-center gap-2 shrink-0">
+                                                <Button size="sm" variant="outline" className="border-white/20" onClick={() => setViewApplication({ kind: 'curator', data: c })}>
+                                                    <Eye className="w-4 h-4 mr-1" /> View
+                                                </Button>
                                                 <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={() => handleCuratorAction(c.id, 'verified')}>
                                                     <CheckCircle className="w-4 h-4 mr-1" /> Approve
                                                 </Button>
@@ -2158,6 +2162,9 @@ export default function AdminDashboard() {
                                                 </div>
                                             </div>
                                             <div className="flex items-center gap-2 shrink-0">
+                                                <Button size="sm" variant="outline" className="border-white/20" onClick={() => setViewApplication({ kind: 'external', data: app })}>
+                                                    <Eye className="w-4 h-4 mr-1" /> View
+                                                </Button>
                                                 <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={() => handleExternalAppAction(app.id, 'approved')}>
                                                     <CheckCircle className="w-4 h-4 mr-1" /> Approve
                                                 </Button>
@@ -2587,6 +2594,79 @@ export default function AdminDashboard() {
                         </div>
                     </div >
                 )
+            }
+
+            {/* APPLICATION DETAILS MODAL */}
+            {
+                viewApplication && (() => {
+                    const { kind, data: d } = viewApplication;
+                    let docs: any = null;
+                    if (kind === 'curator' && d.verification_docs) {
+                        try { docs = JSON.parse(d.verification_docs); } catch { docs = null; }
+                    }
+                    const rows: [string, React.ReactNode][] = kind === 'curator' ? [
+                        ["Name", d.full_name || "—"],
+                        ["Email", d.email || "—"],
+                        ["Status", d.verification_status || "—"],
+                        ["Bank", d.bank_name ? `${d.bank_name} • ${d.account_number || "N/A"}${d.account_name ? ` (${d.account_name})` : ""}` : "Not set"],
+                        ["NIN", d.nin_number || "—"],
+                        ["Portfolio", docs?.portfolio || "—"],
+                        ["Experience", docs?.experience ? `${docs.experience} yrs` : "—"],
+                        ["Genres", docs?.genres || "—"],
+                        ["Phone", docs?.phone || "—"],
+                        ["Why curate", docs?.reason || "—"],
+                        ["ID document", docs?.id_document || "—"],
+                        ["Raw application data", docs ? null : (d.verification_docs || "—")],
+                    ] : [
+                        ["Name", d.name || "—"],
+                        ["Email", d.email || "—"],
+                        ["Bio", d.bio ? `"${d.bio}"` : "—"],
+                        ["Playlist", d.playlist_link ? <a key="pl" href={d.playlist_link} target="_blank" rel="noopener noreferrer" className="text-green-400 hover:underline break-all">{d.playlist_link}</a> : "—"],
+                        ["Socials", d.social_links ? Object.entries(d.social_links).map(([k, v]) => v ? `${k}: ${v}` : "").filter(Boolean).join(" • ") || "—" : "—"],
+                        ["Applied", d.created_at ? new Date(d.created_at).toLocaleString() : "—"],
+                        ["Status", d.status || "pending"],
+                    ];
+                    const doApprove = () => {
+                        if (kind === 'curator') handleCuratorAction(d.id, 'verified');
+                        else handleExternalAppAction(d.id, 'approved');
+                        setViewApplication(null);
+                    };
+                    const doReject = () => {
+                        if (kind === 'curator') handleCuratorAction(d.id, 'rejected');
+                        else handleExternalAppAction(d.id, 'rejected');
+                        setViewApplication(null);
+                    };
+                    return (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in p-4" onClick={() => setViewApplication(null)}>
+                            <div className="bg-zinc-900 border border-white/10 w-full max-w-lg rounded-lg overflow-hidden" onClick={e => e.stopPropagation()}>
+                                <div className="p-5 border-b border-white/10">
+                                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                                        <Eye className="w-5 h-5 text-blue-400" />
+                                        {kind === 'curator' ? "Curator Verification Request" : "External Curator Application"}
+                                    </h3>
+                                    <p className="text-sm text-gray-400 mt-1">{d.full_name || d.name} • {d.email}</p>
+                                </div>
+                                <div className="p-5 space-y-3 max-h-[60vh] overflow-y-auto">
+                                    {rows.filter(([, v]) => v !== null).map(([label, value]) => (
+                                        <div key={label} className="flex flex-col sm:flex-row sm:gap-3 text-sm">
+                                            <span className="text-gray-500 sm:w-36 shrink-0 font-medium">{label}</span>
+                                            <span className="text-gray-200 break-words">{value}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="p-4 border-t border-white/10 flex justify-end gap-2">
+                                    <Button variant="ghost" onClick={() => setViewApplication(null)}>Close</Button>
+                                    <Button variant="destructive" onClick={doReject}>
+                                        <XCircle className="w-4 h-4 mr-1" /> Reject
+                                    </Button>
+                                    <Button className="bg-green-600 hover:bg-green-700" onClick={doApprove}>
+                                        <CheckCircle className="w-4 h-4 mr-1" /> Approve
+                                    </Button>
+                                </div>
+                            </div>
+                        </div>
+                    );
+                })()
             }
 
             {/* TOP UP MODAL */}

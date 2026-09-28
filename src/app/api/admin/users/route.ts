@@ -29,8 +29,9 @@ async function requireAdmin() {
  *
  * { action: "create", email, password, name, role } — creates the auth user
  *   (email auto-confirmed); the handle_new_user trigger builds the profile.
- * { action: "delete", userId } — deletes the auth user and their profile
- *   (related rows cascade). Cannot delete yourself.
+ * { action: "delete", userId } — deletes the auth login (if one exists) and the
+ *   profile (related rows cascade). Tolerates profile-only rows with no auth
+ *   user (e.g. seeded test rows). Cannot delete yourself.
  */
 export async function POST(req: Request) {
   try {
@@ -92,12 +93,20 @@ export async function POST(req: Request) {
         );
       }
 
+      // Delete the auth login if one exists. Some rows (seeded test accounts)
+      // are profile-only with no auth user — that is not a failure.
       const { error: authError } = await supabase.auth.admin.deleteUser(userId);
-      if (authError) {
+      if (authError && !/not found/i.test(authError.message || "")) {
         return NextResponse.json({ error: authError.message }, { status: 400 });
       }
-      // Profile + related rows cascade.
-      await supabase.from("profiles").delete().eq("id", userId);
+      // Delete the profile; dependent rows cascade (or SET NULL).
+      const { error: profileError } = await supabase
+        .from("profiles")
+        .delete()
+        .eq("id", userId);
+      if (profileError) {
+        return NextResponse.json({ error: profileError.message }, { status: 400 });
+      }
 
       return NextResponse.json({ success: true });
     }
