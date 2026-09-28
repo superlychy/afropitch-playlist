@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { supabasePublic } from "@/lib/supabase";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
-import { BadgeCheck, Music2, Users, ArrowRight, ListMusic, User, Search, Filter, CheckCircle } from "lucide-react";
+import { BadgeCheck, Music2, Users, ArrowRight, ListMusic, User, Search, Filter, CheckCircle, AlertCircle } from "lucide-react";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -22,6 +22,7 @@ export default function PlaylistsPage() {
     const [selectedGenre, setSelectedGenre] = useState("All");
     const [selectedPrice, setSelectedPrice] = useState("all");
     const [error, setError] = useState(false);
+    const [retryKey, setRetryKey] = useState(0);
 
     // Selection State
     const [selectedPlaylistIds, setSelectedPlaylistIds] = useState<string[]>([]);
@@ -33,14 +34,14 @@ export default function PlaylistsPage() {
             setIsLoading(true);
             try {
                 // Fetch Playlists
-                const fetchPlaylistsPromise = supabase
+                const fetchPlaylistsPromise = supabasePublic
                     .from('playlists')
                     .select('*, curator:profiles!curator_id(role, verification_status)')
                     .eq('is_active', true)
                     .order('followers', { ascending: false });
 
                 // Fetch Curators
-                const fetchCuratorsPromise = supabase
+                const fetchCuratorsPromise = supabasePublic
                     .from('profiles')
                     .select('*, playlists(count)')
                     .or('role.eq.curator,role.eq.admin');
@@ -90,7 +91,7 @@ export default function PlaylistsPage() {
         };
 
         fetchData();
-    }, []);
+    }, [retryKey]);
 
     const toggleSelection = (id: string, e?: React.MouseEvent) => {
         if (e) e.preventDefault();
@@ -126,11 +127,11 @@ export default function PlaylistsPage() {
         <div className="w-full mx-auto max-w-7xl px-4 py-16 md:py-24 min-h-screen relative pb-32">
             {error && (
                 <div className="flex flex-col items-center justify-center py-20 text-center space-y-4 min-h-[50vh]">
-                    <div className="w-12 h-12 border-4 border-green-500 border-t-transparent rounded-full animate-spin"></div>
+                    <AlertCircle className="w-12 h-12 text-red-400" />
                     <h2 className="text-xl font-bold text-white">Connection Error</h2>
-                    <p className="text-gray-400">Unable to load data. Please refresh the page.</p>
-                    <Button onClick={() => window.location.reload()} variant="outline" className="mt-4 border-white/10 hover:bg-white/10">
-                        Refresh Page
+                    <p className="text-gray-400">Unable to load data. Please try again.</p>
+                    <Button onClick={() => { setError(false); setRetryKey(k => k + 1); }} variant="outline" className="mt-4 border-white/10 hover:bg-white/10">
+                        Try Again
                     </Button>
                 </div>
             )}

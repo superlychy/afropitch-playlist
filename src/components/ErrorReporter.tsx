@@ -44,11 +44,11 @@ export function ErrorReporter() {
         };
         const onRejection = (e: PromiseRejectionEvent) => {
             const r: any = e.reason;
-            report(
-                "unhandledrejection",
-                r?.message || String(r).slice(0, 500),
-                r?.stack
-            );
+            const msg = r?.message || String(r).slice(0, 500);
+            // Benign: Supabase auth tabs coordinating session refresh via
+            // navigator.locks. Expected with multiple tabs open, not a bug.
+            if (/lock .*steal|lock was stolen|lock broken/i.test(msg)) return;
+            report("unhandledrejection", msg, r?.stack);
         };
         window.addEventListener("error", onError);
         window.addEventListener("unhandledrejection", onRejection);
