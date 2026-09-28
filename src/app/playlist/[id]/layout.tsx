@@ -27,7 +27,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
         p.description ||
         `Listen to ${p.name}${followers} — a curated African music playlist on AfroPitch. Artists: pitch your song to this curator.`;
       return {
-        title: `${p.name} | AfroPitch Playlist`,
+        title: { absolute: `${p.name} | AfroPitch Playlist` },
         description,
         openGraph: {
           title: `${p.name} | AfroPitch`,
@@ -47,7 +47,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     // fall through to generic playlist metadata
   }
   return {
-    title: "Playlist | AfroPitch",
+    title: { absolute: "Playlists | AfroPitch" },
     description:
       "Discover a curated African music playlist on AfroPitch — Afrobeats, Amapiano, Afro-house and more. Artists can pitch their songs directly to curators.",
   };
