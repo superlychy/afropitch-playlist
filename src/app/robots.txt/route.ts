@@ -15,7 +15,11 @@ Disallow: /verify/
 # Allow search engines to crawl public pages
 Allow: /
 Allow: /playlists
+Allow: /playlist/
 Allow: /pricing
+Allow: /mixing
+Allow: /mixed
+Allow: /featured
 Allow: /how-it-works
 Allow: /trust
 Allow: /contact

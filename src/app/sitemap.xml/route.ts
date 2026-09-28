@@ -14,17 +14,26 @@ export async function GET() {
     { url: "/mixed", priority: "0.8", changefreq: "weekly" },
     { url: "/how-it-works", priority: "0.8", changefreq: "monthly" },
     { url: "/trust", priority: "0.8", changefreq: "monthly" },
-    { url: "/submit", priority: "0.8", changefreq: "weekly" },
-    { url: "/portal", priority: "0.8", changefreq: "monthly" },
     { url: "/contact", priority: "0.7", changefreq: "monthly" },
     { url: "/curators/join", priority: "0.7", changefreq: "monthly" },
     { url: "/terms", priority: "0.3", changefreq: "yearly" },
     { url: "/privacy", priority: "0.3", changefreq: "yearly" },
-    { url: "/signup/artist", priority: "0.8", changefreq: "monthly" },
-    { url: "/verified", priority: "0.5", changefreq: "monthly" },
-    { url: "/verify", priority: "0.5", changefreq: "monthly" },
-    { url: "/reset-password", priority: "0.5", changefreq: "monthly" },
   ];
+
+  // Public playlist pages (SEO: one URL per playlist)
+  try {
+    const sbPl = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+    const { data: pls } = await sbPl.from("playlists").select("id").limit(500);
+    for (const row of pls ?? []) {
+      const pid = (row as { id: string }).id;
+      if (pid) routes.push({ url: `/playlist/${pid}`, priority: "0.8", changefreq: "daily" });
+    }
+  } catch {
+    // sitemap still serves the static routes if the DB lookup fails
+  }
 
   // Published featured-artist pages (SEO: one URL per artist)
   try {
