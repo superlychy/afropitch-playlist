@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { ShieldCheck, Search, CheckCircle, AlertCircle, Lock, User, LogOut, Mail, ArrowRight, Eye, EyeOff } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { GoogleSignInButton } from "@/components/GoogleSignInButton";
 
 export default function PortalPage() {
     const router = useRouter();
@@ -29,10 +30,16 @@ export default function PortalPage() {
     // Password visibility
     const [showPassword, setShowPassword] = useState(false);
 
-    // Show a suspension notice if redirected here after a blocked login
+    // Show a suspension notice if redirected here after a blocked login,
+    // or an error if the Google OAuth callback failed
     useEffect(() => {
-        if (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("blocked") === "1") {
-            setError("Your account has been suspended. Please contact support if you believe this is a mistake.");
+        if (typeof window !== "undefined") {
+            const params = new URLSearchParams(window.location.search);
+            if (params.get("blocked") === "1") {
+                setError("Your account has been suspended. Please contact support if you believe this is a mistake.");
+            } else if (params.get("oauth_error") === "1") {
+                setError("Google sign-in didn't complete. Please try again.");
+            }
         }
     }, []);
 
@@ -308,6 +315,11 @@ export default function PortalPage() {
                                         {isLoading ? "Processing..." : (isSignup ? "Create Account" : "Log In")}
                                     </Button>
                                 </form>
+                                <GoogleSignInButton
+                                    roleHint={isSignup ? activeTab : undefined}
+                                    onError={setError}
+                                    className="mt-4"
+                                />
                             </CardContent>
                             <CardFooter className="justify-center border-t border-white/5 pt-6">
                                 <p className="text-sm text-gray-400">

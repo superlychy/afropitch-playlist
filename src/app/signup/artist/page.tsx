@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { User, Mail, ArrowRight, Loader2 } from "lucide-react";
 import Link from "next/link";
+import { GoogleSignInButton } from "@/components/GoogleSignInButton";
 
 export default function ArtistSignupPage() {
     const router = useRouter();
@@ -103,6 +104,7 @@ export default function ArtistSignupPage() {
                             )}
                         </Button>
                     </form>
+                    <GoogleSignInButton roleHint="artist" className="mt-4" />
                 </CardContent>
                 <CardFooter className="justify-center border-t border-white/5 pt-6">
                     <p className="text-sm text-gray-400">
