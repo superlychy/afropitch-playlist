@@ -42,6 +42,21 @@ export default function MixedPage() {
             </div>
 
             <MixedSongsView />
+
+            <div className="text-center mt-16 max-w-2xl mx-auto space-y-4">
+                <h2 className="text-2xl sm:text-3xl font-bold text-white">
+                    Want your song to sound like this?
+                </h2>
+                <p className="text-gray-400">
+                    Pick a package, send your stems, and our engineers will take
+                    it from there — release-ready, guaranteed.
+                </p>
+                <Link href="/mixing">
+                    <Button className="bg-green-500 hover:bg-green-400 text-black rounded-xl">
+                        Get your song mixed <ArrowRight className="w-4 h-4 ml-1" />
+                    </Button>
+                </Link>
+            </div>
         </main>
     );
 }
