@@ -13,6 +13,8 @@ interface Feature {
     headline: string;
     story: string;
     artist_id: string | null;
+    photo_url: string | null;
+    cover_art_url: string | null;
 }
 
 export function FeaturedArtistView() {
@@ -24,7 +26,7 @@ export function FeaturedArtistView() {
         (async () => {
             const { data } = await supabase
                 .from("featured_artists")
-                .select("id, slug, week_start, headline, story, artist_id")
+                .select("id, slug, week_start, headline, story, artist_id, photo_url, cover_art_url")
                 .eq("status", "published")
                 .order("week_start", { ascending: false })
                 .limit(1)
@@ -57,18 +59,33 @@ export function FeaturedArtistView() {
         );
     }
 
+    // Artist photo if uploaded, otherwise the song's cover art — same fallback as the detail page.
+    const image = feature.photo_url ?? feature.cover_art_url;
+
     const card = (
         <Card className="border-yellow-500/20 bg-gradient-to-b from-yellow-950/20 to-black/60 overflow-hidden">
             <CardContent className="pt-8 pb-8 px-6 sm:px-10 space-y-5">
-                <p className="text-xs text-yellow-500/80 uppercase tracking-widest">
-                    Week of {new Date(feature.week_start + "T00:00:00").toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" })}
-                </p>
-                <h2 className="text-3xl sm:text-4xl font-extrabold text-white">
-                    {artistName || "Featured Artist"}
-                </h2>
-                {feature.headline && (
-                    <p className="text-lg text-yellow-200/90 font-medium">{feature.headline}</p>
-                )}
+                <div className="flex items-center gap-5">
+                    {image && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                            src={image}
+                            alt={artistName || "Featured artist"}
+                            className="w-24 h-24 sm:w-28 sm:h-28 rounded-full object-cover border-2 border-yellow-500/40 shadow-lg shadow-yellow-500/10 flex-shrink-0"
+                        />
+                    )}
+                    <div className="min-w-0">
+                        <p className="text-xs text-yellow-500/80 uppercase tracking-widest">
+                            Week of {new Date(feature.week_start + "T00:00:00").toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" })}
+                        </p>
+                        <h2 className="text-3xl sm:text-4xl font-extrabold text-white mt-1">
+                            {artistName || "Featured Artist"}
+                        </h2>
+                        {feature.headline && (
+                            <p className="text-lg text-yellow-200/90 font-medium mt-1">{feature.headline}</p>
+                        )}
+                    </div>
+                </div>
                 {feature.story && (
                     <div className="text-gray-300 leading-relaxed whitespace-pre-line">
                         {feature.story}
