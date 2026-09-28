@@ -275,7 +275,7 @@ export default function CuratorDashboard() {
                             verification_status: 'pending',
                             nin_number: appNin
                         },
-                        old_record: { verification_status: 'none' }
+                        old_record: { verification_status: verificationStatus }
                     }
                 }).catch(err => console.error("Manual Notify Failed:", err));
 

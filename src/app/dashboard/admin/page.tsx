@@ -1083,6 +1083,18 @@ export default function AdminDashboard() {
         } else {
             setPendingCurators(prev => prev.filter(c => c.id !== id));
 
+            // Dedup: clear the same person from the external-applications queue if present
+            const curatorEmail = data[0]?.email;
+            if (curatorEmail) {
+                const mapped = action === 'verified' ? 'approved' : 'rejected';
+                await supabase
+                    .from('curator_applications')
+                    .update({ status: mapped })
+                    .eq('email', curatorEmail)
+                    .or('status.is.null,status.eq.pending');
+                setCuratorApplications(prev => prev.filter(a => a.email !== curatorEmail));
+            }
+
             // Send in-app notification to the curator
             const msg = action === 'verified'
                 ? '🎉 Congratulations! Your curator account has been verified. You can now add playlists and receive paid submissions.'
@@ -1116,14 +1128,31 @@ export default function AdminDashboard() {
     };
 
     const handleExternalAppAction = async (appId: string, action: 'approved' | 'rejected') => {
-        const { error } = await supabase
+        const { data, error } = await supabase
             .from('curator_applications')
             .update({ status: action })
-            .eq('id', appId);
+            .eq('id', appId)
+            .select();
 
         if (error) {
             toast('Error: ' + error.message, "error");
             return;
+        }
+        if (!data || data.length === 0) {
+            toast("Update failed: Permission denied or application not found.", "error");
+            return;
+        }
+        // Dedup: clear the same person from the registered-curator queue if present
+        const appEmail = data[0]?.email;
+        if (appEmail) {
+            const mapped = action === 'approved' ? 'verified' : 'rejected';
+            await supabase
+                .from('profiles')
+                .update({ verification_status: mapped })
+                .eq('email', appEmail)
+                .eq('role', 'curator')
+                .eq('verification_status', 'pending');
+            setPendingCurators(prev => prev.filter(c => c.email !== appEmail));
         }
         setCuratorApplications(prev => prev.filter(a => a.id !== appId));
         toast(`Application ${action}.`, "success");
@@ -1178,9 +1207,9 @@ export default function AdminDashboard() {
                     <div>
                         <h1 className="text-3xl font-bold text-white flex items-center gap-3">
                             Admin Dashboard
-                            {(pendingWithdrawalsCount + openTicketsCount + pendingCurators.length + pendingSubmissionsCount) > 0 && (
+                            {(pendingWithdrawalsCount + openTicketsCount + pendingCurators.length + curatorApplications.length + pendingSubmissionsCount) > 0 && (
                                 <span className="bg-red-500 text-white text-sm px-2 py-0.5 rounded-full animate-pulse shadow-lg shadow-red-500/20">
-                                    {pendingWithdrawalsCount + openTicketsCount + pendingCurators.length + pendingSubmissionsCount} Updates
+                                    {pendingWithdrawalsCount + openTicketsCount + pendingCurators.length + curatorApplications.length + pendingSubmissionsCount} Updates
                                 </span>
                             )}
                         </h1>
@@ -1194,10 +1223,10 @@ export default function AdminDashboard() {
                                     <span className="text-xs font-bold text-blue-400">{pendingSubmissionsCount} Songs Pending</span>
                                 </div>
                             )}
-                            {pendingCurators.length > 0 && (
+                            {(pendingCurators.length + curatorApplications.length) > 0 && (
                                 <div className="bg-yellow-500/10 border border-yellow-500/20 px-3 py-1.5 rounded-lg flex items-center gap-2 cursor-pointer hover:bg-yellow-500/20 transition-colors" onClick={() => setActiveTab('applications')}>
                                     <Users className="w-4 h-4 text-yellow-500" />
-                                    <span className="text-xs font-bold text-yellow-400">{pendingCurators.length} Applications</span>
+                                    <span className="text-xs font-bold text-yellow-400">{pendingCurators.length + curatorApplications.length} Applications</span>
                                 </div>
                             )}
                             {pendingWithdrawalsCount > 0 && (

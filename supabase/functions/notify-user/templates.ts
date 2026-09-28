@@ -252,6 +252,52 @@ export const getCuratorApprovedTemplate = (data: {
 </html>
 `;
 
+export const getCuratorVerifiedTemplate = (data: {
+    name: string;
+    dashboardLink: string;
+}) => `
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #0d0d0d; color: #ffffff; padding: 20px; }
+        .container { max-width: 600px; margin: 0 auto; background-color: #1a1a1a; border-radius: 10px; overflow: hidden; border: 1px solid #333; }
+        .header { background-color: #000; padding: 20px; text-align: center; border-bottom: 2px solid #22c55e; }
+        .content { padding: 30px; line-height: 1.6; color: #cccccc; }
+        .button { display: inline-block; padding: 12px 24px; background-color: #22c55e; color: #000; text-decoration: none; border-radius: 5px; font-weight: bold; margin-top: 20px; }
+        .tip-box { background-color: #0d1f14; border-left: 4px solid #22c55e; padding: 15px; margin: 20px 0; border-radius: 0 5px 5px 0; }
+        .footer { text-align: center; padding: 20px; font-size: 12px; color: #666; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header"><h1>AfroPitch</h1></div>
+        <div class="content">
+            <h2>You're Verified! &#x2705;</h2>
+            <p>Hi ${data.name},</p>
+            <p>Great news — your AfroPitch curator account has been <strong>verified</strong>. Your playlists can now receive paid song submissions from artists.</p>
+
+            <div style="text-align: center;">
+                <a href="${data.dashboardLink}" class="button">Open Your Curator Dashboard</a>
+            </div>
+
+            <div class="tip-box">
+                <strong>&#x1F680; WHAT'S NEXT:</strong>
+                <ul style="margin: 10px 0; padding-left: 20px;">
+                    <li><strong>Add your playlists:</strong> make sure they're listed and looking sharp.</li>
+                    <li><strong>Receive submissions:</strong> artists will start pitching songs to you.</li>
+                    <li><strong>Review &amp; earn:</strong> listen, accept the tracks you love, and earn on every submission you review.</li>
+                </ul>
+            </div>
+        </div>
+        <div class="footer">
+            <p>&copy; ${new Date().getFullYear()} AfroPitch. Keep soaring.</p>
+        </div>
+    </div>
+</body>
+</html>
+`;
+
 export const getCuratorRejectedTemplate = (data: {
     name: string;
     dashboardLink: string;

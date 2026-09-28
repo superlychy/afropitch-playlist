@@ -1,7 +1,7 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { Resend } from 'resend';
-import { getTransactionReceiptTemplate, getSongApprovedTemplate, getSongDeclinedTemplate, getSupportTicketTemplate, getSupportTicketReceivedTemplate, getSupportTicketAdminTemplate, getCuratorApprovedTemplate, getCuratorRejectedTemplate, getMixingMessageTemplate, getMixingRefundRequestTemplate, getMixingRefundDeniedTemplate } from './templates.ts';
+import { getTransactionReceiptTemplate, getSongApprovedTemplate, getSongDeclinedTemplate, getSupportTicketTemplate, getSupportTicketReceivedTemplate, getSupportTicketAdminTemplate, getCuratorApprovedTemplate, getCuratorRejectedTemplate, getCuratorVerifiedTemplate, getMixingMessageTemplate, getMixingRefundRequestTemplate, getMixingRefundDeniedTemplate } from './templates.ts';
 
 const resend = new Resend(Deno.env.get('RESEND_API_KEY'));
 const supabase = createClient(
@@ -65,6 +65,10 @@ Deno.serve(async (req) => {
         } else if (table === 'curator_applications' && type === 'UPDATE') {
             if (record.status !== payload.old_record?.status) {
                 await handleCuratorApplicationUpdate(record);
+            }
+        } else if (table === 'profiles' && type === 'UPDATE') {
+            if (record.verification_status !== payload.old_record?.verification_status) {
+                await handleProfileVerificationUpdate(record, payload.old_record);
             }
         } else if (table === 'broadcasts' && type === 'INSERT') {
             await handleBroadcast(record);
@@ -330,7 +334,7 @@ async function handleCuratorApplicationUpdate(record: any) {
         const html = getCuratorApprovedTemplate({
             name,
             playlistLink: record.playlist_link || '',
-            signupLink: `${SITE_URL}/signup`,
+            signupLink: `${SITE_URL}/signup/curator`,
         });
         await sendEmail(email, subject, html);
     } else if (record.status === 'rejected') {
@@ -338,6 +342,29 @@ async function handleCuratorApplicationUpdate(record: any) {
         const html = getCuratorRejectedTemplate({
             name,
             dashboardLink: SITE_URL,
+        });
+        await sendEmail(email, subject, html);
+    }
+}
+async function handleProfileVerificationUpdate(record: any, old_record: any) {
+    // Registered-curator approve/reject email (parity with the external-applicant flow).
+    if (record.role !== 'curator') return;
+    const email = record.email;
+    if (!email) return;
+    const name = record.full_name || 'Curator';
+
+    if (record.verification_status === 'verified') {
+        const subject = `You're verified! Your AfroPitch curator account is live ✅`;
+        const html = getCuratorVerifiedTemplate({
+            name,
+            dashboardLink: `${SITE_URL}/dashboard/curator`,
+        });
+        await sendEmail(email, subject, html);
+    } else if (record.verification_status === 'rejected') {
+        const subject = `Update on your AfroPitch curator verification`;
+        const html = getCuratorRejectedTemplate({
+            name,
+            dashboardLink: `${SITE_URL}/dashboard/curator`,
         });
         await sendEmail(email, subject, html);
     }
