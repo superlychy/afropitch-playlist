@@ -58,23 +58,6 @@ export function AdminFeatured() {
     const [edits, setEdits] = useState<Record<string, { headline: string; story: string; slug: string }>>({});
     const [saving, setSaving] = useState<string | null>(null);
     const [uploadingPhoto, setUploadingPhoto] = useState<string | null>(null);
-    // one-off: move legacy Supabase-hosted photos to Cloudinary
-    const [migratingPhotos, setMigratingPhotos] = useState(false);
-
-    const migratePhotos = async () => {
-        setMigratingPhotos(true);
-        try {
-            const res = await fetch("/api/admin/migrate-featured-photos", { method: "POST" });
-            const j = await res.json();
-            if (!res.ok) throw new Error(j.error || "Migration failed");
-            toast(`Photos migrated to Cloudinary: ${j.migrated.length} moved, ${j.skipped.length} skipped`, "success");
-            load();
-        } catch (e) {
-            toast("Photo migration failed: " + (e instanceof Error ? e.message : "unknown error"), "error");
-        } finally {
-            setMigratingPhotos(false);
-        }
-    };
 
     const load = async () => {
         setLoading(true);
@@ -281,21 +264,9 @@ export function AdminFeatured() {
                     <h2 className="text-xl font-bold text-white">Featured Artist</h2>
                     <p className="text-sm text-gray-500">Drafts → artist questionnaire → review → publish. Published features get their own SEO page.</p>
                 </div>
-                <div className="flex gap-2">
-                    <Button
-                        variant="outline"
-                        onClick={migratePhotos}
-                        disabled={migratingPhotos}
-                        className="rounded-xl text-xs"
-                        title="Move legacy Supabase-hosted featured photos to Cloudinary"
-                    >
-                        {migratingPhotos ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : null}
-                        Migrate photos to Cloudinary
-                    </Button>
-                    <Button onClick={() => setShowNew((v) => !v)} className="bg-yellow-500 hover:bg-yellow-400 text-black rounded-xl">
-                        <Plus className="w-4 h-4 mr-1.5" /> New feature
-                    </Button>
-                </div>
+                <Button onClick={() => setShowNew((v) => !v)} className="bg-yellow-500 hover:bg-yellow-400 text-black rounded-xl">
+                    <Plus className="w-4 h-4 mr-1.5" /> New feature
+                </Button>
             </div>
 
             {showNew && (
