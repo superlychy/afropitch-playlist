@@ -20,6 +20,23 @@ function spotifyEmbedUrl(url: string): string | null {
   return `https://open.spotify.com/embed/${m[1]}/${m[2]}`;
 }
 
+// Google Drive share links play fine in an <audio> tag once converted to a
+// direct download URL, so engineers can paste a Drive link instead of
+// uploading audio anywhere (zero storage on our side).
+function toDirectAudioUrl(url: string): string {
+  try {
+    const u = new URL(url);
+    if (u.hostname.includes("drive.google.com")) {
+      const m = u.pathname.match(/\/file\/d\/([^/]+)/);
+      const id = m?.[1] || u.searchParams.get("id");
+      if (id) return `https://drive.google.com/uc?export=download&id=${id}`;
+    }
+    return url;
+  } catch {
+    return url;
+  }
+}
+
 export function MixedSongsView() {
   const [songs, setSongs] = useState<Song[]>([]);
   const [playlistEmbed, setPlaylistEmbed] = useState<string | null>(null);
@@ -98,10 +115,21 @@ export function MixedSongsView() {
                     <BadgeCheck className="w-3 h-3" /> Mixed by AfroPitch
                   </span>
                 </div>
-                {s.audio_url && (
-                  <audio controls preload="none" src={s.audio_url} className="w-full mt-3 h-9" />
-                )}
-                {s.spotify_url && (
+                {s.audio_url ? (
+                  <audio controls preload="none" src={toDirectAudioUrl(s.audio_url)} className="w-full mt-3 h-9" />
+                ) : s.spotify_url && spotifyEmbedUrl(s.spotify_url) ? (
+                  <iframe
+                    src={spotifyEmbedUrl(s.spotify_url)!}
+                    width="100%"
+                    height="80"
+                    frameBorder="0"
+                    allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+                    loading="lazy"
+                    className="w-full mt-3 rounded-md"
+                    title={`${s.title} preview`}
+                  />
+                ) : null}
+                {s.spotify_url && s.audio_url && (
                   <a
                     href={s.spotify_url}
                     target="_blank"
