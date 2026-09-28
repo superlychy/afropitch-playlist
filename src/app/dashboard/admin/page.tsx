@@ -1148,7 +1148,7 @@ export default function AdminDashboard() {
                         </div>
                     </div>
                     <div className="flex items-center gap-4">
-                        <div className="flex bg-white/5 p-1 rounded-lg border border-white/10 overflow-x-auto max-w-full scrollbar-hide">
+                        <div className="flex bg-white/5 p-1 rounded-lg border border-white/10 overflow-x-auto max-w-full scrollbar-hide justify-[safe_center]">
                             {["overview", "analytics", "users", "withdrawals", "transactions", "support", "playlists", "submissions", "mixing", "featured", "applications", "inbox", "broadcast"].map((tab) => {
                                 let count = 0;
                                 if (tab === 'withdrawals') count = pendingWithdrawalsCount;

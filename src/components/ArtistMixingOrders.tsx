@@ -9,6 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { MixPreviewPlayer } from "@/components/MixPreviewPlayer";
 import { MixingChat } from "@/components/MixingChat";
 import { AudioWaveform, Loader2, ExternalLink, CheckCircle2, MessageCircle } from "lucide-react";
+import { deleteMixPreview, isCloudinaryUrl } from "@/lib/cloudinary";
 
 interface MixingOrder {
     id: string;
@@ -63,6 +64,13 @@ export function ArtistMixingOrders() {
             .order("created_at", { ascending: false });
         if (data) setOrders(data as MixingOrder[]);
         setLoading(false);
+        // Self-healing: any completed/refunded order still holding a Cloudinary
+        // preview gets it deleted (covers cases where the accept-time call failed).
+        (data as MixingOrder[] | null)?.forEach((o) => {
+            if ((o.status === "completed" || o.status === "refunded") && isCloudinaryUrl(o.preview_link)) {
+                void deleteMixPreview(o.id);
+            }
+        });
         if (user?.id && data) {
             const ids = (data as MixingOrder[]).map((o) => o.id);
             const { data: msgs } = await supabase.from("mixing_messages").select("order_id").in("order_id", ids).neq("sender_id", user.id).eq("read_by_recipient", false);
@@ -82,7 +90,12 @@ export function ArtistMixingOrders() {
         const { error } = await supabase.rpc("accept_mix", { p_order_id: id });
         setActing(null);
         if (error) toast("Could not accept: " + error.message, "error");
-        else { toast("Mix accepted — full file unlocked!", "success"); fetchOrders(); }
+        else {
+            toast("Mix accepted — full file unlocked!", "success");
+            // Deal is over — remove the preview from Cloudinary.
+            void deleteMixPreview(id);
+            fetchOrders();
+        }
     };
 
     const requestRefund = async (id: string) => {

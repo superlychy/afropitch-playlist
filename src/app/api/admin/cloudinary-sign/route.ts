@@ -30,7 +30,9 @@ async function requireAdmin() {
  * directly to Cloudinary (audio as resource_type "video", covers as "image").
  * The API secret never leaves the server.
  *
- * Body: { resource_type: "video" | "image" }
+ * Body: { resource_type: "video" | "image", folder_key?: "showcase" | "preview" }
+ *   folder_key "preview" -> afropitch/mix-previews (mixing order previews)
+ *   default "showcase"   -> afropitch/mixed-audio / afropitch/mixed-covers
  */
 export async function POST(req: Request) {
   try {
@@ -51,8 +53,13 @@ export async function POST(req: Request) {
 
     const body = await req.json().catch(() => ({}));
     const resourceType = body.resource_type === "image" ? "image" : "video";
+    const folderKey = body.folder_key === "preview" ? "preview" : "showcase";
     const folder =
-      resourceType === "image" ? "afropitch/mixed-covers" : "afropitch/mixed-audio";
+      folderKey === "preview"
+        ? "afropitch/mix-previews"
+        : resourceType === "image"
+          ? "afropitch/mixed-covers"
+          : "afropitch/mixed-audio";
     const timestamp = Math.floor(Date.now() / 1000);
 
     // Cloudinary signature: sha1 of alphabetically-sorted params + api_secret

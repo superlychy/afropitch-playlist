@@ -1,13 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useToast } from "@/components/ui/toast";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { MixingChat } from "@/components/MixingChat";
 import { Input } from "@/components/ui/input";
-import { Loader2, ExternalLink, AudioWaveform, MessageCircle } from "lucide-react";
+import { Loader2, ExternalLink, AudioWaveform, MessageCircle, Upload } from "lucide-react";
+import { uploadToCloudinary, deleteMixPreview } from "@/lib/cloudinary";
 
 interface MixingOrder {
     id: string;
@@ -45,6 +46,8 @@ export function AdminMixingQueue() {
     const [unread, setUnread] = useState<Record<string, number>>({});
     const [previewLink, setPreviewLink] = useState("");
     const [fullLink, setFullLink] = useState("");
+    const [uploadingPreview, setUploadingPreview] = useState(false);
+    const previewInputRef = useRef<HTMLInputElement>(null);
 
     const fetchAll = useCallback(async () => {
         setLoading(true);
@@ -81,12 +84,25 @@ export function AdminMixingQueue() {
         fetchAll();
     }, [fetchAll]);
 
-    const run = async (id: string, fn: string, args: any, okMsg: string) => {
+    const run = async (id: string, fn: string, args: any, okMsg: string): Promise<boolean> => {
         setActing(id);
         const { error } = await supabase.rpc(fn, args);
         setActing(null);
-        if (error) toast("Failed: " + error.message, "error");
-        else { toast(okMsg, "success"); fetchAll(); }
+        if (error) { toast("Failed: " + error.message, "error"); return false; }
+        toast(okMsg, "success"); fetchAll(); return true;
+    };
+
+    const uploadPreview = async (file: File) => {
+        setUploadingPreview(true);
+        try {
+            const url = await uploadToCloudinary(file, { resourceType: "video", folderKey: "preview" });
+            setPreviewLink(url);
+            toast("Preview uploaded — it will be deleted from Cloudinary automatically when the deal closes.", "success");
+        } catch (e) {
+            toast("Upload failed: " + (e instanceof Error ? e.message : "unknown error"), "error");
+        } finally {
+            setUploadingPreview(false);
+        }
     };
 
     const start = (id: string) => run(id, "start_mix", { p_order_id: id }, "Mix started.");
@@ -95,14 +111,18 @@ export function AdminMixingQueue() {
         run(id, "deliver_mix", { p_order_id: id, p_preview_link: previewLink.trim(), p_full_link: fullLink.trim() || null }, "Preview sent to artist.");
         setDeliverId(null); setPreviewLink(""); setFullLink("");
     };
-    const refund = (id: string) => {
+    const refund = async (id: string) => {
         const reason = window.prompt("Refund reason (shown in the transaction record):", "admin refund") || "admin refund";
-        run(id, "refund_mix", { p_order_id: id, p_reason: reason }, "Refunded to artist wallet.");
+        const ok = await run(id, "refund_mix", { p_order_id: id, p_reason: reason }, "Refunded to artist wallet.");
+        // Deal is over — remove the preview from Cloudinary.
+        if (ok) void deleteMixPreview(id);
     };
-    const resolveRefund = (id: string, approve: boolean) => {
+    const resolveRefund = async (id: string, approve: boolean) => {
         if (approve) {
             if (!window.confirm("Approve this refund? The escrowed amount goes back to the artist's wallet.")) return;
-            run(id, "resolve_mix_refund", { p_order_id: id, p_approve: true, p_note: "refund request approved" }, "Refund approved and sent to artist wallet.");
+            const ok = await run(id, "resolve_mix_refund", { p_order_id: id, p_approve: true, p_note: "refund request approved" }, "Refund approved and sent to artist wallet.");
+            // Deal is over — remove the preview from Cloudinary.
+            if (ok) void deleteMixPreview(id);
         } else {
             const note = window.prompt("Decline reason (the artist gets an email):", "declined") || "declined";
             run(id, "resolve_mix_refund", { p_order_id: id, p_approve: false, p_note: note }, "Refund request declined.");
@@ -183,7 +203,14 @@ export function AdminMixingQueue() {
                         {deliverId === o.id && (
                             <div className="space-y-2 rounded-lg border border-white/10 bg-black/40 p-3">
                                 <p className="text-xs text-gray-400">The artist hears only the preview until they accept. Watermark tag is added automatically by the player.</p>
-                                <Input value={previewLink} onChange={(e) => setPreviewLink(e.target.value)} placeholder="Preview audio link (Drive: Anyone with the link)" className="bg-black/40 border-white/10 text-white text-xs" />
+                                <div className="flex gap-2">
+                                    <Input value={previewLink} onChange={(e) => setPreviewLink(e.target.value)} placeholder="Preview audio link (Drive: Anyone with the link)" className="bg-black/40 border-white/10 text-white text-xs flex-1 min-w-0" />
+                                    <input ref={previewInputRef} type="file" accept="audio/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) void uploadPreview(f); }} />
+                                    <Button type="button" size="sm" variant="outline" onClick={() => previewInputRef.current?.click()} disabled={uploadingPreview} className="rounded-lg text-xs shrink-0">
+                                        {uploadingPreview ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Upload className="w-3 h-3 mr-1" />} Upload
+                                    </Button>
+                                </div>
+                                <p className="text-[11px] text-gray-500">Uploaded previews live on Cloudinary and are deleted automatically when the deal closes.</p>
                                 <Input value={fullLink} onChange={(e) => setFullLink(e.target.value)} placeholder="Full mix link (released after acceptance)" className="bg-black/40 border-white/10 text-white text-xs" />
                                 <Button size="sm" disabled={acting === o.id} onClick={() => deliver(o.id)} className="bg-green-500 hover:bg-green-400 text-black rounded-lg text-xs">
                                     {acting === o.id && <Loader2 className="w-3 h-3 mr-1 animate-spin" />} Send preview to artist
