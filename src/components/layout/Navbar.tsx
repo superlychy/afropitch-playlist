@@ -2,29 +2,118 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Menu, X, Music } from "lucide-react";
+import { Menu, X, ChevronDown } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+
+type MenuGroup = {
+    name: string;
+    links: { name: string; href: string; description?: string }[];
+};
+
+const menuGroups: MenuGroup[] = [
+    {
+        name: "Discover",
+        links: [
+            { name: "Playlists", href: "/playlists", description: "Curated Afrobeat playlists" },
+            { name: "Featured", href: "/featured", description: "Artist of the week" },
+            { name: "Mixed Songs", href: "/mixed", description: "Mixed by AfroPitch" },
+        ],
+    },
+    {
+        name: "Services",
+        links: [
+            { name: "Mixing", href: "/mixing", description: "Pro mixing & mastering" },
+            { name: "Pricing", href: "/pricing", description: "Submission plans" },
+        ],
+    },
+    {
+        name: "Company",
+        links: [
+            { name: "How It Works", href: "/how-it-works", description: "Pitching, explained" },
+            { name: "Trust", href: "/trust", description: "Why artists trust us" },
+            { name: "Contact", href: "/contact", description: "Get in touch" },
+        ],
+    },
+];
+
+function DesktopDropdown({ group }: { group: MenuGroup }) {
+    const [open, setOpen] = useState(false);
+    return (
+        <div
+            className="relative"
+            onMouseEnter={() => setOpen(true)}
+            onMouseLeave={() => setOpen(false)}
+        >
+            <button
+                onClick={() => setOpen((o) => !o)}
+                className="flex items-center gap-1 text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors"
+                aria-expanded={open}
+            >
+                {group.name}
+                <ChevronDown className={`w-3.5 h-3.5 transition-transform ${open ? "rotate-180" : ""}`} />
+            </button>
+            {open && (
+                <div className="absolute left-0 top-full pt-2 w-60">
+                    <div className="rounded-xl border border-white/10 bg-[#0a0a0a]/95 backdrop-blur-md shadow-xl shadow-black/50 p-2">
+                        {group.links.map((link) => (
+                            <Link
+                                key={link.name}
+                                href={link.href}
+                                onClick={() => setOpen(false)}
+                                className="block px-3 py-2.5 rounded-lg hover:bg-white/5 transition-colors"
+                            >
+                                <div className="text-sm font-medium text-white">{link.name}</div>
+                                {link.description && (
+                                    <div className="text-xs text-gray-500">{link.description}</div>
+                                )}
+                            </Link>
+                        ))}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
+
+function MobileGroup({ group, onNavigate }: { group: MenuGroup; onNavigate: () => void }) {
+    const [open, setOpen] = useState(false);
+    return (
+        <div>
+            <button
+                onClick={() => setOpen((o) => !o)}
+                className="flex items-center justify-between w-full text-gray-300 hover:text-white px-3 py-2 rounded-md text-base font-medium"
+                aria-expanded={open}
+            >
+                {group.name}
+                <ChevronDown className={`w-4 h-4 transition-transform ${open ? "rotate-180" : ""}`} />
+            </button>
+            {open && (
+                <div className="pl-4 pb-1">
+                    {group.links.map((link) => (
+                        <Link
+                            key={link.name}
+                            href={link.href}
+                            onClick={onNavigate}
+                            className="block text-gray-400 hover:text-white px-3 py-2 rounded-md text-sm"
+                        >
+                            {link.name}
+                        </Link>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+}
 
 export function Navbar() {
     const [isOpen, setIsOpen] = useState(false);
     const { user, logout } = useAuth();
 
-    const navLinks = [
-        { name: "Home", href: "/" },
-        { name: "How It Works", href: "/how-it-works" },
-        { name: "Playlists", href: "/playlists" },
-        { name: "Pricing", href: "/pricing" },
-        { name: "Mixing", href: "/mixing" },
-        { name: "Featured", href: "/featured" },
-        { name: "Mixed Songs", href: "/mixed" },
-        { name: "Trust", href: "/trust" },
-        { name: "Contact", href: "/contact" },
-    ];
-
     const handleLogout = async () => {
         await logout();
         setIsOpen(false);
     };
+    const closeMenu = () => setIsOpen(false);
 
     return (
         <nav className="fixed w-full z-50 bg-background/80 backdrop-blur-md border-b border-white/10">
@@ -39,19 +128,19 @@ export function Navbar() {
                         </Link>
                     </div>
                     <div className="hidden md:block">
-                        <div className="ml-10 flex items-baseline space-x-4">
-                            {navLinks.map((link) => (
-                                <Link
-                                    key={link.name}
-                                    href={link.href}
-                                    className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors"
-                                >
-                                    {link.name}
-                                </Link>
+                        <div className="ml-10 flex items-center space-x-1">
+                            <Link
+                                href="/"
+                                className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors"
+                            >
+                                Home
+                            </Link>
+                            {menuGroups.map((group) => (
+                                <DesktopDropdown key={group.name} group={group} />
                             ))}
                             <Link
                                 href="/submit"
-                                className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-full text-sm font-bold transition-all"
+                                className="ml-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-full text-sm font-bold transition-all"
                             >
                                 Submit Song
                             </Link>
@@ -99,22 +188,22 @@ export function Navbar() {
 
             {/* Mobile menu */}
             {isOpen && (
-                <div className="md:hidden bg-background border-b border-white/10">
+                <div className="md:hidden bg-background border-b border-white/10 max-h-[80vh] overflow-y-auto">
                     <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
-                        {navLinks.map((link) => (
-                            <Link
-                                key={link.name}
-                                href={link.href}
-                                className="text-gray-300 hover:text-white block px-3 py-2 rounded-md text-base font-medium"
-                                onClick={() => setIsOpen(false)}
-                            >
-                                {link.name}
-                            </Link>
+                        <Link
+                            href="/"
+                            className="text-gray-300 hover:text-white block px-3 py-2 rounded-md text-base font-medium"
+                            onClick={closeMenu}
+                        >
+                            Home
+                        </Link>
+                        {menuGroups.map((group) => (
+                            <MobileGroup key={group.name} group={group} onNavigate={closeMenu} />
                         ))}
                         <Link
                             href="/submit"
                             className="mt-4 w-full text-center bg-green-600 hover:bg-green-700 text-white block px-3 py-2 rounded-md text-base font-bold"
-                            onClick={() => setIsOpen(false)}
+                            onClick={closeMenu}
                         >
                             Submit Song
                         </Link>
@@ -123,7 +212,7 @@ export function Navbar() {
                                 <Link
                                     href={`/dashboard/${user.role}`}
                                     className="mt-2 w-full text-center border border-white/10 text-white block px-3 py-2 rounded-md text-base font-bold"
-                                    onClick={() => setIsOpen(false)}
+                                    onClick={closeMenu}
                                 >
                                     Dashboard
                                 </Link>
@@ -138,7 +227,7 @@ export function Navbar() {
                             <Link
                                 href="/portal"
                                 className="mt-2 w-full text-center text-gray-300 hover:text-white block px-3 py-2 rounded-md text-base font-medium"
-                                onClick={() => setIsOpen(false)}
+                                onClick={closeMenu}
                             >
                                 Login
                             </Link>
