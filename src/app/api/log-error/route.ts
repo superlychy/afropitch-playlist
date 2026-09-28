@@ -17,6 +17,13 @@ export async function POST(req: NextRequest) {
         }
 
         const since = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+        // Benign noise: Supabase auth tabs coordinating session refresh via
+        // navigator.locks ("Lock broken by another request with the 'steal'
+        // option."). Expected with multiple tabs open — drop it server-side
+        // too, so stale cached clients can't fill the table or page anyone.
+        if (/lock .*steal|lock was stolen|lock broken/i.test(message)) {
+            return NextResponse.json({ ok: true, ignored: true });
+        }
         const { data: existing } = await supabase
             .from("client_errors")
             .select("id, error_count")

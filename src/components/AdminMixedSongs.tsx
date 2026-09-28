@@ -119,17 +119,39 @@ export function AdminMixedSongs() {
       comment: form.comment.trim() || null,
       sort_order: parseInt(form.sort_order || "0", 10),
     };
+    const old = editingId ? songs.find((s) => s.id === editingId) : null;
     const { error } = editingId
       ? await supabase.from("mixed_songs").update(payload).eq("id", editingId)
       : await supabase.from("mixed_songs").insert(payload);
-    setSaving(false);
-    if (error) toast("Could not save song: " + error.message, "error");
-    else {
-      toast(editingId ? "Song updated" : "Song added to the showcase", "success");
-      setForm(empty);
-      setEditingId(null);
-      load();
+    if (error) {
+      setSaving(false);
+      toast("Could not save song: " + error.message, "error");
+      return;
     }
+    // After a successful edit, delete any Cloudinary files that are no longer
+    // referenced (Drive links are never touched). Keeps orphans from piling up.
+    if (old) {
+      const stillUsed = [payload.audio_url, payload.cover_url];
+      const orphaned = [old.audio_url, old.cover_url].filter(
+        (u): u is string => !!u && u.includes("res.cloudinary.com") && !stillUsed.includes(u)
+      );
+      if (orphaned.length > 0) {
+        try {
+          await fetch("/api/admin/cloudinary-delete", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ urls: orphaned }),
+          });
+        } catch {
+          toast("Song updated, but old Cloudinary files could not be cleaned up.", "error");
+        }
+      }
+    }
+    setSaving(false);
+    toast(editingId ? "Song updated" : "Song added to the showcase", "success");
+    setForm(empty);
+    setEditingId(null);
+    load();
   };
 
   const toggle = async (s: Song) => {

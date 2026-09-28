@@ -201,7 +201,7 @@ export function MixedSongsView() {
                 ) : null}
                 {s.spotify_url && s.audio_url && (
                   <a
-                    href={s.spotify_url}
+                    href={`/api/go/spotify?to=${encodeURIComponent(s.spotify_url)}&kind=track&ref=${s.id}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-1 text-green-400 text-sm mt-3 hover:underline"

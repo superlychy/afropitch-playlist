@@ -143,7 +143,7 @@ export default function PlaylistPage() {
         {data.playlist.playlist_link && (
           <div className="flex justify-center md:justify-start">
             <a
-              href={data.playlist.playlist_link}
+              href={`/api/go/spotify?to=${encodeURIComponent(data.playlist.playlist_link)}&kind=playlist&ref=${data.playlist.id}`}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-full font-bold transition-all shadow-lg hover:shadow-green-500/25"
