@@ -1903,8 +1903,6 @@ export default function AdminDashboard() {
 
 
 
-            </div >
-
             {/* CHAT MODAL */}
             {
                 showChat && activeTicket && (
@@ -2404,6 +2402,7 @@ export default function AdminDashboard() {
                     </div>
                 )
             }
+            </div>
 
             {/* EDIT PLAYLIST MODAL */}
             {
