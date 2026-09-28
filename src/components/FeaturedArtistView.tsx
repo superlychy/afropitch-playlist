@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { Card, CardContent } from "@/components/ui/card";
 import { Music2 } from "lucide-react";
 
 interface Feature {
     id: string;
+    slug: string | null;
     week_start: string;
     headline: string;
     story: string;
@@ -22,7 +24,7 @@ export function FeaturedArtistView() {
         (async () => {
             const { data } = await supabase
                 .from("featured_artists")
-                .select("id, week_start, headline, story, artist_id")
+                .select("id, slug, week_start, headline, story, artist_id")
                 .eq("status", "published")
                 .order("week_start", { ascending: false })
                 .limit(1)
@@ -55,7 +57,7 @@ export function FeaturedArtistView() {
         );
     }
 
-    return (
+    const card = (
         <Card className="border-yellow-500/20 bg-gradient-to-b from-yellow-950/20 to-black/60 overflow-hidden">
             <CardContent className="pt-8 pb-8 px-6 sm:px-10 space-y-5">
                 <p className="text-xs text-yellow-500/80 uppercase tracking-widest">
@@ -74,5 +76,13 @@ export function FeaturedArtistView() {
                 )}
             </CardContent>
         </Card>
+    );
+
+    if (!feature.slug) return card;
+
+    return (
+        <Link href={`/featured/${feature.slug}`} className="block cursor-pointer">
+            {card}
+        </Link>
     );
 }
