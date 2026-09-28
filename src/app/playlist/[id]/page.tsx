@@ -33,24 +33,42 @@ export default function PlaylistPage() {
   const [data, setData] = useState<PlaylistData | null>(null);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [notFound, setNotFound] = useState(false);
 
   const fetchData = async (sync = false) => {
     if (sync) setSyncing(true);
+    else setLoading(true);
+    setLoadError(null);
+    setNotFound(false);
+    // Client-side backstop: never spin forever, even if the server stalls.
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 25000);
     try {
-      // Sync from Spotify
       const syncRes = await fetch("/api/sync-playlist", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ playlist_id: id }),
+        signal: ctrl.signal,
       });
-      const syncData = await syncRes.json();
+      const syncData = await syncRes.json().catch(() => ({}));
 
-      if (syncData.success) {
+      if (syncRes.ok && syncData.success) {
         setData(syncData);
+      } else if (syncRes.status === 404) {
+        setNotFound(true);
+      } else {
+        throw new Error(syncData.error || "Could not load playlist");
       }
     } catch (err) {
       console.error("Fetch error:", err);
+      setLoadError(
+        err instanceof Error && err.name === "AbortError"
+          ? "The request timed out. Please try again."
+          : "Could not load this playlist. Please try again."
+      );
     } finally {
+      clearTimeout(timer);
       setLoading(false);
       setSyncing(false);
     }
@@ -77,7 +95,7 @@ export default function PlaylistPage() {
     );
   }
 
-  if (!data) {
+  if (notFound) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-black">
         <div className="text-center space-y-4">
@@ -86,6 +104,26 @@ export default function PlaylistPage() {
           <Link href="/playlists" className="text-green-400 hover:underline">
             Browse Playlists
           </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (loadError || !data) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-black">
+        <div className="text-center space-y-4 max-w-sm px-6">
+          <Music className="w-12 h-12 text-gray-600 mx-auto" />
+          <h1 className="text-2xl font-bold text-white">Couldn't load this playlist</h1>
+          <p className="text-gray-400 text-sm">{loadError || "Something went wrong loading the tracks."}</p>
+          <div className="flex items-center justify-center gap-3">
+            <Button onClick={() => fetchData()} className="bg-green-600 hover:bg-green-500 text-white font-semibold">
+              <RefreshCw className="w-4 h-4 mr-2" /> Try again
+            </Button>
+            <Link href="/playlists" className="text-green-400 hover:underline text-sm">
+              Browse Playlists
+            </Link>
+          </div>
         </div>
       </div>
     );

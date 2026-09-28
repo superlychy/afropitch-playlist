@@ -6,12 +6,39 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+// Serve cached tracks when the last successful Spotify sync is this fresh.
+const CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours
+// Never let a Spotify call hang the page longer than this.
+const SPOTIFY_TIMEOUT_MS = 10_000;
+
+interface CachedTrack {
+  name: string;
+  artists: string;
+  spotify_url: string | null;
+  album_image: string | null;
+  duration: number;
+  isrc: string | null;
+}
+
+function fetchWithTimeout(url: string, init: RequestInit = {}, ms = SPOTIFY_TIMEOUT_MS) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), ms);
+  return fetch(url, { ...init, signal: ctrl.signal }).finally(() => clearTimeout(t));
+}
+
+function isFreshCache(syncedAt: string | null): boolean {
+  if (!syncedAt) return false;
+  return Date.now() - new Date(syncedAt).getTime() < CACHE_TTL_MS;
+}
+
 /**
- * POST: Sync a playlist's tracks from Spotify.
+ * POST: Get a playlist's tracks.
  * Body: { playlist_id: string }
  *
- * Fetches the playlist's Spotify link, pulls all tracks,
- * and updates the database with the latest info.
+ * Serves the cached track list instantly when fresh. Otherwise attempts a
+ * live Spotify sync (with timeouts) and refreshes the cache. Falls back to
+ * accepted submissions from the DB when Spotify is unreachable, so the
+ * page never hangs and never dead-ends.
  */
 export async function POST(req: Request) {
   try {
@@ -24,10 +51,10 @@ export async function POST(req: Request) {
       );
     }
 
-    // 1. Get playlist from DB
+    // 1. Get playlist from DB (including track cache)
     const { data: playlist, error: plErr } = await supabase
       .from("playlists")
-      .select("id, name, playlist_link, curator_id")
+      .select("id, name, description, cover_image, followers, playlist_link, curator_id, tracks_cache, tracks_synced_at")
       .eq("id", playlist_id)
       .single();
 
@@ -47,10 +74,7 @@ export async function POST(req: Request) {
       );
     }
 
-    // Parse Spotify playlist ID from URL
-    const playlistMatch = spotifyUrl.match(
-      /spotify\.com\/playlist\/([a-zA-Z0-9]+)/
-    );
+    const playlistMatch = spotifyUrl.match(/spotify\.com\/playlist\/([a-zA-Z0-9]+)/);
     if (!playlistMatch) {
       return NextResponse.json(
         { error: "Invalid Spotify playlist URL" },
@@ -59,55 +83,73 @@ export async function POST(req: Request) {
     }
     const spotifyPlaylistId = playlistMatch[1];
 
-    // 3. Get Spotify access token
+    const cachedTracks = (playlist.tracks_cache ?? []) as CachedTrack[];
+
+    // 3. Fresh cache? Serve it instantly — no Spotify call at all.
+    if (cachedTracks.length > 0 && isFreshCache(playlist.tracks_synced_at)) {
+      return NextResponse.json({
+        success: true,
+        cached: true,
+        playlist: {
+          id: playlist.id,
+          name: playlist.name,
+          description: playlist.description || "Curated AfroPitch Playlist",
+          cover_image: playlist.cover_image,
+          followers: playlist.followers || 0,
+          playlist_link: spotifyUrl,
+        },
+        tracks: cachedTracks,
+        total_tracks: cachedTracks.length,
+        synced_at: playlist.tracks_synced_at,
+      });
+    }
+
+    // 4. Stale/missing cache: try a live Spotify sync, but never hang.
     let spData: any = null;
-    let trackList: any[] = [];
-    let spError = null;
+    let trackList: CachedTrack[] = [];
+    let spError: unknown = null;
     try {
-      const tokenRes = await fetch("https://accounts.spotify.com/api/token", {
+      const tokenRes = await fetchWithTimeout("https://accounts.spotify.com/api/token", {
         method: "POST",
         headers: {
           "Content-Type": "application/x-www-form-urlencoded",
           Authorization: `Basic ${Buffer.from(
-            `${process.env.SPOTIFY_CLIENT_ID || ''}:${process.env.SPOTIFY_CLIENT_SECRET || ''}`
+            `${process.env.SPOTIFY_CLIENT_ID || ""}:${process.env.SPOTIFY_CLIENT_SECRET || ""}`
           ).toString("base64")}`,
         },
         body: "grant_type=client_credentials",
       });
 
-      if (!tokenRes.ok) {
-        throw new Error("Failed to authenticate with Spotify");
-      }
-
+      if (!tokenRes.ok) throw new Error("Failed to authenticate with Spotify");
       const { access_token } = await tokenRes.json();
 
-      // 4. Fetch playlist details from Spotify
-      const spRes = await fetch(
+      const spRes = await fetchWithTimeout(
         `https://api.spotify.com/v1/playlists/${spotifyPlaylistId}?fields=id,name,description,images,tracks(items(track(name,artists(name),external_urls(spotify),album(images),duration_ms,isrc))),followers(total)`,
         { headers: { Authorization: `Bearer ${access_token}` } }
       );
 
       if (!spRes.ok) {
-        const errText = await spRes.text();
-        throw new Error(`Spotify API error: ${errText}`);
+        const errText = await spRes.text().catch(() => "");
+        throw new Error(`Spotify API error: ${errText.slice(0, 120)}`);
       }
 
       spData = await spRes.json();
       const tracks = spData.tracks?.items || [];
-      
-      // Map tracks to submissions (match by title/artist)
+
       trackList = tracks
         .filter((item: any) => item.track)
         .map((item: any) => ({
           name: item.track.name,
           artists: item.track.artists.map((a: any) => a.name).join(", "),
-          spotify_url: item.track.external_urls?.spotify,
-          album_image: item.track.album?.images?.[0]?.url,
-          duration: item.track.duration_ms,
-          isrc: item.track.external_ids?.isrc,
+          spotify_url: item.track.external_urls?.spotify ?? null,
+          album_image: item.track.album?.images?.[0]?.url ?? null,
+          duration: item.track.duration_ms ?? 0,
+          isrc: item.track.external_ids?.isrc ?? null,
         }));
 
-      // 5. Update playlist metadata
+      if (trackList.length === 0) throw new Error("Spotify returned no tracks");
+
+      // 5. Refresh the cache + playlist metadata
       await supabase
         .from("playlists")
         .update({
@@ -115,41 +157,63 @@ export async function POST(req: Request) {
           description: spData.description || "",
           cover_image: spData.images?.[0]?.url || null,
           followers: spData.followers?.total || 0,
+          tracks_cache: trackList,
+          tracks_synced_at: new Date().toISOString(),
         })
         .eq("id", playlist_id);
-    } catch(e) {
-      console.warn("Spotify sync failed, falling back to database.", e);
+    } catch (e) {
+      console.warn("Spotify sync failed, falling back to cache/database.", e);
       spError = e;
     }
 
-    // 6. Fetch existing submissions for this playlist fallback
-    const { data: existingSubs } = await supabase
-      .from("submissions")
-      .select("id, song_title, artist_name, tracking_slug, clicks")
-      .eq("playlist_id", playlist_id)
-      .eq("status", "accepted");
+    // 6. Spotify failed: prefer a stale cache over nothing.
+    if (spError && cachedTracks.length > 0) {
+      return NextResponse.json({
+        success: true,
+        cached: true,
+        stale: true,
+        playlist: {
+          id: playlist.id,
+          name: playlist.name,
+          description: playlist.description || "Curated AfroPitch Playlist",
+          cover_image: playlist.cover_image,
+          followers: playlist.followers || 0,
+          playlist_link: spotifyUrl,
+        },
+        tracks: cachedTracks,
+        total_tracks: cachedTracks.length,
+        synced_at: playlist.tracks_synced_at,
+      });
+    }
 
-    // If Spotify failed, fallback to pulling tracks directly from our accepted submissions table
-    if(spError || trackList.length === 0) {
-      trackList = (existingSubs || []).map(sub => ({
+    // 7. No cache at all: fall back to accepted submissions from our DB.
+    if (spError || trackList.length === 0) {
+      const { data: existingSubs } = await supabase
+        .from("submissions")
+        .select("id, song_title, artist_name, tracking_slug, clicks")
+        .eq("playlist_id", playlist_id)
+        .eq("status", "accepted");
+
+      trackList = (existingSubs || []).map((sub) => ({
         name: sub.song_title,
-        artists: sub.artist_name || 'Accepted Artist',
+        artists: sub.artist_name || "Accepted Artist",
         spotify_url: sub.tracking_slug ? `/track/${sub.tracking_slug}` : spotifyUrl,
         album_image: null,
         duration: 0,
-        isrc: null
+        isrc: null,
       }));
     }
 
     // 8. Return tracks for the playlist page to display
     return NextResponse.json({
       success: true,
+      cached: false,
       playlist: {
         id: playlist.id,
         name: spData?.name || playlist.name,
         description: spData?.description || "Curated AfroPitch Playlist",
-        cover_image: spData?.images?.[0]?.url || null,
-        followers: spData?.followers?.total || 0,
+        cover_image: spData?.images?.[0]?.url || playlist.cover_image,
+        followers: spData?.followers?.total || playlist.followers || 0,
         playlist_link: spotifyUrl,
       },
       tracks: trackList,
@@ -189,7 +253,7 @@ export async function GET() {
     });
   } catch (err: any) {
     return NextResponse.json(
-      { error: err.message },
+      { error: err.message || "Internal error" },
       { status: 500 }
     );
   }
