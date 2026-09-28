@@ -18,6 +18,7 @@ import { CustomEmailForm } from "@/components/CustomEmailForm";
 import { AdminInbox } from "@/components/AdminInbox";
 import { AdminMixing } from "@/components/AdminMixing";
 import { AdminFeatured } from "@/components/AdminFeatured";
+import { usePagination, PaginationControls, FilterButtons } from "@/components/admin/Pagination";
 
 // ----------------------------------------------------------------------
 // TYPES & MOCK DATA (Ideally move to types file)
@@ -214,6 +215,66 @@ export default function AdminDashboard() {
     const [broadcastTargetRole, setBroadcastTargetRole] = useState<'all' | 'artist' | 'curator'>('all');
     const [broadcastAddressing, setBroadcastAddressing] = useState<'dear_all' | 'dear_name'>('dear_all');
     const [isSendingBroadcast, setIsSendingBroadcast] = useState(false);
+
+    // ---- Client-side list filters (data fetching is unchanged; only rendering is sliced) ----
+    const [userSearch, setUserSearch] = useState("");
+    const [userRole, setUserRole] = useState("all");
+    const [subSearch, setSubSearch] = useState("");
+    const [subStatus, setSubStatus] = useState("all");
+    const [withdrawalStatus, setWithdrawalStatus] = useState("all");
+    const [ticketSearch, setTicketSearch] = useState("");
+    const [ticketStatus, setTicketStatus] = useState("all");
+
+    // ---- Derived filtered lists + pagination (50 per page) ----
+    const filteredUsers = usersList.filter(u => {
+        const matchesRole = userRole === "all" || u.role === userRole;
+        const q = userSearch.trim().toLowerCase();
+        const matchesSearch = !q
+            || (u.full_name || "").toLowerCase().includes(q)
+            || (u.email || "").toLowerCase().includes(q);
+        return matchesRole && matchesSearch;
+    });
+    const usersPag = usePagination(filteredUsers.length);
+
+    const filteredSubmissions = allSubmissions.filter(s => {
+        const matchesStatus = subStatus === "all" || s.status === subStatus;
+        const q = subSearch.trim().toLowerCase();
+        const matchesSearch = !q
+            || (s.song_title || "").toLowerCase().includes(q)
+            || (s.artist?.full_name || "").toLowerCase().includes(q);
+        return matchesStatus && matchesSearch;
+    });
+    const submissionsPag = usePagination(filteredSubmissions.length);
+
+    const filteredWithdrawals = withdrawals.filter(w => withdrawalStatus === "all" || w.status === withdrawalStatus);
+    const withdrawalsPag = usePagination(filteredWithdrawals.length);
+
+    const filteredTickets = tickets.filter(t => {
+        const matchesStatus = ticketStatus === "all" || t.status === ticketStatus;
+        const q = ticketSearch.trim().toLowerCase();
+        const matchesSearch = !q
+            || (t.subject || "").toLowerCase().includes(q)
+            || (t.user_name || "").toLowerCase().includes(q)
+            || (t.last_message || "").toLowerCase().includes(q);
+        return matchesStatus && matchesSearch;
+    });
+    const ticketsPag = usePagination(filteredTickets.length);
+
+    const pendingSongs = playlistSongs.filter(s => s.status === "pending");
+    const pendingSongsPag = usePagination(pendingSongs.length);
+
+    const filteredPlaylists = allPlaylists
+        .filter(p => {
+            const adminIds = new Set(usersList.filter(u => u.role === "admin").map(u => u.id));
+            if (playlistFilter === "admin") return adminIds.has(p.curator_id);
+            if (playlistFilter === "user") return !adminIds.has(p.curator_id);
+            return true;
+        })
+        .filter(p => !playlistSearch || p.name.toLowerCase().includes(playlistSearch.toLowerCase()));
+    const playlistsPag = usePagination(filteredPlaylists.length);
+
+    const pendingCuratorsPag = usePagination(pendingCurators.length);
+    const curatorAppsPag = usePagination(curatorApplications.length);
 
     // Notify Admin on Login
     useEffect(() => {
@@ -1416,8 +1477,31 @@ export default function AdminDashboard() {
                             </div>
                         </CardHeader>
                         <CardContent>
+                            <div className="flex flex-col md:flex-row gap-3 md:items-center mb-3">
+                                <div className="relative flex-1 min-w-[180px]">
+                                    <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-500" />
+                                    <Input
+                                        value={userSearch}
+                                        onChange={e => { setUserSearch(e.target.value); usersPag.reset(); }}
+                                        placeholder="Search name or email..."
+                                        className="pl-9 bg-black/40 border-white/10 text-white text-sm"
+                                    />
+                                </div>
+                                <FilterButtons
+                                    options={[
+                                        { value: "all", label: "All" },
+                                        { value: "artist", label: "Artists" },
+                                        { value: "curator", label: "Curators" },
+                                        { value: "admin", label: "Admins" },
+                                    ]}
+                                    value={userRole}
+                                    onChange={setUserRole}
+                                    reset={usersPag.reset}
+                                />
+                            </div>
+                            <p className="text-xs text-gray-500 mb-2">Showing {usersPag.start}–{usersPag.end} of {filteredUsers.length} users</p>
                             <div className="space-y-4">
-                                {usersList.map(u => (
+                                {usersPag.paginate(filteredUsers).map(u => (
                                     <div key={u.id} className="flex items-center justify-between p-4 bg-white/5 rounded-lg border border-white/5">
                                         <div className="flex items-center gap-4">
                                             <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold relative ${u.role === 'artist' ? 'bg-purple-500/20 text-purple-500' : 'bg-green-500/20 text-green-500'}`}>
@@ -1454,6 +1538,7 @@ export default function AdminDashboard() {
                                     </div>
                                 ))}
                             </div>
+                            <PaginationControls page={usersPag.page} totalPages={usersPag.totalPages} start={usersPag.start} end={usersPag.end} total={filteredUsers.length} onPageChange={usersPag.setPage} />
                         </CardContent>
                     </Card>
                 )}
@@ -1510,9 +1595,23 @@ export default function AdminDashboard() {
                             <CardDescription>Manage fund payout requests from curators.</CardDescription>
                         </CardHeader>
                         <CardContent>
+                            <div className="mb-3">
+                                <FilterButtons
+                                    options={[
+                                        { value: "all", label: "All" },
+                                        { value: "pending", label: "Pending" },
+                                        { value: "approved", label: "Approved" },
+                                        { value: "rejected", label: "Rejected" },
+                                    ]}
+                                    value={withdrawalStatus}
+                                    onChange={setWithdrawalStatus}
+                                    reset={withdrawalsPag.reset}
+                                />
+                            </div>
+                            <p className="text-xs text-gray-500 mb-2">Showing {withdrawalsPag.start}–{withdrawalsPag.end} of {filteredWithdrawals.length} requests</p>
                             <div className="space-y-4">
-                                {withdrawals.length === 0 && <p className="text-gray-500 text-center py-4">No requests found.</p>}
-                                {withdrawals.map(w => (
+                                {filteredWithdrawals.length === 0 && <p className="text-gray-500 text-center py-4">No requests found.</p>}
+                                {withdrawalsPag.paginate(filteredWithdrawals).map(w => (
                                     <div key={w.id} className="flex flex-col md:flex-row md:items-center justify-between p-4 bg-white/5 rounded-lg border border-white/5 gap-4">
                                         <div className="flex items-center gap-4">
                                             <div className="bg-green-500/20 p-2 rounded-full text-green-500">
@@ -1549,6 +1648,7 @@ export default function AdminDashboard() {
                                     </div>
                                 ))}
                             </div>
+                            <PaginationControls page={withdrawalsPag.page} totalPages={withdrawalsPag.totalPages} start={withdrawalsPag.start} end={withdrawalsPag.end} total={filteredWithdrawals.length} onPageChange={withdrawalsPag.setPage} />
                         </CardContent>
                     </Card>
                 )}
@@ -1560,7 +1660,7 @@ export default function AdminDashboard() {
                             <div className="flex justify-between items-center mb-6">
                                 <div className="flex bg-black/40 p-1 rounded-lg border border-white/10">
                                     <button
-                                        onClick={() => setPlaylistTab("submissions")}
+                                        onClick={() => { setPlaylistTab("submissions"); pendingSongsPag.reset(); }}
                                         className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${playlistTab === "submissions" ? "bg-blue-600 text-white" : "text-gray-400 hover:text-white"}`}
                                     >
                                         Pending Submissions
@@ -1569,7 +1669,7 @@ export default function AdminDashboard() {
                                         )}
                                     </button>
                                     <button
-                                        onClick={() => setPlaylistTab("all")}
+                                        onClick={() => { setPlaylistTab("all"); playlistsPag.reset(); }}
                                         className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${playlistTab === "all" ? "bg-green-600 text-white" : "text-gray-400 hover:text-white"}`}
                                     >
                                         All Playlists
@@ -1596,6 +1696,9 @@ export default function AdminDashboard() {
                                             </div>
                                         </div>
 
+                                        {pendingSongs.length > 0 && (
+                                            <p className="text-xs text-gray-500 mb-2">Showing {pendingSongsPag.start}–{pendingSongsPag.end} of {pendingSongs.length} pending submissions</p>
+                                        )}
                                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                             {allPlaylists.flatMap(p =>
                                                 (playlistSongs.filter(s => s.playlist_id === p.id && s.status === 'pending') || []).map(s => ({ ...s, playlistName: p.name }))
@@ -1608,7 +1711,7 @@ export default function AdminDashboard() {
                                                     </div>
                                                 )}
 
-                                            {playlistSongs.filter(s => s.status === 'pending').map(song => (
+                                            {pendingSongsPag.paginate(pendingSongs).map(song => (
                                                 <div key={song.id} className="bg-black/40 p-4 rounded-xl border border-white/10 flex flex-col gap-3 relative group hover:border-blue-500/30 transition-colors">
                                                     <div className="flex justify-between items-start">
                                                         <div>
@@ -1639,6 +1742,7 @@ export default function AdminDashboard() {
                                                 </div>
                                             ))}
                                         </div>
+                                        <PaginationControls page={pendingSongsPag.page} totalPages={pendingSongsPag.totalPages} start={pendingSongsPag.start} end={pendingSongsPag.end} total={pendingSongs.length} onPageChange={pendingSongsPag.setPage} />
                                     </div>
                                 </div>
                             )}
@@ -1648,36 +1752,30 @@ export default function AdminDashboard() {
                             {playlistTab === "all" && (
                                 <div className="space-y-4">
                                     <div className="flex flex-col md:flex-row gap-4 justify-between bg-black/40 p-4 rounded-xl border border-white/5">
-                                        <div className="flex gap-2">
-                                            {(['all', 'admin', 'user'] as const).map(filter => (
-                                                <button
-                                                    key={filter}
-                                                    onClick={() => setPlaylistFilter(filter)}
-                                                    className={`px-3 py-1.5 rounded text-xs font-bold uppercase transition-all ${playlistFilter === filter ? 'bg-white text-black' : 'bg-white/5 text-gray-400 hover:bg-white/10'}`}
-                                                >
-                                                    {filter === 'all' ? 'All Playlists' : filter === 'admin' ? 'My Playlists' : 'Curator Playlists'}
-                                                </button>
-                                            ))}
-                                        </div>
+                                        <FilterButtons
+                                            options={[
+                                                { value: "all", label: "All Playlists" },
+                                                { value: "admin", label: "My Playlists" },
+                                                { value: "user", label: "Curator Playlists" },
+                                            ]}
+                                            value={playlistFilter}
+                                            onChange={(v) => setPlaylistFilter(v as "all" | "admin" | "user")}
+                                            reset={playlistsPag.reset}
+                                        />
                                         <div className="w-full md:w-64">
                                             <Input
                                                 placeholder="Search playlists..."
                                                 value={playlistSearch}
-                                                onChange={(e) => setPlaylistSearch(e.target.value)}
+                                                onChange={(e) => { setPlaylistSearch(e.target.value); playlistsPag.reset(); }}
                                                 className="bg-black/20 border-white/10 h-8 text-xs"
                                             />
                                         </div>
                                     </div>
 
+                                    <p className="text-xs text-gray-500">Showing {playlistsPag.start}–{playlistsPag.end} of {filteredPlaylists.length} playlists</p>
+
                                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                                        {allPlaylists
-                                            .filter(p => {
-                                                const adminIds = new Set(usersList.filter(u => u.role === 'admin').map(u => u.id));
-                                                if (playlistFilter === 'admin') return adminIds.has(p.curator_id);
-                                                if (playlistFilter === 'user') return !adminIds.has(p.curator_id);
-                                                return true;
-                                            })
-                                            .filter(p => !playlistSearch || p.name.toLowerCase().includes(playlistSearch.toLowerCase()))
+                                        {playlistsPag.paginate(filteredPlaylists)
                                             .map((playlist) => (
                                                 <Card key={playlist.id} className="bg-black/40 border-white/10 overflow-hidden hover:border-white/20 transition-all group">
                                                     <div className="h-32 bg-gradient-to-br from-gray-800 to-black relative">
@@ -1736,8 +1834,9 @@ export default function AdminDashboard() {
                                                     </CardContent>
                                                 </Card>
                                             ))}
-                                        {allPlaylists.length === 0 && <p className="text-gray-500 col-span-3 text-center py-10">No playlists found.</p>}
+                                        {filteredPlaylists.length === 0 && <p className="text-gray-500 col-span-3 text-center py-10">No playlists found.</p>}
                                     </div>
+                                    <PaginationControls page={playlistsPag.page} totalPages={playlistsPag.totalPages} start={playlistsPag.start} end={playlistsPag.end} total={filteredPlaylists.length} onPageChange={playlistsPag.setPage} />
                                 </div>
                             )}
                         </div>
@@ -1752,8 +1851,30 @@ export default function AdminDashboard() {
                                 <CardTitle className="text-white">Support Tickets</CardTitle>
                             </CardHeader>
                             <CardContent>
+                                <div className="flex flex-col md:flex-row gap-3 md:items-center mb-3">
+                                    <div className="relative flex-1 min-w-[180px]">
+                                        <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-500" />
+                                        <Input
+                                            value={ticketSearch}
+                                            onChange={e => { setTicketSearch(e.target.value); ticketsPag.reset(); }}
+                                            placeholder="Search subject, user, or message..."
+                                            className="pl-9 bg-black/40 border-white/10 text-white text-sm"
+                                        />
+                                    </div>
+                                    <FilterButtons
+                                        options={[
+                                            { value: "all", label: "All" },
+                                            { value: "open", label: "Open" },
+                                            { value: "closed", label: "Closed" },
+                                        ]}
+                                        value={ticketStatus}
+                                        onChange={setTicketStatus}
+                                        reset={ticketsPag.reset}
+                                    />
+                                </div>
+                                <p className="text-xs text-gray-500 mb-2">Showing {ticketsPag.start}–{ticketsPag.end} of {filteredTickets.length} tickets</p>
                                 <div className="space-y-4">
-                                    {tickets.map(t => (
+                                    {ticketsPag.paginate(filteredTickets).map(t => (
                                         <div key={t.id} className="flex items-center justify-between p-4 bg-white/5 rounded-lg border border-white/5 hover:bg-white/10 cursor-pointer transition-colors">
                                             <div className="flex items-center gap-4">
                                                 <div className="bg-blue-500/20 p-2 rounded-full text-blue-500">
@@ -1774,6 +1895,7 @@ export default function AdminDashboard() {
                                         </div>
                                     ))}
                                 </div>
+                                <PaginationControls page={ticketsPag.page} totalPages={ticketsPag.totalPages} start={ticketsPag.start} end={ticketsPag.end} total={filteredTickets.length} onPageChange={ticketsPag.setPage} />
                             </CardContent>
                         </Card>
                     )
@@ -1913,11 +2035,12 @@ export default function AdminDashboard() {
                                 <CardDescription>Curators who have applied via their dashboard for identity verification.</CardDescription>
                             </CardHeader>
                             <CardContent>
+                                <p className="text-xs text-gray-500 mb-2">Showing {pendingCuratorsPag.start}–{pendingCuratorsPag.end} of {pendingCurators.length}</p>
                                 <div className="space-y-4">
                                     {pendingCurators.length === 0 && (
                                         <p className="text-gray-500 text-center py-4 text-sm">No pending profile verifications.</p>
                                     )}
-                                    {pendingCurators.map(c => (
+                                    {pendingCuratorsPag.paginate(pendingCurators).map(c => (
                                         <div key={c.id} className="flex flex-col md:flex-row md:items-center justify-between p-4 bg-white/5 rounded-lg border border-white/5 gap-4">
                                             <div className="flex items-center gap-4">
                                                 <div className="w-10 h-10 rounded-full bg-yellow-500/20 text-yellow-500 flex items-center justify-center font-bold text-lg">
@@ -1959,6 +2082,7 @@ export default function AdminDashboard() {
                                         </div>
                                     ))}
                                 </div>
+                                <PaginationControls page={pendingCuratorsPag.page} totalPages={pendingCuratorsPag.totalPages} start={pendingCuratorsPag.start} end={pendingCuratorsPag.end} total={pendingCurators.length} onPageChange={pendingCuratorsPag.setPage} />
                             </CardContent>
                         </Card>
 
@@ -1975,11 +2099,12 @@ export default function AdminDashboard() {
                                 <CardDescription>Applications submitted via the public /curators/join page (not yet registered users).</CardDescription>
                             </CardHeader>
                             <CardContent>
+                                <p className="text-xs text-gray-500 mb-2">Showing {curatorAppsPag.start}–{curatorAppsPag.end} of {curatorApplications.length}</p>
                                 <div className="space-y-4">
                                     {curatorApplications.length === 0 && (
                                         <p className="text-gray-500 text-center py-4 text-sm">No external applications.</p>
                                     )}
-                                    {curatorApplications.map(app => (
+                                    {curatorAppsPag.paginate(curatorApplications).map(app => (
                                         <div key={app.id} className="flex flex-col md:flex-row md:items-center justify-between p-4 bg-white/5 rounded-lg border border-blue-500/10 gap-4">
                                             <div className="flex items-start gap-4">
                                                 <div className="w-10 h-10 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center font-bold text-lg shrink-0">
@@ -2016,6 +2141,7 @@ export default function AdminDashboard() {
                                         </div>
                                     ))}
                                 </div>
+                                <PaginationControls page={curatorAppsPag.page} totalPages={curatorAppsPag.totalPages} start={curatorAppsPag.start} end={curatorAppsPag.end} total={curatorApplications.length} onPageChange={curatorAppsPag.setPage} />
                             </CardContent>
                         </Card>
                     </div>
@@ -2191,11 +2317,35 @@ export default function AdminDashboard() {
                                 <Button variant="outline" className="border-white/10 text-white hover:bg-white/10" onClick={fetchAllSubmissions}>Refresh List</Button>
                             </CardHeader>
                             <CardContent>
+                                <div className="flex flex-col md:flex-row gap-3 md:items-center mb-3">
+                                    <div className="relative flex-1 min-w-[180px]">
+                                        <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-500" />
+                                        <Input
+                                            value={subSearch}
+                                            onChange={e => { setSubSearch(e.target.value); submissionsPag.reset(); }}
+                                            placeholder="Search song title or artist..."
+                                            className="pl-9 bg-black/40 border-white/10 text-white text-sm"
+                                        />
+                                    </div>
+                                    <FilterButtons
+                                        options={[
+                                            { value: "all", label: "All" },
+                                            { value: "pending", label: "Pending" },
+                                            { value: "accepted", label: "Accepted" },
+                                            { value: "declined", label: "Declined" },
+                                            { value: "archived", label: "Archived" },
+                                        ]}
+                                        value={subStatus}
+                                        onChange={setSubStatus}
+                                        reset={submissionsPag.reset}
+                                    />
+                                </div>
+                                <p className="text-xs text-gray-500 mb-2">Showing {submissionsPag.start}–{submissionsPag.end} of {filteredSubmissions.length} submissions</p>
                                 <div className="space-y-2">
-                                    {allSubmissions.length === 0 ? (
+                                    {filteredSubmissions.length === 0 ? (
                                         <div className="text-center py-10 text-gray-500">No submissions found.</div>
                                     ) : (
-                                        allSubmissions.map(sub => (
+                                        submissionsPag.paginate(filteredSubmissions).map(sub => (
                                             <div key={sub.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-lg bg-black/40 border border-white/5 hover:bg-white/5 transition-colors gap-4">
                                                 <div className="flex flex-col min-w-0">
                                                     <div className="flex items-center gap-2 mb-1">
@@ -2239,6 +2389,7 @@ export default function AdminDashboard() {
                                         ))
                                     )}
                                 </div>
+                                <PaginationControls page={submissionsPag.page} totalPages={submissionsPag.totalPages} start={submissionsPag.start} end={submissionsPag.end} total={filteredSubmissions.length} onPageChange={submissionsPag.setPage} />
                             </CardContent>
                         </Card>
                     </div>

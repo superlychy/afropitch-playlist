@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { ArrowDownLeft, ArrowUpRight, Search, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { pricingConfig } from "@/../config/pricing";
+import { usePagination, PaginationControls } from "@/components/admin/Pagination";
 
 interface Transaction {
     id: string;
@@ -103,6 +104,8 @@ export function TransactionsList({ userId, allowedTypes }: { userId?: string; al
         ? visibleTransactions.filter(t => t.type === 'payment').reduce((s, t) => s + Math.abs(Number(t.amount)), 0)
         : Math.abs(summary['payment']?.total || 0);
 
+    const txPag = usePagination(filtered.length);
+
     if (isLoading) return (
         <div className="flex items-center gap-2 text-gray-500 text-sm py-6">
             <RefreshCw className="w-4 h-4 animate-spin" /> Loading transactions...
@@ -135,7 +138,7 @@ export function TransactionsList({ userId, allowedTypes }: { userId?: string; al
                     <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-500" />
                     <Input
                         value={search}
-                        onChange={e => setSearch(e.target.value)}
+                        onChange={e => { setSearch(e.target.value); txPag.reset(); }}
                         placeholder="Search name, email, description..."
                         className="pl-9 bg-black/40 border-white/10 text-white text-sm"
                     />
@@ -146,7 +149,7 @@ export function TransactionsList({ userId, allowedTypes }: { userId?: string; al
                         .map(t => (
                             <button
                                 key={t}
-                                onClick={() => setTypeFilter(t)}
+                                onClick={() => { setTypeFilter(t); txPag.reset(); }}
                                 className={`px-3 py-1.5 rounded text-xs font-bold capitalize border transition-all ${typeFilter === t
                                     ? 'bg-green-600 text-white border-green-500'
                                     : 'bg-white/5 text-gray-400 border-white/10 hover:border-white/30'
@@ -169,7 +172,7 @@ export function TransactionsList({ userId, allowedTypes }: { userId?: string; al
             ) : (
                 <Card className="bg-black/40 border-white/10 max-h-[600px] overflow-y-auto">
                     <CardContent className="p-0 divide-y divide-white/5">
-                        {filtered.map((tx) => (
+                        {txPag.paginate(filtered).map((tx) => (
                             <div
                                 key={tx.id}
                                 className="p-4 flex items-center justify-between hover:bg-white/5 transition-colors gap-4"
@@ -213,7 +216,8 @@ export function TransactionsList({ userId, allowedTypes }: { userId?: string; al
                     </CardContent>
                 </Card>
             )}
-            <p className="text-xs text-gray-600 text-right">{filtered.length} of {transactions.length} transactions</p>
+            <p className="text-xs text-gray-500">Showing {txPag.start}–{txPag.end} of {filtered.length} transactions</p>
+            <PaginationControls page={txPag.page} totalPages={txPag.totalPages} start={txPag.start} end={txPag.end} total={filtered.length} onPageChange={txPag.setPage} />
         </div>
     );
 }
