@@ -1173,8 +1173,8 @@ export default function AdminDashboard() {
 
     return (
         <>
-            <div className="container mx-auto px-4 max-w-7xl py-8">
-                <div className="flex justify-between items-center mb-8">
+            <div className="container mx-auto px-4 max-w-7xl py-8 overflow-x-clip">
+                <div className="flex flex-col gap-4 lg:flex-row lg:justify-between lg:items-center mb-8">
                     <div>
                         <h1 className="text-3xl font-bold text-white flex items-center gap-3">
                             Admin Dashboard
@@ -1208,8 +1208,8 @@ export default function AdminDashboard() {
                             )}
                         </div>
                     </div>
-                    <div className="flex items-center gap-4">
-                        <div className="flex bg-white/5 p-1 rounded-lg border border-white/10 overflow-x-auto max-w-full scrollbar-hide justify-[safe_center]">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-full lg:w-auto">
+                        <div className="flex bg-white/5 p-1 rounded-lg border border-white/10 overflow-x-auto w-full lg:max-w-full scrollbar-hide justify-[safe_center]">
                             {["overview", "analytics", "users", "withdrawals", "transactions", "support", "playlists", "submissions", "mixing", "featured", "applications", "inbox", "broadcast"].map((tab) => {
                                 let count = 0;
                                 if (tab === 'withdrawals') count = pendingWithdrawalsCount;
@@ -1387,10 +1387,10 @@ export default function AdminDashboard() {
                                         {topCampaigns.length === 0 && <p className="text-gray-500 text-sm">No campaigns data available.</p>}
                                         {topCampaigns.map((c, idx) => (
                                             <div key={c.id} className="flex items-center justify-between p-3 bg-white/5 rounded border border-white/5">
-                                                <div className="flex items-center gap-4">
-                                                    <div className="font-bold text-lg text-white/20 w-6">#{idx + 1}</div>
-                                                    <div>
-                                                        <p className="font-bold text-white">{c.song_title}</p>
+                                                <div className="flex items-center gap-4 min-w-0">
+                                                    <div className="font-bold text-lg text-white/20 w-6 shrink-0">#{idx + 1}</div>
+                                                    <div className="min-w-0">
+                                                        <p className="font-bold text-white truncate">{c.song_title}</p>
                                                         <p className="text-xs text-gray-400">by {c.artist?.full_name || 'Unknown'}</p>
                                                         {c.playlist && <p className="text-[10px] text-green-400">on {c.playlist.name}</p>}
                                                     </div>
@@ -1414,10 +1414,10 @@ export default function AdminDashboard() {
                                         {topPlaylists.length === 0 && <p className="text-gray-500 text-sm">No playlist data available.</p>}
                                         {topPlaylists.map((p, idx) => (
                                             <div key={p.playlist_id} className="flex items-center justify-between p-3 bg-white/5 rounded border border-white/5">
-                                                <div className="flex items-center gap-4">
-                                                    <div className="font-bold text-lg text-white/20 w-6">#{idx + 1}</div>
-                                                    <div>
-                                                        <p className="font-bold text-white">{p.playlist_name}</p>
+                                                <div className="flex items-center gap-4 min-w-0">
+                                                    <div className="font-bold text-lg text-white/20 w-6 shrink-0">#{idx + 1}</div>
+                                                    <div className="min-w-0">
+                                                        <p className="font-bold text-white truncate">{p.playlist_name}</p>
                                                         <p className="text-xs text-gray-400">Curator: {p.curator_name || 'Unknown'}</p>
                                                     </div>
                                                 </div>
@@ -1443,14 +1443,14 @@ export default function AdminDashboard() {
                 {/* USERS MANAGEMENT */}
                 {activeTab === "users" && (
                     <Card className="bg-black/40 border-white/10">
-                        <CardHeader className="flex flex-row items-center justify-between">
+                        <CardHeader className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
                             <CardTitle className="text-white flex items-center gap-3">
                                 User Management
                                 <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-gray-500 hover:text-white" onClick={refreshUsers} title="Refresh List">
                                     <RefreshCw className={`w-4 h-4 ${isRefreshingUsers ? 'animate-spin' : ''}`} />
                                 </Button>
                             </CardTitle>
-                            <div className="flex gap-2">
+                            <div className="flex gap-2 flex-wrap">
                                 <Button size="sm" className="bg-blue-600 text-white hover:bg-blue-700" onClick={() => setShowCustomEmail(true)}>
                                     <Send className="w-4 h-4 mr-2" /> Send Email
                                 </Button>
@@ -1502,28 +1502,28 @@ export default function AdminDashboard() {
                             <p className="text-xs text-gray-500 mb-2">Showing {usersPag.start}–{usersPag.end} of {filteredUsers.length} users</p>
                             <div className="space-y-4">
                                 {usersPag.paginate(filteredUsers).map(u => (
-                                    <div key={u.id} className="flex items-center justify-between p-4 bg-white/5 rounded-lg border border-white/5">
-                                        <div className="flex items-center gap-4">
-                                            <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold relative ${u.role === 'artist' ? 'bg-purple-500/20 text-purple-500' : 'bg-green-500/20 text-green-500'}`}>
+                                    <div key={u.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 bg-white/5 rounded-lg border border-white/5">
+                                        <div className="flex items-center gap-4 min-w-0 w-full sm:w-auto">
+                                            <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold relative shrink-0 ${u.role === 'artist' ? 'bg-purple-500/20 text-purple-500' : 'bg-green-500/20 text-green-500'}`}>
                                                 {u.full_name[0]}
                                                 {u.is_online && (
                                                     <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-zinc-900 rounded-full" title="Online"></span>
                                                 )}
                                             </div>
                                             <div>
-                                                <p className="font-bold text-white flex items-center gap-2">
-                                                    {u.full_name}
+                                                <p className="font-bold text-white flex items-center gap-2 flex-wrap">
+                                                    <span className="truncate">{u.full_name}</span>
                                                     <span className={`text-[10px] px-2 py-0.5 rounded-full border ${u.role === 'artist' ? 'border-purple-500 text-purple-500' : 'border-green-500 text-green-500'}`}>{u.role}</span>
                                                     {u.is_blocked && <span className="text-[10px] bg-red-500 text-white px-2 rounded">BLOCKED</span>}
                                                 </p>
-                                                <p className="text-sm text-gray-500">{u.email}</p>
+                                                <p className="text-sm text-gray-500 truncate">{u.email}</p>
                                                 <div className="mt-1 flex items-center gap-2">
                                                     <span className="text-xs text-gray-400">Bal:</span>
                                                     <span className="text-sm font-bold text-green-400">{pricingConfig.currency}{(u.balance || 0).toLocaleString()}</span>
                                                 </div>
                                             </div>
                                         </div>
-                                        <div className="flex items-center gap-2">
+                                        <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
                                             <Button size="icon" variant="ghost" className="h-8 w-8 hover:bg-white/10" onClick={() => setShowTopUp(u)} title="Top Up Balance">
                                                 <DollarSign className="w-4 h-4 text-green-400" />
                                             </Button>
@@ -1613,8 +1613,8 @@ export default function AdminDashboard() {
                                 {filteredWithdrawals.length === 0 && <p className="text-gray-500 text-center py-4">No requests found.</p>}
                                 {withdrawalsPag.paginate(filteredWithdrawals).map(w => (
                                     <div key={w.id} className="flex flex-col md:flex-row md:items-center justify-between p-4 bg-white/5 rounded-lg border border-white/5 gap-4">
-                                        <div className="flex items-center gap-4">
-                                            <div className="bg-green-500/20 p-2 rounded-full text-green-500">
+                                        <div className="flex items-center gap-4 min-w-0 w-full md:w-auto">
+                                            <div className="bg-green-500/20 p-2 rounded-full text-green-500 shrink-0">
                                                 <DollarSign className="w-6 h-6" />
                                             </div>
                                             <div>
@@ -1625,7 +1625,7 @@ export default function AdminDashboard() {
                                                     </span>
                                                 </p>
                                                 <p className="text-sm text-gray-400">Requested by <span className="text-white">{w.user_name}</span> • {w.date}</p>
-                                                <p className="text-xs text-gray-500 mt-1 font-mono">{w.bank_details}</p>
+                                                <p className="text-xs text-gray-500 mt-1 font-mono break-all">{w.bank_details}</p>
                                                 {w.reason && <p className="text-xs text-gray-400 mt-1"><span className="text-gray-500">Reason:</span> {w.reason}</p>}
                                             </div>
                                         </div>
@@ -1657,8 +1657,8 @@ export default function AdminDashboard() {
                 {
                     activeTab === "playlists" && (
                         <div className="space-y-6">
-                            <div className="flex justify-between items-center mb-6">
-                                <div className="flex bg-black/40 p-1 rounded-lg border border-white/10">
+                            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6">
+                                <div className="flex bg-black/40 p-1 rounded-lg border border-white/10 overflow-x-auto">
                                     <button
                                         onClick={() => { setPlaylistTab("submissions"); pendingSongsPag.reset(); }}
                                         className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${playlistTab === "submissions" ? "bg-blue-600 text-white" : "text-gray-400 hover:text-white"}`}
@@ -1875,18 +1875,18 @@ export default function AdminDashboard() {
                                 <p className="text-xs text-gray-500 mb-2">Showing {ticketsPag.start}–{ticketsPag.end} of {filteredTickets.length} tickets</p>
                                 <div className="space-y-4">
                                     {ticketsPag.paginate(filteredTickets).map(t => (
-                                        <div key={t.id} className="flex items-center justify-between p-4 bg-white/5 rounded-lg border border-white/5 hover:bg-white/10 cursor-pointer transition-colors">
-                                            <div className="flex items-center gap-4">
-                                                <div className="bg-blue-500/20 p-2 rounded-full text-blue-500">
+                                        <div key={t.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 bg-white/5 rounded-lg border border-white/5 hover:bg-white/10 cursor-pointer transition-colors">
+                                            <div className="flex items-center gap-4 min-w-0 w-full sm:w-auto">
+                                                <div className="bg-blue-500/20 p-2 rounded-full text-blue-500 shrink-0">
                                                     <MessageSquare className="w-6 h-6" />
                                                 </div>
                                                 <div>
-                                                    <p className="font-bold text-white">{t.subject}</p>
+                                                    <p className="font-bold text-white truncate">{t.subject}</p>
                                                     <p className="text-sm text-gray-400">From: {t.user_name} • {t.date}</p>
                                                     <p className="text-xs text-gray-500 mt-1 line-clamp-1">{t.last_message}</p>
                                                 </div>
                                             </div>
-                                            <div className="flex items-center gap-3">
+                                            <div className="flex items-center gap-3 w-full sm:w-auto justify-start sm:justify-end">
                                                 <span className={`text-[10px] px-2 py-1 rounded-full uppercase ${t.status === 'open' ? 'bg-green-500 text-white' : 'bg-gray-500 text-white'}`}>
                                                     {t.status}
                                                 </span>
@@ -1907,7 +1907,7 @@ export default function AdminDashboard() {
             {
                 showChat && activeTicket && (
                     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in">
-                        <div className="bg-zinc-900 border border-white/10 w-full max-w-2xl h-[600px] flex flex-col rounded-xl shadow-2xl">
+                        <div className="bg-zinc-900 border border-white/10 w-full max-w-2xl mx-4 h-[85vh] max-h-[600px] flex flex-col rounded-xl shadow-2xl">
                             {/* Header */}
                             <div className="p-4 border-b border-white/10 flex justify-between items-center bg-zinc-900 rounded-t-xl">
                                 <div>
@@ -1975,7 +1975,7 @@ export default function AdminDashboard() {
             {
                 showAddUser && (
                     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in">
-                        <div className="bg-zinc-900 border border-white/10 w-full max-w-md p-6 rounded-lg space-y-4">
+                        <div className="bg-zinc-900 border border-white/10 w-full max-w-md mx-4 p-6 rounded-lg space-y-4 max-h-[90vh] overflow-y-auto">
                             <h3 className="text-xl font-bold text-white">Add New User</h3>
                             <p className="text-sm text-gray-400">Create a login for a new user. They can sign in immediately.</p>
 
@@ -2049,8 +2049,8 @@ export default function AdminDashboard() {
                                                         {c.full_name}
                                                         <span className="text-[10px] bg-yellow-500/20 text-yellow-500 px-2 rounded-full uppercase">Pending</span>
                                                     </p>
-                                                    <p className="text-sm text-gray-500">{c.email}</p>
-                                                    <div className="mt-1 text-xs text-gray-400">
+                                                    <p className="text-sm text-gray-500 break-all">{c.email}</p>
+                                                    <div className="mt-1 text-xs text-gray-400 break-all">
                                                         Bank: {c.bank_name || 'Not set'} • Acc: {c.account_number || 'N/A'}
                                                         {c.nin_number && <span className="ml-2">• NIN: {c.nin_number}</span>}
                                                     </div>
@@ -2225,9 +2225,9 @@ export default function AdminDashboard() {
                                 </div>
 
                                 <div className="space-y-2">
-                                    <div className="flex justify-between items-center bg-zinc-900 border border-white/10 rounded-t-lg p-2 border-b-0">
+                                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 bg-zinc-900 border border-white/10 rounded-t-lg p-2 border-b-0">
                                         <label className="text-xs font-bold text-gray-400 px-2">Message Content (HTML)</label>
-                                        <div className="flex gap-1">
+                                        <div className="flex gap-1 flex-wrap">
                                             {/* Simple HTML Toolbar */}
                                             {[
                                                 { label: 'B', tag: '<b>', close: '</b>' },
@@ -2408,7 +2408,7 @@ export default function AdminDashboard() {
             {
                 showEditPlaylist && adminEditingPlaylist && (
                     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in">
-                        <div className="bg-zinc-900 border border-white/10 w-full max-w-md p-6 rounded-lg space-y-4">
+                        <div className="bg-zinc-900 border border-white/10 w-full max-w-md mx-4 p-6 rounded-lg space-y-4 max-h-[90vh] overflow-y-auto">
                             <h3 className="text-xl font-bold text-white">Edit Playlist</h3>
                             <div className="space-y-3">
                                 <div>
