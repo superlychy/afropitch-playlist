@@ -1,11 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useState, type ChangeEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/components/ui/toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Trash2, Loader2, Plus, Music2 } from "lucide-react";
+import { Trash2, Loader2, Plus, Music2, Upload } from "lucide-react";
 
 type Song = {
   id: string;
@@ -28,6 +28,9 @@ export function AdminMixedSongs() {
   const [saving, setSaving] = useState(false);
   const [playlistUrl, setPlaylistUrl] = useState("");
   const [savingPlaylist, setSavingPlaylist] = useState(false);
+  const [uploading, setUploading] = useState<"audio" | "cover" | null>(null);
+  const audioInputRef = useRef<HTMLInputElement>(null);
+  const coverInputRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
     const { data } = await supabase.from("mixed_songs").select("*").order("sort_order").order("created_at", { ascending: false });
@@ -41,6 +44,44 @@ export function AdminMixedSongs() {
 
   const set = (k: string) => (e: ChangeEvent<HTMLInputElement>) =>
     setForm((f) => ({ ...f, [k]: e.target.value }));
+
+  // Upload a file straight to Cloudinary (signed server-side), then fill the field.
+  const uploadFile = async (file: File, kind: "audio" | "cover") => {
+    setUploading(kind);
+    try {
+      const signRes = await fetch("/api/admin/cloudinary-sign", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ resource_type: kind === "cover" ? "image" : "video" }),
+      });
+      const sign = await signRes.json();
+      if (!signRes.ok) throw new Error(sign.error || "Could not get upload signature");
+
+      const data = new FormData();
+      data.append("file", file);
+      data.append("api_key", sign.api_key);
+      data.append("timestamp", String(sign.timestamp));
+      data.append("signature", sign.signature);
+      data.append("folder", sign.folder);
+
+      const upRes = await fetch(sign.upload_url, { method: "POST", body: data });
+      const up = await upRes.json();
+      if (!upRes.ok) throw new Error(up.error?.message || "Upload failed");
+
+      setForm((f) => ({ ...f, [kind === "cover" ? "cover_url" : "audio_url"]: up.secure_url }));
+      toast(kind === "cover" ? "Cover uploaded" : "Audio uploaded — full track will stream with the AfroPitch voice tag", "success");
+    } catch (e) {
+      toast("Upload failed: " + (e instanceof Error ? e.message : "unknown error"), "error");
+    } finally {
+      setUploading(null);
+    }
+  };
+
+  const onFilePicked = (kind: "audio" | "cover") => (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (file) void uploadFile(file, kind);
+  };
 
   const add = async () => {
     if (!form.title.trim() || !form.artist_name.trim()) {
@@ -99,8 +140,20 @@ export function AdminMixedSongs() {
           <CardContent className="p-4 grid grid-cols-1 md:grid-cols-2 gap-3">
             <input value={form.title} onChange={set("title")} placeholder="Song title *" className="rounded-xl bg-black/30 border border-white/10 px-3 py-2 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-green-500/50" />
             <input value={form.artist_name} onChange={set("artist_name")} placeholder="Artist name *" className="rounded-xl bg-black/30 border border-white/10 px-3 py-2 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-green-500/50" />
-            <input value={form.audio_url} onChange={set("audio_url")} placeholder="Audio URL (mp3 or Google Drive link…)" className="rounded-xl bg-black/30 border border-white/10 px-3 py-2 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-green-500/50" />
-            <input value={form.cover_url} onChange={set("cover_url")} placeholder="Cover image URL" className="rounded-xl bg-black/30 border border-white/10 px-3 py-2 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-green-500/50" />
+            <div className="flex gap-2">
+              <input value={form.audio_url} onChange={set("audio_url")} placeholder="Audio URL (mp3 or Google Drive link…)" className="flex-1 min-w-0 rounded-xl bg-black/30 border border-white/10 px-3 py-2 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-green-500/50" />
+              <input ref={audioInputRef} type="file" accept="audio/*" className="hidden" onChange={onFilePicked("audio")} />
+              <Button type="button" variant="outline" size="sm" onClick={() => audioInputRef.current?.click()} disabled={uploading !== null} className="rounded-xl shrink-0">
+                {uploading === "audio" ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : <Upload className="w-3.5 h-3.5 mr-1" />} Upload MP3
+              </Button>
+            </div>
+            <div className="flex gap-2">
+              <input value={form.cover_url} onChange={set("cover_url")} placeholder="Cover image URL" className="flex-1 min-w-0 rounded-xl bg-black/30 border border-white/10 px-3 py-2 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-green-500/50" />
+              <input ref={coverInputRef} type="file" accept="image/*" className="hidden" onChange={onFilePicked("cover")} />
+              <Button type="button" variant="outline" size="sm" onClick={() => coverInputRef.current?.click()} disabled={uploading !== null} className="rounded-xl shrink-0">
+                {uploading === "cover" ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : <Upload className="w-3.5 h-3.5 mr-1" />} Upload
+              </Button>
+            </div>
             <input value={form.spotify_url} onChange={set("spotify_url")} placeholder="Spotify track URL (optional)" className="rounded-xl bg-black/30 border border-white/10 px-3 py-2 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-green-500/50" />
             <input value={form.sort_order} onChange={set("sort_order")} placeholder="Order (0 = first)" type="number" className="rounded-xl bg-black/30 border border-white/10 px-3 py-2 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-green-500/50" />
             <div className="md:col-span-2">
