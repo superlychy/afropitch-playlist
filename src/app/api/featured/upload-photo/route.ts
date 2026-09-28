@@ -1,13 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createHash } from "crypto";
 import { createClient } from "@/lib/supabase-server";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
 
-// Uploads a Featured Artist photo to the `featured-photos` bucket.
+// Uploads a Featured Artist photo to Cloudinary (folder `afropitch/featured-photos`).
+// Only text lives in Supabase; all media goes to Cloudinary.
 // Two authorized paths:
 //  1. Artist: multipart field `token` = their questionnaire token.
 //  2. Admin: multipart field `feature_id` + a logged-in admin session.
-// The photo is stored at featured-photos/<feature_id>/photo.<ext> (upsert),
-// and featured_artists.photo_url is updated to the public URL.
+// The photo uses public_id = the feature id, so re-uploads overwrite it,
+// and featured_artists.photo_url is updated to the Cloudinary URL.
 
 const ALLOWED_MIME: Record<string, string> = {
     "image/jpeg": "jpg",
@@ -78,18 +80,41 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ ok: false, error: "Missing credentials." }, { status: 400 });
         }
 
-        const path = `${featureId}/photo.${ext}`;
-        const bytes = Buffer.from(await file.arrayBuffer());
-        const { error: uploadError } = await admin.storage
-            .from("featured-photos")
-            .upload(path, bytes, { upsert: true, contentType: file.type });
-        if (uploadError) {
-            return NextResponse.json({ ok: false, error: "Upload failed. Please try again." }, { status: 500 });
+        const cloudName = process.env.CLOUDINARY_CLOUD_NAME || "dhjsvoorl";
+        const apiKey = process.env.CLOUDINARY_API_KEY;
+        const apiSecret = process.env.CLOUDINARY_API_SECRET;
+        if (!apiKey || !apiSecret) {
+            return NextResponse.json({ ok: false, error: "Photo uploads are not configured. Please try again later." }, { status: 503 });
         }
 
-        const { data: urlData } = admin.storage.from("featured-photos").getPublicUrl(path);
+        // Server-side signed upload to Cloudinary; the secret never leaves the server.
+        const timestamp = Math.floor(Date.now() / 1000);
+        const folder = "afropitch/featured-photos";
+        const publicId = featureId as string;
+        const toSign = `folder=${folder}&invalidate=true&overwrite=true&public_id=${publicId}&timestamp=${timestamp}${apiSecret}`;
+        const signature = createHash("sha1").update(toSign).digest("hex");
+
+        const bytes = Buffer.from(await file.arrayBuffer());
+        const data = new FormData();
+        data.append("file", new Blob([bytes], { type: file.type }), `photo.${ext}`);
+        data.append("api_key", apiKey);
+        data.append("timestamp", String(timestamp));
+        data.append("signature", signature);
+        data.append("folder", folder);
+        data.append("public_id", publicId);
+        data.append("overwrite", "true");
+        data.append("invalidate", "true");
+
+        const upRes = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+            method: "POST",
+            body: data,
+        });
+        const up = await upRes.json().catch(() => ({}));
+        if (!upRes.ok || !up.secure_url) {
+            return NextResponse.json({ ok: false, error: "Upload failed. Please try again." }, { status: 500 });
+        }
         // Cache-bust so a replaced photo shows immediately.
-        const publicUrl = `${urlData.publicUrl}?v=${Date.now()}`;
+        const publicUrl = `${up.secure_url}?v=${Date.now()}`;
 
         const { error: updateError } = await admin
             .from("featured_artists")

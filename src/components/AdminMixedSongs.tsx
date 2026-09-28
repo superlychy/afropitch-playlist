@@ -14,13 +14,14 @@ type Song = {
   cover_url: string | null;
   audio_url: string | null;
   spotify_url: string | null;
+  comment: string | null;
   sort_order: number;
   active: boolean;
 };
 
 const FALLBACK_COVER = "/mixed-fallback-cover.png";
 
-const empty = { title: "", artist_name: "", cover_url: "", audio_url: "", spotify_url: "", sort_order: "0" };
+const empty = { title: "", artist_name: "", cover_url: "", audio_url: "", spotify_url: "", comment: "", sort_order: "0" };
 
 export function AdminMixedSongs() {
   const { toast } = useToast();
@@ -29,8 +30,6 @@ export function AdminMixedSongs() {
   const [form, setForm] = useState(empty);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [playlistUrl, setPlaylistUrl] = useState("");
-  const [savingPlaylist, setSavingPlaylist] = useState(false);
   const [uploading, setUploading] = useState<"audio" | "cover" | null>(null);
   const audioInputRef = useRef<HTMLInputElement>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
@@ -38,14 +37,15 @@ export function AdminMixedSongs() {
   const load = useCallback(async () => {
     const { data } = await supabase.from("mixed_songs").select("*").order("sort_order").order("created_at", { ascending: false });
     setSongs((data ?? []) as Song[]);
-    const { data: setting } = await supabase.from("site_settings").select("value").eq("key", "mixed_playlist_url").single();
-    setPlaylistUrl(setting?.value ?? "");
     setLoading(false);
   }, []);
 
   useEffect(() => { load(); }, [load]);
 
   const set = (k: string) => (e: ChangeEvent<HTMLInputElement>) =>
+    setForm((f) => ({ ...f, [k]: e.target.value }));
+
+  const setArea = (k: string) => (e: ChangeEvent<HTMLTextAreaElement>) =>
     setForm((f) => ({ ...f, [k]: e.target.value }));
 
   // Upload a file straight to Cloudinary (signed server-side), then fill the field.
@@ -93,6 +93,7 @@ export function AdminMixedSongs() {
       cover_url: s.cover_url ?? "",
       audio_url: s.audio_url ?? "",
       spotify_url: s.spotify_url ?? "",
+      comment: s.comment ?? "",
       sort_order: String(s.sort_order),
     });
     setEditingId(s.id);
@@ -115,6 +116,7 @@ export function AdminMixedSongs() {
       cover_url: form.cover_url.trim() || null,
       audio_url: form.audio_url.trim() || null,
       spotify_url: form.spotify_url.trim() || null,
+      comment: form.comment.trim() || null,
       sort_order: parseInt(form.sort_order || "0", 10),
     };
     const { error } = editingId
@@ -163,17 +165,6 @@ export function AdminMixedSongs() {
     load();
   };
 
-  const savePlaylist = async () => {
-    setSavingPlaylist(true);
-    const { error } = await supabase.from("site_settings").upsert(
-      { key: "mixed_playlist_url", value: playlistUrl.trim() },
-      { onConflict: "key" }
-    );
-    setSavingPlaylist(false);
-    if (error) toast("Could not save playlist: " + error.message, "error");
-    else toast("Playlist link saved", "success");
-  };
-
   if (loading) return <div className="flex items-center gap-2 text-gray-500 text-sm"><Loader2 className="w-4 h-4 animate-spin" /> Loading showcase…</div>;
 
   return (
@@ -207,6 +198,7 @@ export function AdminMixedSongs() {
             </div>
             <input value={form.spotify_url} onChange={set("spotify_url")} placeholder="Spotify track URL (optional)" className="rounded-xl bg-black/30 border border-white/10 px-3 py-2 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-green-500/50" />
             <input value={form.sort_order} onChange={set("sort_order")} placeholder="Order (0 = first)" type="number" className="rounded-xl bg-black/30 border border-white/10 px-3 py-2 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-green-500/50" />
+            <textarea value={form.comment} onChange={setArea("comment")} placeholder="Comment — producer, contributors, credits… (optional)" rows={2} className="md:col-span-2 rounded-xl bg-black/30 border border-white/10 px-3 py-2 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-green-500/50 resize-y" />
             <div className="md:col-span-2 flex gap-2">
               <Button onClick={save} disabled={saving} className="bg-green-500 hover:bg-green-400 text-black rounded-xl">
                 {saving ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : editingId ? <Pencil className="w-4 h-4 mr-1" /> : <Plus className="w-4 h-4 mr-1" />} {editingId ? "Save changes" : "Add song"}
@@ -242,22 +234,6 @@ export function AdminMixedSongs() {
               </Button>
             </div>
           ))}
-        </div>
-      </div>
-
-      <div>
-        <h3 className="text-white font-semibold mb-1">Spotify playlist</h3>
-        <p className="text-gray-500 text-sm mb-4">Paste the Spotify playlist URL to embed it at the top of /mixed.</p>
-        <div className="flex gap-2">
-          <input
-            value={playlistUrl}
-            onChange={(e) => setPlaylistUrl(e.target.value)}
-            placeholder="https://open.spotify.com/playlist/…"
-            className="flex-1 rounded-xl bg-black/30 border border-white/10 px-3 py-2 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-green-500/50"
-          />
-          <Button onClick={savePlaylist} disabled={savingPlaylist} className="bg-green-500 hover:bg-green-400 text-black rounded-xl">
-            {savingPlaylist ? <Loader2 className="w-4 h-4 animate-spin" /> : "Save"}
-          </Button>
         </div>
       </div>
     </div>

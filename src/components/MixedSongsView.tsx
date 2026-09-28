@@ -12,6 +12,7 @@ type Song = {
   cover_url: string | null;
   audio_url: string | null;
   spotify_url: string | null;
+  comment: string | null;
 };
 
 const FALLBACK_COVER = "/mixed-fallback-cover.png";
@@ -131,24 +132,17 @@ function WatermarkedAudio({ src, tagSrc = "/mixed-tag.mp3" }: { src: string; tag
 
 export function MixedSongsView() {
   const [songs, setSongs] = useState<Song[]>([]);
-  const [playlistEmbed, setPlaylistEmbed] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     (async () => {
       const { data } = await supabase
         .from("mixed_songs")
-        .select("id, title, artist_name, cover_url, audio_url, spotify_url")
+        .select("id, title, artist_name, cover_url, audio_url, spotify_url, comment")
         .eq("active", true)
         .order("sort_order")
         .order("created_at", { ascending: false });
       setSongs((data ?? []) as Song[]);
-      const { data: setting } = await supabase
-        .from("site_settings")
-        .select("value")
-        .eq("key", "mixed_playlist_url")
-        .single();
-      if (setting?.value) setPlaylistEmbed(spotifyEmbedUrl(setting.value));
       setLoading(false);
     })();
   }, []);
@@ -163,21 +157,6 @@ export function MixedSongsView() {
 
   return (
     <div>
-      {playlistEmbed && (
-        <div className="max-w-3xl mx-auto mb-14">
-          <iframe
-            src={playlistEmbed}
-            width="100%"
-            height="352"
-            frameBorder="0"
-            allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-            loading="lazy"
-            className="rounded-2xl"
-            title="Mixed by AfroPitch playlist"
-          />
-        </div>
-      )}
-
       {songs.length === 0 ? (
         <div className="text-center py-16 max-w-xl mx-auto">
           <Music2 className="w-10 h-10 text-gray-600 mx-auto mb-4" />
@@ -198,6 +177,9 @@ export function MixedSongsView() {
                   <div className="flex-1 min-w-0">
                     <div className="text-white font-semibold truncate">{s.title}</div>
                     <div className="text-gray-400 text-sm truncate">{s.artist_name}</div>
+                    {s.comment && (
+                      <div className="text-gray-500 text-xs mt-1 line-clamp-3">{s.comment}</div>
+                    )}
                     <span className="inline-flex items-center gap-1 text-[10px] text-green-300 bg-green-950/50 border border-green-500/30 rounded-full px-2 py-0.5 mt-1.5">
                       <BadgeCheck className="w-3 h-3" /> Mixed by AfroPitch
                     </span>
