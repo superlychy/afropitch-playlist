@@ -14,6 +14,8 @@ type Song = {
   spotify_url: string | null;
 };
 
+const FALLBACK_COVER = "/mixed-fallback-cover.png";
+
 function spotifyEmbedUrl(url: string): string | null {
   const m = url.match(/open\.spotify\.com\/(playlist|album|track)\/([a-zA-Z0-9]+)/);
   if (!m) return null;
@@ -190,12 +192,8 @@ export function MixedSongsView() {
             <Card key={s.id} className="bg-white/5 border-white/10 rounded-2xl overflow-hidden">
               <CardContent className="p-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-[72px] h-[72px] rounded-xl overflow-hidden bg-gradient-to-br from-green-500/30 to-orange-500/30 flex items-center justify-center shrink-0">
-                    {s.cover_url ? (
-                      <img src={s.cover_url} alt={`${s.title} cover`} className="w-full h-full object-cover" />
-                    ) : (
-                      <Music2 className="w-7 h-7 text-green-300/70" />
-                    )}
+                  <div className="w-[72px] h-[72px] rounded-xl overflow-hidden bg-black/40 shrink-0">
+                    <img src={s.cover_url || FALLBACK_COVER} alt={`${s.title} cover`} className="w-full h-full object-cover" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="text-white font-semibold truncate">{s.title}</div>

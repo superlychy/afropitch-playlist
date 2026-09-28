@@ -5,7 +5,7 @@ import { supabase } from "@/lib/supabase";
 import { useToast } from "@/components/ui/toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Trash2, Loader2, Plus, Music2, Upload } from "lucide-react";
+import { Trash2, Loader2, Plus, Pencil, Upload } from "lucide-react";
 
 type Song = {
   id: string;
@@ -18,6 +18,8 @@ type Song = {
   active: boolean;
 };
 
+const FALLBACK_COVER = "/mixed-fallback-cover.png";
+
 const empty = { title: "", artist_name: "", cover_url: "", audio_url: "", spotify_url: "", sort_order: "0" };
 
 export function AdminMixedSongs() {
@@ -25,6 +27,7 @@ export function AdminMixedSongs() {
   const [songs, setSongs] = useState<Song[]>([]);
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState(empty);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [playlistUrl, setPlaylistUrl] = useState("");
   const [savingPlaylist, setSavingPlaylist] = useState(false);
@@ -83,25 +86,46 @@ export function AdminMixedSongs() {
     if (file) void uploadFile(file, kind);
   };
 
-  const add = async () => {
+  const startEdit = (s: Song) => {
+    setForm({
+      title: s.title,
+      artist_name: s.artist_name,
+      cover_url: s.cover_url ?? "",
+      audio_url: s.audio_url ?? "",
+      spotify_url: s.spotify_url ?? "",
+      sort_order: String(s.sort_order),
+    });
+    setEditingId(s.id);
+  };
+
+  const cancelEdit = () => {
+    setForm(empty);
+    setEditingId(null);
+  };
+
+  const save = async () => {
     if (!form.title.trim() || !form.artist_name.trim()) {
       toast("Title and artist are required", "error");
       return;
     }
     setSaving(true);
-    const { error } = await supabase.from("mixed_songs").insert({
+    const payload = {
       title: form.title.trim(),
       artist_name: form.artist_name.trim(),
       cover_url: form.cover_url.trim() || null,
       audio_url: form.audio_url.trim() || null,
       spotify_url: form.spotify_url.trim() || null,
       sort_order: parseInt(form.sort_order || "0", 10),
-    });
+    };
+    const { error } = editingId
+      ? await supabase.from("mixed_songs").update(payload).eq("id", editingId)
+      : await supabase.from("mixed_songs").insert(payload);
     setSaving(false);
-    if (error) toast("Could not add song: " + error.message, "error");
+    if (error) toast("Could not save song: " + error.message, "error");
     else {
-      toast("Song added to the showcase", "success");
+      toast(editingId ? "Song updated" : "Song added to the showcase", "success");
       setForm(empty);
+      setEditingId(null);
       load();
     }
   };
@@ -113,7 +137,29 @@ export function AdminMixedSongs() {
 
   const remove = async (s: Song) => {
     if (!confirm(`Remove "${s.title}" from the showcase?`)) return;
+    // Clean up the Cloudinary files too (Drive links are left alone —
+    // AfroPitch never deletes Google Drive files).
+    const urls = [s.audio_url, s.cover_url].filter(
+      (u): u is string => !!u && u.includes("res.cloudinary.com")
+    );
+    if (urls.length > 0) {
+      try {
+        const res = await fetch("/api/admin/cloudinary-delete", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ urls }),
+        });
+        const json = await res.json().catch(() => null);
+        const failed = json?.results?.filter(
+          (r: { deleted: boolean; reason?: string }) => !r.deleted && r.reason !== "not-cloudinary"
+        );
+        if (failed?.length > 0) toast("Song removed, but some Cloudinary files could not be deleted.", "error");
+      } catch {
+        toast("Song removed, but Cloudinary cleanup failed.", "error");
+      }
+    }
     await supabase.from("mixed_songs").delete().eq("id", s.id);
+    if (editingId === s.id) cancelEdit();
     load();
   };
 
@@ -135,6 +181,11 @@ export function AdminMixedSongs() {
       <div>
         <h3 className="text-white font-semibold mb-1">Mixed by AfroPitch — public showcase</h3>
         <p className="text-gray-500 text-sm mb-4">Songs added here appear on the public <span className="text-gray-300">/mixed</span> page.</p>
+        {editingId && (
+          <p className="text-xs text-yellow-400 mb-2">
+            Editing “{form.title || "song"}” — change any detail or re-upload the files, then save.
+          </p>
+        )}
 
         <Card className="bg-white/5 border-white/10 mb-4">
           <CardContent className="p-4 grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -156,10 +207,15 @@ export function AdminMixedSongs() {
             </div>
             <input value={form.spotify_url} onChange={set("spotify_url")} placeholder="Spotify track URL (optional)" className="rounded-xl bg-black/30 border border-white/10 px-3 py-2 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-green-500/50" />
             <input value={form.sort_order} onChange={set("sort_order")} placeholder="Order (0 = first)" type="number" className="rounded-xl bg-black/30 border border-white/10 px-3 py-2 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-green-500/50" />
-            <div className="md:col-span-2">
-              <Button onClick={add} disabled={saving} className="bg-green-500 hover:bg-green-400 text-black rounded-xl">
-                {saving ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <Plus className="w-4 h-4 mr-1" />} Add song
+            <div className="md:col-span-2 flex gap-2">
+              <Button onClick={save} disabled={saving} className="bg-green-500 hover:bg-green-400 text-black rounded-xl">
+                {saving ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : editingId ? <Pencil className="w-4 h-4 mr-1" /> : <Plus className="w-4 h-4 mr-1" />} {editingId ? "Save changes" : "Add song"}
               </Button>
+              {editingId && (
+                <Button onClick={cancelEdit} variant="outline" className="rounded-xl">
+                  Cancel
+                </Button>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -169,7 +225,7 @@ export function AdminMixedSongs() {
           {songs.map((s) => (
             <div key={s.id} className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 px-3 py-2">
               <div className="w-9 h-9 rounded-lg bg-white/10 flex items-center justify-center overflow-hidden shrink-0">
-                {s.cover_url ? <img src={s.cover_url} alt="" className="w-full h-full object-cover" /> : <Music2 className="w-4 h-4 text-gray-500" />}
+                <img src={s.cover_url || FALLBACK_COVER} alt="" className="w-full h-full object-cover" />
               </div>
               <div className="flex-1 min-w-0">
                 <div className="text-white text-sm font-semibold truncate">{s.title}</div>
@@ -177,6 +233,9 @@ export function AdminMixedSongs() {
               </div>
               <Button variant="outline" size="sm" onClick={() => toggle(s)} className="rounded-xl text-xs">
                 {s.active ? "Hide" : "Show"}
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => startEdit(s)} className="rounded-xl text-xs" title="Edit song">
+                <Pencil className="w-3.5 h-3.5" />
               </Button>
               <Button variant="outline" size="sm" onClick={() => remove(s)} className="rounded-xl text-xs text-red-400 border-red-500/30">
                 <Trash2 className="w-3.5 h-3.5" />
