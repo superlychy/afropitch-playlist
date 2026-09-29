@@ -18,6 +18,13 @@ export const metadata: Metadata = {
   },
   description: siteConfig.description,
   keywords: siteConfig.keywords,
+  authors: [{ name: "AfroPitch", url: siteConfig.url }],
+  creator: "AfroPitch",
+  publisher: "AfroPitch",
+  category: "music",
+  alternates: {
+    canonical: siteConfig.url,
+  },
   openGraph: {
     type: "website",
     locale: "en_US",
@@ -78,16 +85,81 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{
             __html: JSON.stringify({
               "@context": "https://schema.org",
-              "@type": "Organization",
-              "name": siteConfig.name,
-              "url": siteConfig.url,
-              "logo": `${siteConfig.url}/logo.png`,
-              sameAs: [siteConfig.links.twitter, siteConfig.links.instagram],
-              contactPoint: {
-                "@type": "ContactPoint",
-                email: siteConfig.contact.email,
-                contactType: "customer support",
-              },
+              "@graph": [
+                {
+                  "@type": "Organization",
+                  "@id": `${siteConfig.url}#organization`,
+                  "name": siteConfig.name,
+                  "url": siteConfig.url,
+                  "logo": `${siteConfig.url}/logo.png`,
+                  "description": siteConfig.description,
+                  "slogan": "Connect African artists to real playlist curators",
+                  sameAs: [siteConfig.links.twitter, siteConfig.links.instagram],
+                  "knowsAbout": [
+                    "Afrobeats playlist pitching",
+                    "Amapiano playlist promotion",
+                    "Francophone African music",
+                    "Afro-house music",
+                    "Alté music",
+                    "African music curation",
+                    "Spotify playlist placement",
+                    "Independent artist promotion in Africa",
+                    "Song mixing and mastering for African artists",
+                  ],
+                  "areaServed": [
+                    { "@type": "Country", "name": "Nigeria" },
+                    { "@type": "Country", "name": "Ghana" },
+                    { "@type": "Country", "name": "South Africa" },
+                    { "@type": "Country", "name": "Kenya" },
+                    { "@type": "Country", "name": "Ivory Coast" },
+                    { "@type": "Country", "name": "Cameroon" },
+                    { "@type": "Place", "name": "Africa" },
+                    { "@type": "Place", "name": "Worldwide" },
+                  ],
+                  "makesOffer": [
+                    {
+                      "@type": "Offer",
+                      "itemOffered": {
+                        "@type": "Service",
+                        "name": "Playlist pitching to real African music curators",
+                        "description":
+                          "Submit songs to vetted Spotify, Apple Music, Audiomack and Boomplay playlist curators across Afrobeats, Amapiano, Francophone and Afro-house genres, with a refund policy.",
+                      },
+                    },
+                    {
+                      "@type": "Offer",
+                      "itemOffered": {
+                        "@type": "Service",
+                        "name": "Professional song mixing and mastering for African artists",
+                        "description":
+                          "Radio-ready mixing and mastering packages (Demo Polish, Full Mix, Mix + Master) with escrow-protected payments and revision rounds.",
+                      },
+                    },
+                    {
+                      "@type": "Offer",
+                      "itemOffered": {
+                        "@type": "Service",
+                        "name": "Featured artist spotlight",
+                        "description":
+                          "Editorial spotlight placements (Artist of the Week, Rising Artist, Artist of the Season) that showcase African artists to new audiences.",
+                      },
+                    },
+                  ],
+                  contactPoint: {
+                    "@type": "ContactPoint",
+                    email: siteConfig.contact.email,
+                    contactType: "customer support",
+                  },
+                },
+                {
+                  "@type": "WebSite",
+                  "@id": `${siteConfig.url}#website`,
+                  "name": siteConfig.name,
+                  "url": siteConfig.url,
+                  "publisher": { "@id": `${siteConfig.url}#organization` },
+                  "inLanguage": "en",
+                },
+              ],
             }),
           }}
         />

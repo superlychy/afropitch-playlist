@@ -15,6 +15,7 @@ export async function GET() {
     { url: "/how-it-works", priority: "0.8", changefreq: "monthly" },
     { url: "/trust", priority: "0.8", changefreq: "monthly" },
     { url: "/contact", priority: "0.7", changefreq: "monthly" },
+    { url: "/curators", priority: "0.8", changefreq: "weekly" },
     { url: "/curators/join", priority: "0.7", changefreq: "monthly" },
     { url: "/terms", priority: "0.3", changefreq: "yearly" },
     { url: "/privacy", priority: "0.3", changefreq: "yearly" },
