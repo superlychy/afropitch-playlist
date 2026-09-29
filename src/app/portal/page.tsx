@@ -37,6 +37,8 @@ export default function PortalPage() {
             const params = new URLSearchParams(window.location.search);
             if (params.get("blocked") === "1") {
                 setError("Your account has been suspended. Please contact support if you believe this is a mistake.");
+            } else if (params.get("session") === "expired") {
+                setError("Your session expired. Please sign in again.");
             } else if (params.get("oauth_error") === "1") {
                 setError("Google sign-in didn't complete. Please try again.");
             }

@@ -507,6 +507,12 @@ export default function ArtistDashboard() {
     [refreshUser, toast]
   );
 
+  // If the session died (or never existed), don't leave a blank page behind —
+  // send the user back to login.
+  useEffect(() => {
+    if (!isLoading && !user) router.push("/portal");
+  }, [isLoading, user, router]);
+
   if (isLoading) return <div className="p-8 text-center text-gray-500">Loading dashboard...</div>;
   if (!user) return null;
 

@@ -1199,6 +1199,12 @@ export default function AdminDashboard() {
         }
     };
 
+    // If the session died (or never existed), don't leave a blank page behind —
+    // send the user back to login.
+    useEffect(() => {
+        if (!isLoading && !user) router.push("/portal");
+    }, [isLoading, user, router]);
+
     if (isLoading) return <div className="p-10 text-center text-white">Loading Admin...</div>;
 
     return (
