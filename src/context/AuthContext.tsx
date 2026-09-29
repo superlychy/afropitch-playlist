@@ -261,8 +261,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           prev
             ? {
                 ...prev,
+                name: profile.full_name || prev.name,
+                email: profile.email || prev.email,
                 balance: Number(profile.balance),
                 role: profile.role,
+                bio: profile.bio ?? prev.bio,
+                instagram: profile.instagram ?? prev.instagram,
+                twitter: profile.twitter ?? prev.twitter,
+                website: profile.website ?? prev.website,
               }
             : null
         );

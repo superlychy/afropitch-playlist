@@ -215,24 +215,31 @@ export default function CuratorDashboard() {
     const handleUpdateProfile = async () => {
         if (!user) return;
         setIsUpdatingProfile(true);
-        const { error } = await supabase.from('profiles').update({
-            bio: profileBio,
-            instagram: profileIg,
-            twitter: profileTwitter,
-            website: profileWeb,
-            bank_name: bankName,
-            account_number: accountNumber,
-            account_name: accountName,
-            avatar_url: profileAvatar
-        }).eq('id', user.id);
+        try {
+            const { error } = await supabase.from('profiles').update({
+                bio: profileBio,
+                instagram: profileIg,
+                twitter: profileTwitter,
+                website: profileWeb,
+                bank_name: bankName,
+                account_number: accountNumber,
+                account_name: accountName,
+                avatar_url: profileAvatar
+            }).eq('id', user.id);
 
-        if (error) {
-            toast("Error: " + error.message, "error");
-        } else {
-            toast("Profile updated!", "success");
-            setShowProfile(false);
+            if (error) {
+                toast("Error: " + error.message, "error");
+            } else {
+                toast("Profile updated!", "success");
+                setShowProfile(false);
+                await refreshUser();
+            }
+        } catch (e: any) {
+            toast("Could not save your profile. Please check your connection and try again.", "error");
+        } finally {
+            // Always release the button - a stuck spinner here was the reported bug.
+            setIsUpdatingProfile(false);
         }
-        setIsUpdatingProfile(false);
     };
 
     const handleApplyCurator = async () => {
