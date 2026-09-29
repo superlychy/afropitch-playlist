@@ -38,7 +38,7 @@ const QUESTIONS = [
     {
         key: "whats_next",
         label: "What's next for you?",
-        placeholder: "Upcoming releases, shows, collaborations — anything fans should watch for.",
+        placeholder: "Upcoming releases, shows, collaborations. Anything fans should watch for.",
     },
 ];
 
@@ -124,7 +124,7 @@ export function FeaturedQuestionnaireForm({
     const handleSubmit = async () => {
         setError(null);
         if (bio.trim().length < 40) {
-            setError("Please write a little more for your bio — at least a couple of sentences so fans get to know you.");
+            setError("Please write a little more for your bio. At least a couple of sentences so fans get to know you.");
             return;
         }
         const filledSocials = Object.fromEntries(
@@ -181,12 +181,12 @@ export function FeaturedQuestionnaireForm({
                 </h1>
                 <p className="text-gray-400">
                     AfroPitch wants to spotlight you as Featured Artist of the Week.
-                    Answer a few questions below — your words will appear on your public
+                    Answer a few questions below. Your words will appear on your public
                     feature page, which fans can find on Google.
                 </p>
                 {initial.questionnaire_completed_at && (
                     <p className="text-xs text-yellow-400/80">
-                        You've answered before — editing and re-submitting updates your draft.
+                        You've answered before. Editing and re-submitting updates your draft.
                     </p>
                 )}
             </div>
@@ -195,7 +195,7 @@ export function FeaturedQuestionnaireForm({
                 <CardHeader>
                     <CardTitle className="text-white text-lg">Your bio</CardTitle>
                     <CardDescription>
-                        A few sentences about you — where you're from, how you started, what your sound is.
+                        A few sentences about you: where you're from, how you started, what your sound is.
                         This is the first thing fans (and Google) will read.
                     </CardDescription>
                 </CardHeader>
@@ -253,7 +253,7 @@ export function FeaturedQuestionnaireForm({
                 <CardHeader className="pb-3">
                     <CardTitle className="text-white text-base font-semibold">Your photo <span className="text-gray-500 font-normal text-sm">(optional)</span></CardTitle>
                     <CardDescription>
-                        Upload a clear photo of you — it appears on your public feature page.
+                        Upload a clear photo of you. It appears on your public feature page.
                         Skip this and we'll use your song's cover art instead.
                     </CardDescription>
                 </CardHeader>

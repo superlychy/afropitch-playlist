@@ -38,7 +38,7 @@ const STATUS_LABEL: Record<string, string> = {
     awaiting_payment: "Awaiting payment",
     in_escrow: "Payment held in escrow",
     in_progress: "Mixing in progress",
-    delivered: "Preview ready — your call",
+    delivered: "Preview ready. Your call",
     completed: "Completed",
     refunded: "Refunded to wallet",
     cancelled: "Cancelled",
@@ -92,7 +92,7 @@ export function ArtistMixingOrders() {
         setActing(null);
         if (error) toast("Could not accept: " + error.message, "error");
         else {
-            toast("Mix accepted — full file unlocked!", "success");
+            toast("Mix accepted! Full file unlocked!", "success");
             // Deal is over — remove the preview from Cloudinary.
             void deleteMixPreview(id);
             fetchOrders();
@@ -105,7 +105,7 @@ export function ArtistMixingOrders() {
         const { error } = await supabase.rpc("request_mix_refund", { p_order_id: id, p_reason: refundReason.trim() });
         setActing(null);
         if (error) toast("Could not request refund: " + error.message, "error");
-        else { toast("Refund requested — we'll review it shortly.", "success"); setRefundFor(null); setRefundReason(""); fetchOrders(); }
+        else { toast("Refund requested. We'll review it shortly.", "success"); setRefundFor(null); setRefundReason(""); fetchOrders(); }
     };
 
     if (loading) return <p className="text-gray-500 text-sm">Loading mixing orders…</p>;
@@ -147,7 +147,7 @@ export function ArtistMixingOrders() {
                                         <p className="text-xs text-yellow-400/90">
                                             Please accept or request a refund within 3 days of delivery
                                             (by {new Date(new Date(o.delivered_at).getTime() + 3 * 24 * 60 * 60 * 1000).toLocaleDateString()})
-                                            — after that the order auto-completes and your payment is released.
+                                            After that, the order auto-completes and your payment is released.
                                         </p>
                                     )}
                                     <div className="flex flex-wrap gap-2">
@@ -161,7 +161,7 @@ export function ArtistMixingOrders() {
                                         </Button>
                                         {o.refund_requested_at ? (
                                             <span className="inline-flex items-center text-xs text-yellow-400 border border-yellow-500/30 rounded-xl px-3 py-2">
-                                                Refund requested — awaiting review
+                                                Refund requested. Awaiting review
                                             </span>
                                         ) : (
                                             <Button
@@ -170,7 +170,7 @@ export function ArtistMixingOrders() {
                                                 variant="outline"
                                                 className="border-white/20 text-gray-300 rounded-xl text-sm"
                                             >
-                                                Not happy — request a refund
+                                                Not happy? Request a refund
                                             </Button>
                                         )}
                                     </div>
@@ -212,7 +212,7 @@ export function ArtistMixingOrders() {
 
                             {(o.status === "in_escrow" || o.status === "in_progress") && (
                                 o.refund_requested_at ? (
-                                    <p className="text-xs text-yellow-400">Refund requested — awaiting review.</p>
+                                    <p className="text-xs text-yellow-400">Refund requested. Awaiting review.</p>
                                 ) : (
                                     <Button
                                         disabled={acting === o.id}

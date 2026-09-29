@@ -50,7 +50,7 @@ const broadcastHtml = `
 
               <p style="margin-top:30px;">
                 Thank you for being part of the AfroPitchPlay community.<br><br>
-                — The AfroPitchPlay Team
+                - The AfroPitchPlay Team
               </p>
             </td>
           </tr>

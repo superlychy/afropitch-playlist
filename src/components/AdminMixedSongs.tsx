@@ -72,7 +72,7 @@ export function AdminMixedSongs() {
       if (!upRes.ok) throw new Error(up.error?.message || "Upload failed");
 
       setForm((f) => ({ ...f, [kind === "cover" ? "cover_url" : "audio_url"]: up.secure_url }));
-      toast(kind === "cover" ? "Cover uploaded" : "Audio uploaded — full track will stream with the AfroPitch voice tag", "success");
+      toast(kind === "cover" ? "Cover uploaded" : "Audio uploaded. Full track will stream with the AfroPitch voice tag", "success");
     } catch (e) {
       toast("Upload failed: " + (e instanceof Error ? e.message : "unknown error"), "error");
     } finally {
@@ -209,11 +209,11 @@ export function AdminMixedSongs() {
   return (
     <div className="space-y-8">
       <div>
-        <h3 className="text-white font-semibold mb-1">Mixed by AfroPitch — public showcase</h3>
+        <h3 className="text-white font-semibold mb-1">Mixed by AfroPitch: public showcase</h3>
         <p className="text-gray-500 text-sm mb-4">Songs added here appear on the public <span className="text-gray-300">/mixed</span> page.</p>
         {editingId && (
           <p className="text-xs text-yellow-400 mb-2">
-            Editing “{form.title || "song"}” — change any detail or re-upload the files, then save.
+            Editing “{form.title || "song"}” : change any detail or re-upload the files, then save.
           </p>
         )}
 
@@ -237,10 +237,10 @@ export function AdminMixedSongs() {
             </div>
             <input value={form.spotify_url} onChange={set("spotify_url")} placeholder="Spotify track URL (optional)" className="rounded-xl bg-black/30 border border-white/10 px-3 py-2 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-green-500/50" />
             <div>
-              <label className="block text-[11px] text-gray-500 mb-1">Display order — lower shows first (0 = top)</label>
+              <label className="block text-[11px] text-gray-500 mb-1">Display order: lower shows first (0 = top)</label>
               <input value={form.sort_order} onChange={set("sort_order")} placeholder="0" type="number" className="w-full rounded-xl bg-black/30 border border-white/10 px-3 py-2 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-green-500/50" />
             </div>
-            <textarea value={form.comment} onChange={setArea("comment")} placeholder="Comment — producer, contributors, credits… (optional)" rows={2} className="md:col-span-2 rounded-xl bg-black/30 border border-white/10 px-3 py-2 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-green-500/50 resize-y" />
+            <textarea value={form.comment} onChange={setArea("comment")} placeholder="Comment: producer, contributors, credits… (optional)" rows={2} className="md:col-span-2 rounded-xl bg-black/30 border border-white/10 px-3 py-2 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-green-500/50 resize-y" />
             <div className="md:col-span-2 flex gap-2">
               <Button onClick={save} disabled={saving} className="bg-green-500 hover:bg-green-400 text-black rounded-xl">
                 {saving ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : editingId ? <Pencil className="w-4 h-4 mr-1" /> : <Plus className="w-4 h-4 mr-1" />} {editingId ? "Save changes" : "Add song"}

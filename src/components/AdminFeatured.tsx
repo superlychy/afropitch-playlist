@@ -217,7 +217,7 @@ export function AdminFeatured() {
         if (status === "published") {
             const e = getEdit(f);
             if (!e.slug.trim()) {
-                toast("Set a URL slug before publishing — it's what Google will index.", "error");
+                toast("Set a URL slug before publishing. It's what Google will index.", "error");
                 return;
             }
             if (!f.questionnaire_completed_at) {
@@ -504,7 +504,7 @@ export function AdminFeatured() {
             {features.length === 0 && (
                 <Card className="border-dashed border-white/10 bg-white/5">
                     <CardContent className="pt-10 pb-10 text-center">
-                        <p className="text-gray-400">No features yet. Create the first draft above — or pick one from Monday's shortlist.</p>
+                        <p className="text-gray-400">No features yet. Create the first draft above, or pick one from Monday's shortlist.</p>
                     </CardContent>
                 </Card>
             )}

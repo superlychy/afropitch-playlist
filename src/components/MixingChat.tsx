@@ -109,7 +109,7 @@ export function MixingChat({ orderId }: { orderId: string }) {
           </div>
         ) : messages.length === 0 ? (
           <p className="text-center text-gray-500 text-sm py-6">
-            No messages yet. Say hello — your engineer replies here.
+            No messages yet. Say hello, your engineer replies here.
           </p>
         ) : (
           messages.map((m) => {

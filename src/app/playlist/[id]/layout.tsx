@@ -25,7 +25,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
           : "";
       const description =
         p.description ||
-        `Listen to ${p.name}${followers} — a curated African music playlist on AfroPitch. Artists: pitch your song to this curator.`;
+        `Listen to ${p.name}${followers}, a curated African music playlist on AfroPitch. Artists: pitch your song to this curator.`;
       return {
         title: { absolute: `${p.name} | AfroPitch Playlist` },
         description,
@@ -49,7 +49,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return {
     title: { absolute: "Playlists | AfroPitch" },
     description:
-      "Discover a curated African music playlist on AfroPitch — Afrobeats, Amapiano, Afro-house and more. Artists can pitch their songs directly to curators.",
+      "Discover a curated African music playlist on AfroPitch: Afrobeats, Amapiano, Afro-house and more. Artists can pitch their songs directly to curators.",
   };
 }
 

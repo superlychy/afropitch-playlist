@@ -275,7 +275,7 @@ export const getCuratorVerifiedTemplate = (data: {
         <div class="content">
             <h2>You're Verified! &#x2705;</h2>
             <p>Hi ${data.name},</p>
-            <p>Great news — your AfroPitch curator account has been <strong>verified</strong>. Your playlists can now receive paid song submissions from artists.</p>
+            <p>Great news! Your AfroPitch curator account has been <strong>verified</strong>. Your playlists can now receive paid song submissions from artists.</p>
 
             <div style="text-align: center;">
                 <a href="${data.dashboardLink}" class="button">Open Your Curator Dashboard</a>

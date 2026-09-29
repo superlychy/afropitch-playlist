@@ -166,10 +166,10 @@ export default function PrivacyPolicy() {
                     <h2 className="text-2xl font-bold text-white mb-4">12. Lawful Basis for Processing</h2>
                     <p>Under the Nigeria Data Protection Act 2023, we process your personal data on the following lawful bases:</p>
                     <ul className="list-disc pl-5 space-y-2 mt-2">
-                        <li>Performance of our contract with you — creating and managing your account, processing submissions and mixing orders, and paying curators.</li>
-                        <li>Your consent — marketing communications, and cross-border data transfers where consent is required.</li>
-                        <li>Legal obligations — keeping financial and transaction records as required by law.</li>
-                        <li>Our legitimate interests — preventing fraud and abuse and keeping the Platform secure, balanced against your rights.</li>
+                        <li>Performance of our contract with you: creating and managing your account, processing submissions and mixing orders, and paying curators.</li>
+                        <li>Your consent: marketing communications, and cross-border data transfers where consent is required.</li>
+                        <li>Legal obligations: keeping financial and transaction records as required by law.</li>
+                        <li>Our legitimate interests: preventing fraud and abuse and keeping the Platform secure, balanced against your rights.</li>
                     </ul>
                 </section>
 

@@ -7,7 +7,7 @@ import { ChevronRight, Music2 } from "lucide-react";
 export const metadata: Metadata = {
     title: "AfroPitch Spotlight | AfroPitch",
     description:
-        "The AfroPitch Spotlight champions African artists on the rise — Artist of the Season, Artist of the Week and Rising Artist: their stories, their sound, and the songs you need to hear.",
+        "The AfroPitch Spotlight champions African artists on the rise: Artist of the Season, Artist of the Week and Rising Artist. Their stories, their sound, and the songs you need to hear.",
     keywords: [
         "afropitch spotlight",
         "african artist spotlight",
@@ -20,7 +20,7 @@ export const metadata: Metadata = {
     openGraph: {
         title: "AfroPitch Spotlight | AfroPitch",
         description:
-            "The artists we're championing right now — across every tier.",
+            "The artists we're championing right now, across every tier.",
         url: "https://afropitchplay.best/featured",
         type: "website",
     },
@@ -33,7 +33,7 @@ const TIER_ORDER = ["Artist of the Season", "Artist of the Week", "Rising Artist
 const TIER_META: Record<string, { emoji: string; blurb: string }> = {
     "Artist of the Season": {
         emoji: "🌟",
-        blurb: "Our quarterly crown — one artist carrying the sound of the season.",
+        blurb: "Our quarterly crown. One artist carrying the sound of the season.",
     },
     "Artist of the Week": {
         emoji: "⭐",
@@ -41,7 +41,7 @@ const TIER_META: Record<string, { emoji: string; blurb: string }> = {
     },
     "Rising Artist": {
         emoji: "🚀",
-        blurb: "New names breaking through — hear them first.",
+        blurb: "New names breaking through. Hear them first.",
     },
 };
 
@@ -176,7 +176,7 @@ export default async function FeaturedPage() {
                     Artists we&apos;re <span className="text-yellow-400">championing</span>
                 </h1>
                 <p className="text-xl text-gray-400 max-w-2xl mx-auto">
-                    One stage, every tier — from weekly risers to the artist of the
+                    One stage, every tier: from weekly risers to the artist of the
                     season. The sound, the story, and the staying power.
                 </p>
             </div>

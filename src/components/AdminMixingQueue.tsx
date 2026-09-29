@@ -97,7 +97,7 @@ export function AdminMixingQueue() {
         try {
             const url = await uploadToCloudinary(file, { resourceType: "video", folderKey: "preview" });
             setPreviewLink(url);
-            toast("Preview uploaded — it will be deleted from Cloudinary automatically when the deal closes.", "success");
+            toast("Preview uploaded. It will be deleted from Cloudinary automatically when the deal closes.", "success");
         } catch (e) {
             toast("Upload failed: " + (e instanceof Error ? e.message : "unknown error"), "error");
         } finally {

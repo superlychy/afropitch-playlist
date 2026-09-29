@@ -37,17 +37,17 @@ const FAQ_DATA = [
     {
         question: "How does the mixing service work?",
         keywords: ["mix", "master", "mixing", "mastering", "stems", "engineer", "polish"],
-        answer: `Our engineers mix and master your song for you:\n• Demo Polish — ${CUR}35,000 (~3 days)\n• Full Mix — ${CUR}65,000 (~5 days)\n• Mix + Master — ${CUR}100,000 (~7 days)\n\nPick a package on the Mixing page, share your Google Drive link, and pay securely. Your money is held in escrow until you approve the final mix — you'll review a watermarked preview first.`
+        answer: `Our engineers mix and master your song for you:\n• Demo Polish: ${CUR}35,000 (~3 days)\n• Full Mix: ${CUR}65,000 (~5 days)\n• Mix + Master: ${CUR}100,000 (~7 days)\n\nPick a package on the Mixing page, share your Google Drive link, and pay securely. Your money is held in escrow until you approve the final mix. You'll review a watermarked preview first.`
     },
     {
         question: "Is my payment safe? (Escrow)",
         keywords: ["escrow", "safe", "secure", "hold my money", "protect"],
-        answer: "Yes. Mixing payments are held in escrow — the engineer only gets paid when you accept the finished mix. If you're not happy, it comes straight back to your wallet."
+        answer: "Yes. Mixing payments are held in escrow. The engineer only gets paid when you accept the finished mix. If you're not happy, it comes straight back to your wallet."
     },
     {
         question: "Can I pay from outside Nigeria?",
         keywords: ["ghana", "kenya", "south africa", "outside nigeria", "international", "dollar", "cedi", "rand", "abroad"],
-        answer: "Yes! International Visa and Mastercard payments are accepted — you're charged in naira and your bank handles the currency conversion."
+        answer: "Yes! International Visa and Mastercard payments are accepted. You're charged in naira and your bank handles the currency conversion."
     },
     {
         question: "Do you offer refunds?",
@@ -60,9 +60,9 @@ const FAQ_DATA = [
         answer: "Absolutely. We strictly vet every curator to ensure they are real humans with active, organic playlists. We have zero tolerance for bots."
     },
     {
-        question: "My song was declined — what now?",
+        question: "My song was declined. What now?",
         keywords: ["declined", "rejected", "not approved", "denied"],
-        answer: "Don't give up on the song! The most common reason is mix quality. Our engineers can professionally mix it for you — check the Mixing page (from Demo Polish at ₦35,000) and resubmit once it sounds its best."
+        answer: "Don't give up on the song! The most common reason is mix quality. Our engineers can professionally mix it for you. Check the Mixing page (from Demo Polish at ₦35,000) and resubmit once it sounds its best."
     },
     {
         question: "How do I withdraw my earnings?",
@@ -72,12 +72,12 @@ const FAQ_DATA = [
     {
         question: "What is the Featured Artist program?",
         keywords: ["featured", "feature me", "spotlight", "artist of the week"],
-        answer: "Each week we spotlight one artist on the Featured page — with their bio, Q&A, and a permanent SEO-friendly page. Our team picks artists with quality music and staying power. Keep releasing great music and you could be next!"
+        answer: "Each week we spotlight one artist on the Featured page, with their bio, Q&A, and a permanent SEO-friendly page. Our team picks artists with quality music and staying power. Keep releasing great music and you could be next!"
     },
     {
         question: "How do I become a curator?",
         keywords: ["become a curator", "apply as curator", "curator application", "join as curator"],
-        answer: "Head to the Curators section and submit an application with your playlist links. Our team reviews every application — we only accept curators with real, active, organic playlists."
+        answer: "Head to the Curators section and submit an application with your playlist links. Our team reviews every application. We only accept curators with real, active, organic playlists."
     },
     {
         question: "What genres do you accept?",
@@ -92,7 +92,7 @@ const FAQ_DATA = [
     {
         question: "Can I talk to a human?",
         keywords: ["human", "agent", "person", "real person", "call", "phone", "whatsapp", "talk to someone"],
-        answer: "Of course — open a support ticket below and our team will reply here in the chat (and by email). We typically respond within a day."
+        answer: "Of course! Open a support ticket below and our team will reply here in the chat (and by email). We typically respond within a day."
     },
 ];
 
@@ -177,8 +177,8 @@ export function AIHelp() {
                 setTicketSubject(textToSend.slice(0, 120));
                 pushAssistant(
                     activeTicket
-                        ? "I don't have an answer for that — but you can continue your open conversation with our team, or open a fresh ticket below."
-                        : "I don't have an answer for that yet — but I can open a support ticket and our team will get back to you right here in the chat.",
+                        ? "I don't have an answer for that, but you can continue your open conversation with our team, or open a fresh ticket below."
+                        : "I don't have an answer for that yet, but I can open a support ticket and our team will get back to you right here in the chat.",
                     { isTicketPrompt: true }
                 );
             }
@@ -279,14 +279,14 @@ export function AIHelp() {
             if (json?.ok) {
                 setShowTicketForm(false);
                 setTicketName(""); setTicketEmail(""); setTicketSubject(""); setTicketMessage("");
-                pushAssistant("Ticket opened — you're now chatting with our support team below. We'll reply here and by email.");
+                pushAssistant("Ticket opened. You're now chatting with our support team below. We'll reply here and by email.");
                 openTicketMode({ ticket_id: json.ticket_id, access_token: json.access_token, subject: ticketSubject.trim() });
             } else {
                 pushAssistant(`Couldn't open the ticket: ${json?.error || "please try again"}.`);
             }
         } catch {
             setTicketSending(false);
-            pushAssistant("Couldn't open the ticket right now — please try again in a moment.");
+            pushAssistant("Couldn't open the ticket right now. Please try again in a moment.");
         }
     };
 

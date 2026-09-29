@@ -952,7 +952,7 @@ export default function ArtistDashboard() {
               <Input value={profileWeb} onChange={(e) => setProfileWeb(e.target.value)} placeholder="https://" />
             </div>
             <div className="pt-2 border-t border-white/10">
-              <p className="text-xs text-gray-500 mb-3">Bank details — used for withdrawals.</p>
+              <p className="text-xs text-gray-500 mb-3">Bank details for withdrawals.</p>
               <div className="space-y-2">
                 <Label>Bank Name</Label>
                 <Input value={bankName} onChange={(e) => setBankName(e.target.value)} placeholder="e.g. GTBank" />

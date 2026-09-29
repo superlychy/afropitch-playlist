@@ -161,8 +161,7 @@ export function MixedSongsView() {
         <div className="text-center py-16 max-w-xl mx-auto">
           <Music2 className="w-10 h-10 text-gray-600 mx-auto mb-4" />
           <p className="text-gray-400">
-            The first AfroPitch-mixed releases are on their way. Check back soon —
-            or be one of the first artists on the wall.
+            The first AfroPitch-mixed releases are on their way. Check back soon, or be one of the first artists on the wall.
           </p>
         </div>
       ) : (

@@ -66,16 +66,16 @@ export async function generateMetadata({
     const description =
         feature.bio?.slice(0, 160) ??
         feature.headline ??
-        `${name} is AfroPitch's Featured Artist of the Week — discover their story, sound, and music.`;
+        `${name} is AfroPitch's Featured Artist of the Week. Discover their story, sound, and music.`;
     // Artist photo if uploaded, otherwise the song's cover art (set when the draft is created).
     const image = feature.photo_url ?? feature.cover_art_url;
 
     return {
-        title: `${name} — Featured Artist of the Week | AfroPitch`,
+        title: `${name}: Featured Artist of the Week | AfroPitch`,
         description,
         keywords: [name, "afrobeats artist", "african musician", "featured artist", "AfroPitch", feature.song_title ?? ""].filter(Boolean),
         openGraph: {
-            title: `${name} — Featured Artist of the Week | AfroPitch`,
+            title: `${name}: Featured Artist of the Week | AfroPitch`,
             description,
             url: `${siteUrl}/featured/${feature.slug}`,
             type: "article",
@@ -83,7 +83,7 @@ export async function generateMetadata({
         },
         twitter: {
             card: "summary_large_image",
-            title: `${name} — Featured Artist of the Week | AfroPitch`,
+            title: `${name}: Featured Artist of the Week | AfroPitch`,
             description,
             ...(image ? { images: [image] } : {}),
         },

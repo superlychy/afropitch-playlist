@@ -52,7 +52,7 @@ export function SongSearch({ value, onChange }: { value: string; onChange: (url:
 
   const select = (s: Song) => {
     setSelected(s);
-    setQuery(`${s.name} — ${s.artists}`);
+    setQuery(`${s.name} - ${s.artists}`);
     setShow(false);
     onChange(s.spotifyUrl || "");
   };

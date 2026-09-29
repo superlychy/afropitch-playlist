@@ -20,7 +20,7 @@ export async function GET(req: Request) {
       return NextResponse.json({
         results: [],
         query: q,
-        message: "Spotify search not configured — paste link manually",
+        message: "Spotify search not configured. Paste link manually",
       });
     }
 

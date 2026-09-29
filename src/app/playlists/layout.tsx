@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "African Playlists | Real Curator Playlists for Afrobeats, Amapiano & More",
   description:
-    "Browse real African curator playlists on AfroPitch — Afrobeats, Amapiano, Afro-house, Alte and Francophone vibes. Pitch your song directly to the curators behind them.",
+    "Browse real African curator playlists on AfroPitch: Afrobeats, Amapiano, Afro-house, Alte and Francophone vibes. Pitch your song directly to the curators behind them.",
   openGraph: {
     title: "African Playlists | AfroPitch",
     description:

@@ -100,7 +100,7 @@ function TicketThread({ ticketId }: { ticketId: string }) {
       const data = await res.json();
       if (data.ok) {
         setReply("");
-        toast("Reply sent — the visitor gets it by email.", "success");
+        toast("Reply sent. The visitor gets it by email.", "success");
         loadThread();
       } else {
         toast(data.error || "Could not send reply.", "error");

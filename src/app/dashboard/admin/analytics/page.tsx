@@ -242,7 +242,7 @@ export default function AnalyticsPage() {
                 <CardHeader>
                     <CardTitle className="text-white flex items-center gap-2">
                         Recent Visitors
-                        <span className="text-xs text-gray-500 font-normal">— grouped by IP, sorted by last seen</span>
+                        <span className="text-xs text-gray-500 font-normal">(grouped by IP, sorted by last seen)</span>
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="p-0">

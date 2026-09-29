@@ -138,7 +138,7 @@ export function MixingOrderForm() {
             } catch (e: any) {
                 if (e?.message && !/failed to fetch|networkerror/i.test(e.message)) {
                     toast(
-                        "Payment received — order failed: " + e.message + ". Contact support.",
+                        "Payment received, but the order failed: " + e.message + ". Contact support.",
                         "error"
                     );
                     setPlacing(false);
@@ -171,7 +171,7 @@ export function MixingOrderForm() {
 
                 if (error) {
                     toast(
-                        "Payment received — order failed: " + error.message + ". Contact support.",
+                        "Payment received, but the order failed: " + error.message + ". Contact support.",
                         "error"
                     );
                     lockRef.current = false;
@@ -310,7 +310,7 @@ export function MixingOrderForm() {
                 ) : !valid ? (
                     <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
                         <p className="text-sm text-gray-300 font-medium mb-2">
-                            Almost there — finish these to unlock payment:
+                            Almost there. Finish these to unlock payment:
                         </p>
                         <ul className="text-sm text-gray-500 space-y-1.5">
                             {!selected && <li>• Choose a package in step 1</li>}
@@ -350,13 +350,13 @@ export function MixingOrderForm() {
                             />
                             <p className="text-xs text-gray-500 max-w-md">
                                 Paying places your order immediately. Your ₦{Number(selected.price_ngn).toLocaleString()} is held
-                                in escrow — it only goes to the engineer when you accept
+                                in escrow. It only goes to the engineer when you accept
                                 the finished mix. Not happy? It comes straight back to
                                 your wallet.
                             </p>
                             <p className="text-xs text-gray-500 max-w-md">
                                 Paying from outside Nigeria? International Visa and
-                                Mastercard payments are accepted — your bank handles
+                                Mastercard payments are accepted. Your bank handles
                                 the currency conversion.
                             </p>
                         </div>

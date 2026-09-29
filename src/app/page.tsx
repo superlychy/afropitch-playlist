@@ -35,7 +35,7 @@ export default function Home() {
     },
     {
       q: "Does Afropitch offer song mixing and mastering?",
-      a: "Yes. Afropitch offers professional mixing packages for African artists — Demo Polish, Full Mix, and Mix + Master — with escrow-protected payments, watermarked previews, and revision rounds so you only release the final mix when you are happy with it."
+      a: "Yes. Afropitch offers professional mixing packages for African artists: Demo Polish, Full Mix, and Mix + Master, with escrow-protected payments, watermarked previews, and revision rounds so you only release the final mix when you are happy with it."
     },
     {
       q: "Which countries do Afropitch curators cover?",
@@ -47,7 +47,7 @@ export default function Home() {
     },
     {
       q: "Can I promote my music as an independent or unsigned artist?",
-      a: "Absolutely. Afropitch was built for independent and upcoming African artists — no label or connections needed. Submit your music, get heard by real curators, and track your playlist performance."
+      a: "Absolutely. Afropitch was built for independent and upcoming African artists. No label or connections needed. Submit your music, get heard by real curators, and track your playlist performance."
     }
   ];
 

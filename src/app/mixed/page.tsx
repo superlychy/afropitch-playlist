@@ -7,7 +7,7 @@ import { ArrowRight } from "lucide-react";
 export const metadata: Metadata = {
     title: "Songs Mixed by AfroPitch | AfroPitch",
     description:
-        "Listen to songs professionally mixed and mastered by AfroPitch engineers — Afrobeats, Amapiano, Afro-house and Alte, release-ready.",
+        "Listen to songs professionally mixed and mastered by AfroPitch engineers: Afrobeats, Amapiano, Afro-house and Alte, release-ready.",
     keywords: [
         "afrobeats mixing examples",
         "afropitch mixed songs",
@@ -15,7 +15,7 @@ export const metadata: Metadata = {
         "amapiano mixing engineer portfolio",
     ],
     openGraph: {
-        title: "Mixed by AfroPitch — hear the difference",
+        title: "Mixed by AfroPitch: hear the difference",
         description:
             "Real songs, mixed and mastered by AfroPitch engineers. This is what your track could sound like.",
         url: "https://afropitchplay.best/mixed",
@@ -31,8 +31,8 @@ export default function MixedPage() {
                     Mixed by <span className="text-green-400">AfroPitch</span>
                 </h1>
                 <p className="text-xl text-gray-400">
-                    Real songs, mixed and mastered by our engineers. Press play —
-                    this is what your track could sound like.
+                    Real songs, mixed and mastered by our engineers. Press play.
+                    This is what your track could sound like.
                 </p>
                 <Link href="/mixing">
                     <Button className="bg-green-500 hover:bg-green-400 text-black rounded-xl">
@@ -49,7 +49,7 @@ export default function MixedPage() {
                 </h2>
                 <p className="text-gray-400">
                     Pick a package, send your stems, and our engineers will take
-                    it from there — release-ready, guaranteed.
+                    it from there. Release-ready, guaranteed.
                 </p>
                 <Link href="/mixing">
                     <Button className="bg-green-500 hover:bg-green-400 text-black rounded-xl">

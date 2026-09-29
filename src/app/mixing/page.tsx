@@ -17,7 +17,7 @@ import {
 export const metadata: Metadata = {
     title: "Professional Song Mixing Service for African Artists | AfroPitch",
     description:
-        "Get your Afrobeats, Amapiano or Afro-house track professionally mixed. Escrow-protected payment, watermarked previews — pay only when you love the mix.",
+        "Get your Afrobeats, Amapiano or Afro-house track professionally mixed. Escrow-protected payment, watermarked previews. Pay only when you love the mix.",
     keywords: [
         "song mixing service Nigeria",
         "afrobeats mixing engineer",
@@ -28,7 +28,7 @@ export const metadata: Metadata = {
         "AfroPitch mixing",
     ],
     openGraph: {
-        title: "AfroPitch Mixing Service — Radio-ready mixes for African artists",
+        title: "AfroPitch Mixing Service: Radio-ready mixes for African artists",
         description:
             "Professional mixing with escrow protection: your money is only released when you accept the finished mix.",
         url: "https://afropitchplay.best/mixing",
@@ -39,7 +39,7 @@ export const metadata: Metadata = {
 const faqs = [
     {
         q: "How does the escrow payment work?",
-        a: "You pay upfront, but your money is held in escrow — not sent to the engineer. When the mix is done you get a watermarked 60-second preview. Only when you accept the mix is the payment released. If you're not satisfied, the full amount is refunded to your AfroPitch wallet, which you can withdraw to your bank account.",
+        a: "You pay upfront, but your money is held in escrow, not sent to the engineer. When the mix is done you get a watermarked 60-second preview. Only when you accept the mix is the payment released. If you're not satisfied, the full amount is refunded to your AfroPitch wallet, which you can withdraw to your bank account.",
     },
     {
         q: "What files should I upload?",
@@ -55,7 +55,7 @@ const faqs = [
     },
     {
         q: "How will I review the mix?",
-        a: "You'll get a 60-second preview right in your dashboard. It carries an AfroPitch voice tag played three times, so it can't be reused — the full, clean file is released only after you accept.",
+        a: "You'll get a 60-second preview right in your dashboard. It carries an AfroPitch voice tag played three times, so it can't be reused. The full, clean file is released only after you accept.",
     },
     {
         q: "How long does a mix take?",
@@ -63,7 +63,7 @@ const faqs = [
     },
     {
         q: "Will a better mix help my song get playlisted?",
-        a: "Curators reject great songs every day because the mix can't compete sonically. A professional mix gives your song a fair shot — and many of the songs declined for mix quality come straight back through this service.",
+        a: "Curators reject great songs every day because the mix can't compete sonically. A professional mix gives your song a fair shot, and many of the songs declined for mix quality come straight back through this service.",
     },
 ];
 
@@ -91,7 +91,7 @@ const steps = [
     {
         icon: CreditCard,
         title: "Pay into escrow",
-        text: "Your payment is held safely — the engineer only gets paid when you accept the mix.",
+        text: "Your payment is held safely. The engineer only gets paid when you accept the mix.",
     },
     {
         icon: AudioWaveform,
@@ -124,7 +124,7 @@ export default function MixingPage() {
                 </h1>
                 <p className="text-xl text-gray-400">
                     Your song deserves to compete sonically. Get it professionally
-                    mixed by an AfroPitch engineer — with your money held in escrow
+                    mixed by an AfroPitch engineer, with your money held in escrow
                     until you approve the final mix.
                 </p>
                 <div className="flex flex-wrap justify-center gap-3 pt-2">
@@ -150,7 +150,7 @@ export default function MixingPage() {
                     Every week, curators on AfroPitch turn down good songs for one
                     fixable reason: the mix can't stand next to commercial releases.
                     Muddy low end, harsh vocals, drums that disappear on small
-                    speakers — listeners skip in seconds, and playlist curators know it.
+                    speakers. Listeners skip in seconds, and playlist curators know it.
                 </p>
                 <p className="text-gray-400 leading-relaxed">
                     The AfroPitch mixing service exists to fix exactly that. Upload

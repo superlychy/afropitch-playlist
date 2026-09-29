@@ -95,7 +95,7 @@ export async function POST(request: Request) {
                     <p style="color: #555; font-size: 14px;">Re: ${esc(ticket.subject || 'your support ticket')}</p>
                     <div style="background: #f5f5f5; border-left: 4px solid #16a34a; padding: 14px 16px; margin: 16px 0; white-space: pre-wrap;">${esc(message)}</div>
                     <p style="color: #555; font-size: 14px;">Need anything else? Just reply to this email and our team will pick it up.</p>
-                    <p style="color: #999; font-size: 12px;">— The AfroPitch Team</p>
+                    <p style="color: #999; font-size: 12px;">- The AfroPitch Team</p>
                 </div>`;
             try {
                 await resend.emails.send({

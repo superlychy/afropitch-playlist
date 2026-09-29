@@ -148,7 +148,7 @@ export default function TermsOfService() {
 
                 <section>
                     <h2 className="text-2xl font-bold text-white mb-4">12. Changes to Terms</h2>
-                    <p>We may update these Terms from time to time. Where changes are material, we will give you reasonable notice before they take effect — for example, by email or a notice on the Platform. Your continued use of the Platform after the changes take effect means you accept the updated Terms.</p>
+                    <p>We may update these Terms from time to time. Where changes are material, we will give you reasonable notice before they take effect, for example by email or a notice on the Platform. Your continued use of the Platform after the changes take effect means you accept the updated Terms.</p>
                 </section>
 
                 <section>
