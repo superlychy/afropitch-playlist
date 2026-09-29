@@ -79,14 +79,14 @@ export default function TermsOfService() {
                 </section>
 
                 <section>
-                    <h2 className="text-2xl font-bold text-white mb-4">6. Payments</h2>
+                    <h2 className="text-2xl font-bold text-white mb-4">6. Payments and refunds</h2>
                     <ul className="list-disc pl-5 space-y-2">
-                        <li>All payments are processed through third-party payment providers.</li>
-                        <li>AfroPitch may charge service fees.</li>
-                        <li>Fees are displayed before payment confirmation.</li>
-                        <li>Payments are generally non-refundable unless required by law.</li>
-                        <li>Curator payouts are subject to verification and may be delayed for fraud checks.</li>
-                        <li>AfroPitch reserves the right to withhold payouts if suspicious activity is detected.</li>
+                        <li>All payments are processed through third-party payment providers (including Paystack). AfroPitch does not store your full card details.</li>
+                        <li>All fees, commissions, and service charges are displayed before you confirm payment.</li>
+                        <li>Submission fees are non-refundable once a curator review has started. If no review has started, you may request a refund by contacting us.</li>
+                        <li>Mixing orders are held in escrow and governed by Section 16.</li>
+                        <li>Curator payouts and wallet withdrawals are subject to verification and fraud checks (see Section 17).</li>
+                        <li>Except as stated in these Terms, payments are non-refundable unless required by law.</li>
                     </ul>
                 </section>
 
@@ -148,7 +148,7 @@ export default function TermsOfService() {
 
                 <section>
                     <h2 className="text-2xl font-bold text-white mb-4">12. Changes to Terms</h2>
-                    <p>AfroPitch may update these Terms at any time. Continued use of the platform after changes means you accept the updated Terms.</p>
+                    <p>We may update these Terms from time to time. Where changes are material, we will give you reasonable notice before they take effect — for example, by email or a notice on the Platform. Your continued use of the Platform after the changes take effect means you accept the updated Terms.</p>
                 </section>
 
                 <section>
@@ -157,8 +157,8 @@ export default function TermsOfService() {
                 </section>
 
                 <section>
-                    <h2 className="text-2xl font-bold text-white mb-4">14. Governing Law</h2>
-                    <p>These Terms shall be governed by the laws of {country}.</p>
+                    <h2 className="text-2xl font-bold text-white mb-4">14. Governing Law and Disputes</h2>
+                    <p>These Terms shall be governed by the laws of {country}. Any disputes arising from these Terms or your use of the Platform shall be resolved in the courts of Lagos State, {country}.</p>
                 </section>
 
                 <section>
@@ -167,6 +167,45 @@ export default function TermsOfService() {
                     <ul className="list-none mt-2 space-y-1">
                         <li>Email: <a href={`mailto:${contactEmail}`} className="text-green-500 hover:underline">{contactEmail}</a></li>
                         <li>Website: <a href={websiteUrl} className="text-green-500 hover:underline">{websiteUrl}</a></li>
+                    </ul>
+                </section>
+
+                <section>
+                    <h2 className="text-2xl font-bold text-white mb-4">16. Mixing service</h2>
+                    <ul className="list-disc pl-5 space-y-2">
+                        <li>AfroPitch offers a professional song mixing service with the following packages and typical turnaround times: Demo Polish (₦35,000, about 3 days), Full Mix (₦65,000, about 5 days), and Mix + Master (₦100,000, about 7 days). The price shown at checkout is the price that applies to your order.</li>
+                        <li>You pay upfront, but your payment is held in escrow. It is not released to the engineer until you accept the delivered mix.</li>
+                        <li>You will receive a watermarked preview of the mix in your dashboard. The full, clean file is released to you only after you accept the mix.</li>
+                        <li>If you are not satisfied with the delivered mix, you may request a refund instead of accepting. The full amount will be refunded to your AfroPitch wallet, which you can withdraw to your bank account under Section 17.</li>
+                        <li>If you neither accept the mix nor request a refund within 3 days of delivery, the order will be automatically completed and the escrowed payment released to the engineer.</li>
+                        <li>Each package includes revision rounds as shown at checkout: Demo Polish includes 1 round, Full Mix includes 2 rounds, and Mix + Master includes 3 rounds.</li>
+                        <li>You confirm that you own, or have the rights to, any song files you share for mixing. You are responsible for the file-sharing links you provide (for example, Google Drive links set to “Anyone with the link”); AfroPitch is not responsible if anyone else accesses files you choose to share publicly.</li>
+                    </ul>
+                </section>
+
+                <section>
+                    <h2 className="text-2xl font-bold text-white mb-4">17. Fees, commissions, and withdrawals</h2>
+                    <ul className="list-disc pl-5 space-y-2">
+                        <li>When an artist pays a submission fee, 70% goes to the reviewing curator and 30% is retained by AfroPitch as a platform fee. The amounts shown to you before payment already reflect this split.</li>
+                        <li>Curator payouts and wallet withdrawals may be delayed for verification and fraud checks. AfroPitch may withhold payouts where suspicious activity is detected.</li>
+                        <li>The minimum withdrawal amount is ₦5,000. Withdrawals are reviewed and approved by AfroPitch before funds are released to your bank account.</li>
+                        <li>Refunds for mixing orders are credited to your AfroPitch wallet (see Section 16) and may be withdrawn under this section.</li>
+                    </ul>
+                </section>
+
+                <section>
+                    <h2 className="text-2xl font-bold text-white mb-4">18. Copyright complaints</h2>
+                    <ul className="list-disc pl-5 space-y-2">
+                        <li>If you believe that content on the Platform infringes your copyright, send a notice to <a href={`mailto:${contactEmail}`} className="text-green-500 hover:underline">{contactEmail}</a> including: (a) identification of the copyrighted work; (b) identification of the material you claim is infringing; (c) your contact details; and (d) a statement that you believe in good faith the use is not authorized.</li>
+                        <li>We will act on valid notices, which may include removing the material. Users who repeatedly upload infringing content may have their accounts suspended or terminated.</li>
+                    </ul>
+                </section>
+
+                <section>
+                    <h2 className="text-2xl font-bold text-white mb-4">19. General</h2>
+                    <ul className="list-disc pl-5 space-y-2">
+                        <li>Severability: if any part of these Terms is found to be unenforceable, the remaining parts continue in full effect.</li>
+                        <li>You may not assign or transfer your rights under these Terms without our written consent.</li>
                     </ul>
                 </section>
             </div>

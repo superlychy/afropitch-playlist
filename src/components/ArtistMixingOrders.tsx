@@ -20,6 +20,7 @@ interface MixingOrder {
     preview_link: string | null;
     full_link: string | null;
     refund_requested_at: string | null;
+    delivered_at: string | null;
     created_at: string;
 }
 
@@ -59,7 +60,7 @@ export function ArtistMixingOrders() {
         setLoading(true);
         const { data } = await supabase
             .from("mixing_orders")
-            .select("id, song_title, package_name, amount, status, preview_link, full_link, refund_requested_at, created_at")
+            .select("id, song_title, package_name, amount, status, preview_link, full_link, refund_requested_at, delivered_at, created_at")
             .eq("artist_id", user.id)
             .order("created_at", { ascending: false });
         if (data) setOrders(data as MixingOrder[]);
@@ -142,6 +143,13 @@ export function ArtistMixingOrders() {
                             {o.status === "delivered" && o.preview_link && (
                                 <div className="space-y-3">
                                     <MixPreviewPlayer src={o.preview_link} />
+                                    {o.delivered_at && !o.refund_requested_at && (
+                                        <p className="text-xs text-yellow-400/90">
+                                            Please accept or request a refund within 3 days of delivery
+                                            (by {new Date(new Date(o.delivered_at).getTime() + 3 * 24 * 60 * 60 * 1000).toLocaleDateString()})
+                                            — after that the order auto-completes and your payment is released.
+                                        </p>
+                                    )}
                                     <div className="flex flex-wrap gap-2">
                                         <Button
                                             disabled={acting === o.id}

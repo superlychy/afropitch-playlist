@@ -38,6 +38,8 @@ export default function PrivacyPolicy() {
                         <li>Username</li>
                         <li>Payment details (processed via third-party providers)</li>
                         <li>Bank details (for curator payouts, if applicable)</li>
+                        <li>National Identification Number (NIN) and identity verification documents (for curator verification, where applicable)</li>
+                        <li>Song files and file-sharing links you provide (for mixing orders)</li>
                         <li>Country and location information</li>
                     </ul>
 
@@ -75,6 +77,7 @@ export default function PrivacyPolicy() {
                         <li>Comply with legal obligations</li>
                     </ul>
                     <p className="mt-2">We do not sell your personal data to third parties.</p>
+                    <p className="mt-2">We may send you service-related notifications about your account. With your consent, we may also send promotional messages about AfroPitch. You can opt out of promotional messages at any time using the unsubscribe link in the message or by contacting us.</p>
                 </section>
 
                 <section>
@@ -124,21 +127,23 @@ export default function PrivacyPolicy() {
                         <li>For as long as your account is active</li>
                         <li>As necessary to comply with legal obligations</li>
                         <li>To resolve disputes and enforce agreements</li>
+                        <li>Financial and transaction records may be retained for as long as required by law</li>
                     </ul>
                     <p className="mt-2">You may request account deletion, subject to legal retention requirements.</p>
                 </section>
 
                 <section>
                     <h2 className="text-2xl font-bold text-white mb-4">8. Your Rights</h2>
-                    <p>Depending on your location, you may have the right to:</p>
+                    <p>Under the Nigeria Data Protection Act 2023, you have the right to:</p>
                     <ul className="list-disc pl-5 space-y-2 mt-2">
                         <li>Access your personal data</li>
-                        <li>Correct inaccurate data</li>
-                        <li>Request deletion</li>
-                        <li>Restrict processing</li>
-                        <li>Object to certain uses of your data</li>
+                        <li>Correct inaccurate or incomplete data</li>
+                        <li>Request deletion of your data</li>
+                        <li>Restrict or object to certain processing</li>
+                        <li>Receive your data in a portable format (data portability)</li>
+                        <li>Withdraw consent at any time, where processing is based on consent</li>
                     </ul>
-                    <p className="mt-2 text-white">To exercise these rights, contact us at the email below.</p>
+                    <p className="mt-2">To exercise any of these rights, contact us at <a href={`mailto:${contactEmail}`} className="text-green-500 hover:underline">{contactEmail}</a>. You may also lodge a complaint with the Nigeria Data Protection Commission (NDPC).</p>
                 </section>
 
                 <section>
@@ -148,7 +153,7 @@ export default function PrivacyPolicy() {
 
                 <section>
                     <h2 className="text-2xl font-bold text-white mb-4">10. International Users</h2>
-                    <p>If you access AfroPitch from outside {country}, your data may be transferred and processed in other countries.</p>
+                    <p>We host the Platform with third-party infrastructure providers, so your data may be transferred to and processed in countries outside {country}. Where required by the Nigeria Data Protection Act 2023, we rely on your consent and take reasonable steps to ensure appropriate safeguards for such transfers.</p>
                     <p className="mt-2">By using the platform, you consent to such transfers.</p>
                 </section>
 
@@ -158,7 +163,18 @@ export default function PrivacyPolicy() {
                 </section>
 
                 <section>
-                    <h2 className="text-2xl font-bold text-white mb-4">12. Contact Us</h2>
+                    <h2 className="text-2xl font-bold text-white mb-4">12. Lawful Basis for Processing</h2>
+                    <p>Under the Nigeria Data Protection Act 2023, we process your personal data on the following lawful bases:</p>
+                    <ul className="list-disc pl-5 space-y-2 mt-2">
+                        <li>Performance of our contract with you — creating and managing your account, processing submissions and mixing orders, and paying curators.</li>
+                        <li>Your consent — marketing communications, and cross-border data transfers where consent is required.</li>
+                        <li>Legal obligations — keeping financial and transaction records as required by law.</li>
+                        <li>Our legitimate interests — preventing fraud and abuse and keeping the Platform secure, balanced against your rights.</li>
+                    </ul>
+                </section>
+
+                <section>
+                    <h2 className="text-2xl font-bold text-white mb-4">13. Contact Us</h2>
                     <p>If you have questions about this Privacy Policy:</p>
                     <ul className="list-none mt-2 space-y-1">
                         <li>Email: <a href={`mailto:${contactEmail}`} className="text-green-500 hover:underline">{contactEmail}</a></li>
