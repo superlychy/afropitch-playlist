@@ -5,7 +5,7 @@ import { supabase } from "@/lib/supabase";
 import { useToast } from "@/components/ui/toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Trash2, Loader2, Plus, Pencil, Upload } from "lucide-react";
+import { Trash2, Loader2, Plus, Pencil, Upload, ChevronUp, ChevronDown } from "lucide-react";
 
 type Song = {
   id: string;
@@ -159,6 +159,23 @@ export function AdminMixedSongs() {
     load();
   };
 
+  // Rearrange the showcase: swap display order with the neighbour above/below.
+  const move = async (s: Song, dir: -1 | 1) => {
+    const idx = songs.findIndex((x) => x.id === s.id);
+    const other = songs[idx + dir];
+    if (!other) return;
+    let newOrder = other.sort_order;
+    const otherOrder = s.sort_order;
+    if (newOrder === otherOrder) newOrder = other.sort_order + dir; // equal orders: nudge so the move is visible
+    const { error } = await supabase.from("mixed_songs").update({ sort_order: newOrder }).eq("id", s.id);
+    if (error) {
+      toast("Could not reorder: " + error.message, "error");
+      return;
+    }
+    await supabase.from("mixed_songs").update({ sort_order: otherOrder }).eq("id", other.id);
+    load();
+  };
+
   const remove = async (s: Song) => {
     if (!confirm(`Remove "${s.title}" from the showcase?`)) return;
     // Clean up the Cloudinary files too (Drive links are left alone —
@@ -219,7 +236,10 @@ export function AdminMixedSongs() {
               </Button>
             </div>
             <input value={form.spotify_url} onChange={set("spotify_url")} placeholder="Spotify track URL (optional)" className="rounded-xl bg-black/30 border border-white/10 px-3 py-2 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-green-500/50" />
-            <input value={form.sort_order} onChange={set("sort_order")} placeholder="Order (0 = first)" type="number" className="rounded-xl bg-black/30 border border-white/10 px-3 py-2 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-green-500/50" />
+            <div>
+              <label className="block text-[11px] text-gray-500 mb-1">Display order — lower shows first (0 = top)</label>
+              <input value={form.sort_order} onChange={set("sort_order")} placeholder="0" type="number" className="w-full rounded-xl bg-black/30 border border-white/10 px-3 py-2 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-green-500/50" />
+            </div>
             <textarea value={form.comment} onChange={setArea("comment")} placeholder="Comment — producer, contributors, credits… (optional)" rows={2} className="md:col-span-2 rounded-xl bg-black/30 border border-white/10 px-3 py-2 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-green-500/50 resize-y" />
             <div className="md:col-span-2 flex gap-2">
               <Button onClick={save} disabled={saving} className="bg-green-500 hover:bg-green-400 text-black rounded-xl">
@@ -236,8 +256,17 @@ export function AdminMixedSongs() {
 
         <div className="space-y-2">
           {songs.length === 0 && <p className="text-gray-500 text-sm">No songs yet.</p>}
-          {songs.map((s) => (
+          {songs.length > 1 && <p className="text-gray-600 text-xs">Tip: use ↑ ↓ to rearrange the showcase order.</p>}
+          {songs.map((s, i) => (
             <div key={s.id} className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 px-3 py-2">
+              <div className="flex flex-col shrink-0 -gap-0.5">
+                <button onClick={() => move(s, -1)} disabled={i === 0} title="Move up" className="text-gray-500 hover:text-white disabled:opacity-20 disabled:hover:text-gray-500 p-0.5">
+                  <ChevronUp className="w-4 h-4" />
+                </button>
+                <button onClick={() => move(s, 1)} disabled={i === songs.length - 1} title="Move down" className="text-gray-500 hover:text-white disabled:opacity-20 disabled:hover:text-gray-500 p-0.5">
+                  <ChevronDown className="w-4 h-4" />
+                </button>
+              </div>
               <div className="w-9 h-9 rounded-lg bg-white/10 flex items-center justify-center overflow-hidden shrink-0">
                 <img src={s.cover_url || FALLBACK_COVER} alt="" className="w-full h-full object-cover" />
               </div>
