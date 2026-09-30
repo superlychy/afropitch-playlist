@@ -1996,23 +1996,29 @@ export default function AdminDashboard() {
                     {/* PLAYLISTS MANAGEMENT */}
                     {activeTab === "playlists" && (
                         <div className="space-y-6">
-                            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6">
-                                <div className="flex bg-[#141417] p-1 rounded-xl border border-white/[0.08] overflow-x-auto">
+                            <div className="mb-2">
+                                <h2 className="text-xl lg:text-2xl font-extrabold text-white">Playlists</h2>
+                                <p className="text-sm text-[#71717A] mt-0.5">Review the submission queue or browse every playlist.</p>
+                            </div>
+                            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+                                <div className="grid grid-cols-2 sm:flex bg-[#141417] p-1.5 rounded-2xl border border-white/[0.08] w-full sm:w-auto">
                                     <button
                                         onClick={() => { setPlaylistTab("submissions"); pendingSongsPag.reset(); }}
-                                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${playlistTab === "submissions" ? "bg-blue-600 text-white" : "text-gray-400 hover:text-white"}`}
+                                        aria-pressed={playlistTab === "submissions"}
+                                        className={`flex-1 sm:flex-none px-5 sm:px-6 py-2.5 rounded-xl text-sm font-extrabold transition-all ${playlistTab === "submissions" ? "bg-[#22C55E] text-[#04120a]" : "text-gray-400 hover:text-white"}`}
                                     >
-                                        Pending Submissions
+                                        Review queue
                                         {pendingSubmissionsCount > 0 && (
-                                            <span className="ml-2 bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full animate-pulse">{pendingSubmissionsCount}</span>
+                                            <span className={`ml-2 text-[10px] px-1.5 py-0.5 rounded-full font-extrabold ${playlistTab === "submissions" ? "bg-[#04120a]/20 text-[#04120a]" : "bg-red-500 text-white animate-pulse"}`}>{pendingSubmissionsCount}</span>
                                         )}
                                     </button>
                                     <button
                                         onClick={() => { setPlaylistTab("all"); playlistsPag.reset(); }}
-                                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${playlistTab === "all" ? "bg-green-600 text-white" : "text-gray-400 hover:text-white"}`}
+                                        aria-pressed={playlistTab === "all"}
+                                        className={`flex-1 sm:flex-none px-5 sm:px-6 py-2.5 rounded-xl text-sm font-extrabold transition-all ${playlistTab === "all" ? "bg-[#22C55E] text-[#04120a]" : "text-gray-400 hover:text-white"}`}
                                     >
-                                        All Playlists
-                                        <span className="ml-2 bg-white/10 text-white text-[10px] px-1.5 py-0.5 rounded-full">{allPlaylists.length}</span>
+                                        All playlists
+                                        <span className={`ml-2 text-[10px] px-1.5 py-0.5 rounded-full font-extrabold ${playlistTab === "all" ? "bg-[#04120a]/20 text-[#04120a]" : "bg-white/10 text-white"}`}>{allPlaylists.length}</span>
                                     </button>
                                 </div>
 

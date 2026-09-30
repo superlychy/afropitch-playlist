@@ -1,7 +1,7 @@
 "use client";
 
 import {
-    Home, ListMusic, List, History, Wallet, Users, MessageSquare, Settings,
+    Home, ListMusic, History, Wallet, Users, MessageSquare, Settings,
     Star, Send, Mail, BarChart3, DollarSign, UserPlus, MoreHorizontal, LogOut, X,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -25,8 +25,7 @@ interface NavItem {
 
 const MANAGE_ITEMS: NavItem[] = [
     { tab: "overview", label: "Overview", icon: Home },
-    { tab: "playlists", playlistTab: "submissions", label: "Submissions", icon: ListMusic, count: 0 }, // count wired below
-    { tab: "playlists", playlistTab: "all", label: "Playlists", icon: List },
+    { tab: "playlists", playlistTab: "submissions", label: "Playlists", icon: ListMusic, count: 0 }, // count wired below (pending queue count)
     { tab: "mixing", label: "Mixing orders", icon: Settings },
     { tab: "withdrawals", label: "Withdrawals", icon: Wallet, count: 0 },
     { tab: "users", label: "Users", icon: Users },
@@ -56,7 +55,9 @@ function isActive(
     playlistTab: PlaylistSubTab,
 ): boolean {
     if (item.tab !== activeTab) return false;
-    if (item.tab === "playlists") return (item.playlistTab || "all") === playlistTab;
+    // "Playlists" is a single merged item: it covers both the review queue
+    // (submissions) and the all-playlists inner tabs.
+    if (item.tab === "playlists") return true;
     return true;
 }
 
@@ -152,8 +153,7 @@ export function AdminBottomNav({
 }) {
     const items: (NavItem & { more?: boolean })[] = [
         { tab: "overview", label: "Home", icon: Home },
-        { tab: "playlists", playlistTab: "submissions", label: "Queue", icon: ListMusic },
-        { tab: "playlists", playlistTab: "all", label: "Playlists", icon: List },
+        { tab: "playlists", playlistTab: "submissions", label: "Playlists", icon: ListMusic },
         { tab: "support", label: "Support", icon: MessageSquare },
     ];
     return (
@@ -196,8 +196,7 @@ export function AdminBottomNav({
 /* ------------------------------------------------------------------ */
 const MORE_ITEMS: NavItem[] = [
     { tab: "overview", label: "Overview", icon: Home },
-    { tab: "playlists", playlistTab: "submissions", label: "Review queue", icon: ListMusic },
-    { tab: "playlists", playlistTab: "all", label: "Playlists", icon: List },
+    { tab: "playlists", playlistTab: "submissions", label: "Playlists", icon: ListMusic }, // merged: opens on the review queue tab, covers all playlists too
     { tab: "submissions", label: "Submission history", icon: History },
     { tab: "withdrawals", label: "Withdrawals", icon: Wallet },
     { tab: "users", label: "Users", icon: Users },

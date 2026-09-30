@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient as createAuthClient } from "@/lib/supabase-server";
+import { getSpotifyArtwork } from "@/lib/spotifyArt";
 
 const VALID_DOMAINS = [
   "open.spotify.com",
@@ -54,12 +55,24 @@ export async function POST(req: Request) {
     // caller via auth.uid(), so it is called on the user's own session client
     // (not the service role). Any client-supplied total is ignored: the
     // server prices every playlist itself.
+
+    // Best-effort cover art: fetched from Spotify's public oEmbed endpoint so
+    // review queue cards can show the real artwork. A failure here must never
+    // fail the submission, so it is guarded by try/catch inside and out.
+    let art: string | null = null;
+    try {
+      art = await getSpotifyArtwork(song_link);
+    } catch {
+      art = null;
+    }
+
     const { data, error } = await auth.rpc("submit_with_payment", {
       p_playlist_ids: playlist_ids,
       p_song_title: song_title,
       p_artist_name: artist_name,
       p_song_link: song_link,
       p_tier: tier || "standard",
+      p_cover_art_url: art,
     });
 
     if (error) {
