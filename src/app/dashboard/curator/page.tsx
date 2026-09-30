@@ -384,6 +384,12 @@ export default function CuratorDashboard() {
             return;
         }
 
+        if (amount < 5000) {
+            toast("Minimum withdrawal is ₦5,000.", "error");
+            setIsWithdrawing(false);
+            return;
+        }
+
         // Use Atomic RPC to prevent "Ghost Deductions" and ensure History
         const { data, error } = await supabase.rpc('request_payout', {
             p_user_id: user.id,
@@ -1441,6 +1447,7 @@ export default function CuratorDashboard() {
                                             />
                                         </div>
                                         <p className="text-xs text-zinc-500">Available: {pricingConfig.currency}{user?.balance?.toLocaleString()}</p>
+                                        <p className="text-xs text-zinc-500">Minimum withdrawal: {pricingConfig.currency}5,000</p>
                                     </div>
                                 </div>
                                 <div className="flex justify-end gap-2">

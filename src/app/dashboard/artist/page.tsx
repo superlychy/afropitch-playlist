@@ -164,6 +164,12 @@ export default function ArtistDashboard() {
       return;
     }
 
+    if (amount < 5000) {
+      toast("Minimum withdrawal is ₦5,000.", "error");
+      setIsWithdrawing(false);
+      return;
+    }
+
     const { data, error } = await supabase.rpc("request_payout", {
       p_user_id: user.id,
       p_amount: amount,
@@ -611,8 +617,7 @@ export default function ArtistDashboard() {
           {/* ===== Submit CTA ===== */}
           <div className="mb-4 lg:mb-[18px] bg-gradient-to-br from-[#14532D] via-[#052E16] to-[#0A0A0B] border border-[#22C55E]/30 rounded-[20px] lg:rounded-[18px] p-[18px] lg:p-5 flex items-center gap-3.5">
             <div className="flex-1">
-              <h3 className="text-[17px] font-bold mb-1">Submit new music</h3>
-              <p className="text-xs lg:text-[13px] text-[#BBF7D0]">Get on 18 real playlists across Africa</p>
+              <h3 className="text-[17px] font-bold mb-1">Submit your music</h3>
             </div>
             <button
               onClick={() => router.push("/submit")}

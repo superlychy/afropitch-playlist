@@ -1,0 +1,15 @@
+-- Drop the legacy 5-arg request_payout wrapper.
+--
+-- Root cause of the curator "Unable to process payout" error (2026-10-01):
+-- two overloads existed live:
+--   1. request_payout(uuid,numeric,text,text,text)        -- SQL wrapper delegating to (2)
+--   2. request_payout(uuid,numeric,text,text,text,text)   -- hardened plpgsql (auth check, min 5000)
+-- The curator dashboard calls the RPC with 5 args. PostgREST could not choose
+-- between overload (1) (exact arity) and overload (2) (via the p_reason
+-- DEFAULT NULL), so the call failed at the HTTP layer and the client showed
+-- the generic "Unable to process payout" error. The artist dashboard passes
+-- 6 args (including p_reason) and was unaffected.
+--
+-- With the wrapper gone, a 5-arg call unambiguously matches overload (2) and
+-- p_reason simply defaults to NULL (only artists are required to give one).
+DROP FUNCTION IF EXISTS public.request_payout(uuid, numeric, text, text, text);

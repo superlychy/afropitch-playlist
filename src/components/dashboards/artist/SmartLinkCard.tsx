@@ -183,9 +183,14 @@ export function SmartLinkCard({
         </p>
         {qrBox}
         <div className="flex gap-2 mt-3">
-          <div className="flex-1 min-w-0 bg-[#1B1B1F] border border-white/[0.08] rounded-[10px] px-3 py-2.5 text-xs text-zinc-400 truncate">
+          <a
+            href={trackUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex-1 min-w-0 bg-[#1B1B1F] border border-white/[0.08] rounded-[10px] px-3 py-2.5 text-xs text-[#22C55E] truncate hover:border-[#22C55E]/40 transition-colors"
+          >
             {trackUrl}
-          </div>
+          </a>
           <button
             onClick={copy}
             className="shrink-0 bg-[#22C55E] hover:bg-[#1aa34e] text-[#04120a] rounded-[10px] px-4 text-xs font-extrabold flex items-center gap-1.5"

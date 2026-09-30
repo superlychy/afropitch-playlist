@@ -52,9 +52,34 @@ export function ErrorReporter() {
         };
         window.addEventListener("error", onError);
         window.addEventListener("unhandledrejection", onRejection);
+        // Also capture console.error: caught-and-logged failures (e.g. a
+        // failed payout RPC that only does console.error) would otherwise
+        // never reach the error log. Same throttling applies.
+        const origConsoleError = console.error.bind(console);
+        const onConsoleError = (...args: any[]) => {
+            try {
+                const msg = args
+                    .map((a) =>
+                        a instanceof Error
+                            ? a.message + "\n" + (a.stack || "")
+                            : typeof a === "object"
+                              ? JSON.stringify(a).slice(0, 500)
+                              : String(a),
+                    )
+                    .join(" ")
+                    .slice(0, 500);
+                const stack = args.find((a) => a instanceof Error)?.stack;
+                report("console.error", msg, stack);
+            } catch {
+                // Reporting must never break the page.
+            }
+            origConsoleError(...args);
+        };
+        console.error = onConsoleError as typeof console.error;
         return () => {
             window.removeEventListener("error", onError);
             window.removeEventListener("unhandledrejection", onRejection);
+            console.error = origConsoleError;
         };
     }, []);
     return null;
