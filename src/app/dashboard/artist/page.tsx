@@ -92,6 +92,9 @@ export default function ArtistDashboard() {
   // Real Data State
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [loadingSubmissions, setLoadingSubmissions] = useState(true);
+  // Smart-link per-platform click counts, grouped by submission id.
+  // Fetched once here (not once per SmartLinkCard) via get_my_link_stats.
+  const [linkStats, setLinkStats] = useState<Record<string, Record<string, number>>>({});
 
   // Notifications
   const [showNotifications, setShowNotifications] = useState(false);
@@ -111,6 +114,7 @@ export default function ArtistDashboard() {
       setProfileTwitter(user.twitter || "");
       setProfileWeb(user.website || "");
       fetchSubmissions();
+      fetchLinkStats();
       fetchNotifications();
       fetchBankDetails();
     }
@@ -208,6 +212,19 @@ export default function ArtistDashboard() {
       setSubmissions(data as any);
     }
     setLoadingSubmissions(false);
+  };
+
+  const fetchLinkStats = async () => {
+    if (!user) return;
+    const { data } = await supabase.rpc("get_my_link_stats");
+    if (data) {
+      const grouped: Record<string, Record<string, number>> = {};
+      for (const row of data as { submission_id: string; platform: string; clicks: number }[]) {
+        if (!grouped[row.submission_id]) grouped[row.submission_id] = {};
+        grouped[row.submission_id][row.platform] = Number(row.clicks);
+      }
+      setLinkStats(grouped);
+    }
   };
 
   const handleUpdateProfile = async () => {
@@ -531,7 +548,7 @@ export default function ArtistDashboard() {
                     </div>
                   </div>
                   {sub.status === "accepted" && sub.tracking_slug && (
-                    <SmartLinkCard submission={sub} onSaved={fetchSubmissions} />
+                    <SmartLinkCard submission={sub} stats={linkStats[sub.id] || {}} onSaved={() => { fetchSubmissions(); fetchLinkStats(); }} />
                   )}
                   {(sub.status === "declined" || sub.status === "rejected" || sub.status === "archived") && sub.feedback && (
                     <div className="mt-3 p-2 bg-red-900/20 border border-red-500/20 rounded">

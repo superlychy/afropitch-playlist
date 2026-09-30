@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { getSpotifyArtwork } from "@/lib/spotifyArt";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -52,6 +53,10 @@ export async function POST(req: Request) {
         { status: 400 }
       );
     }
+
+    // Best-effort cover art from the Spotify link (never blocks the submission).
+    // Fired early so the fetch overlaps the DB work below.
+    const artworkPromise = getSpotifyArtwork(song_link);
 
     // --- Check for duplicate submissions (same artist, same song, same playlist) ---
     const { data: existing } = await supabase
@@ -183,6 +188,7 @@ export async function POST(req: Request) {
     }
 
     // Insert submissions
+    const coverArt = await artworkPromise;
     const submissions = playlist_ids.map((playlistId: string) => {
       const cost = perItemCosts[playlistId] || 0;
       const finalCost = cost > 0 ? Math.max(0, cost - discountPerItem) : 0;
@@ -195,6 +201,7 @@ export async function POST(req: Request) {
         tier,
         amount_paid: finalCost,
         status: "pending",
+        cover_art_url: coverArt,
       };
     });
 

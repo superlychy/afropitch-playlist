@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/components/ui/toast";
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,9 @@ interface SmartLinkCardProps {
     boomplay_url: string | null;
     cover_art_url: string | null;
   };
+  // Per-platform click counts for this submission, fetched once at the
+  // dashboard level (not per card) and passed down.
+  stats: Record<string, number>;
   onSaved: () => void;
 }
 
@@ -29,9 +32,8 @@ const PLATFORM_LABELS: Record<string, string> = {
   boomplay: "Boomplay",
 };
 
-export default function SmartLinkCard({ submission, onSaved }: SmartLinkCardProps) {
+export default function SmartLinkCard({ submission, stats, onSaved }: SmartLinkCardProps) {
   const { toast } = useToast();
-  const [stats, setStats] = useState<Record<string, number>>({});
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [showQr, setShowQr] = useState(false);
@@ -42,20 +44,10 @@ export default function SmartLinkCard({ submission, onSaved }: SmartLinkCardProp
     cover_art_url: submission.cover_art_url || "",
   });
 
-  const trackUrl = `https://afropitchplay.best/track/${submission.tracking_slug}`;
-
-  useEffect(() => {
-    (async () => {
-      const { data } = await supabase.rpc("get_my_link_stats");
-      if (data) {
-        const mine: Record<string, number> = {};
-        for (const row of data as { submission_id: string; platform: string; clicks: number }[]) {
-          if (row.submission_id === submission.id) mine[row.platform] = Number(row.clicks);
-        }
-        setStats(mine);
-      }
-    })();
-  }, [submission.id]);
+  // Always matches the deployment the artist is actually viewing.
+  const trackUrl = typeof window !== "undefined"
+    ? `${window.location.origin}/track/${submission.tracking_slug}`
+    : `/track/${submission.tracking_slug}`;
 
   const save = async () => {
     setSaving(true);

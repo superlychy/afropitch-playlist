@@ -7,6 +7,7 @@ export const revalidate = 3600;
 import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { Metadata } from 'next';
 import CopyLinkButton from './CopyLinkButton';
+import { siteUrl } from '@/lib/siteUrl';
 
 const getAdminSupabase = () => createAdminClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -46,7 +47,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       title: `${sub.song_title} - ${sub.artist_name}`,
       description: `Stream "${sub.song_title}" by ${sub.artist_name} on ${playlistName || "AfroPitch"}`,
       type: 'music.song',
-      url: `https://afropitchplay.best/track/${slug}`,
+      url: `${siteUrl()}/track/${slug}`,
       images: sub.cover_art_url ? [{ url: sub.cover_art_url }] : undefined,
     },
   };
@@ -97,7 +98,7 @@ export default async function TrackPage({ params }: Props) {
     ? submission.playlist[0]?.name
     : (submission.playlist as any)?.name;
 
-  const pageUrl = `https://afropitchplay.best/track/${slug}`;
+  const pageUrl = `${siteUrl()}/track/${slug}`;
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(pageUrl)}`;
 
   const goUrl = (platformKey: string, to: string) =>
