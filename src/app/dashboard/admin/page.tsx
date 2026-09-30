@@ -201,6 +201,37 @@ export default function AdminDashboard() {
     const [playlistFilter, setPlaylistFilter] = useState<"all" | "admin" | "user">("all");
     const [playlistSearch, setPlaylistSearch] = useState("");
 
+    // Featured email state (send branded questionnaire email from a submission row)
+    const [featuredEmailSub, setFeaturedEmailSub] = useState<any | null>(null);
+    const [featuredEmailCategory, setFeaturedEmailCategory] = useState<"artist-of-the-week" | "rising-artist" | "artist-of-the-season">("artist-of-the-week");
+    const [sendingFeaturedEmail, setSendingFeaturedEmail] = useState(false);
+
+    const sendFeaturedEmail = async () => {
+        if (!featuredEmailSub) return;
+        setSendingFeaturedEmail(true);
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            const res = await fetch("/api/admin/send-featured-email", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${session?.access_token}`,
+                },
+                body: JSON.stringify({
+                    submission_id: featuredEmailSub.id,
+                    category: featuredEmailCategory,
+                }),
+            });
+            const json = await res.json();
+            if (!res.ok) throw new Error(json.error || "Failed to send email");
+            toast(`Featured email sent to ${featuredEmailSub.artist?.full_name || "artist"}.`, "success");
+            setFeaturedEmailSub(null);
+        } catch (e: any) {
+            toast("Error: " + (e.message || "Failed to send email"), "error");
+        }
+        setSendingFeaturedEmail(false);
+    };
+
     // Add Playlist State (Admin)
     const [showAddPlaylist, setShowAddPlaylist] = useState(false);
     const [newPlaylistLink, setNewPlaylistLink] = useState("");
@@ -883,7 +914,7 @@ export default function AdminDashboard() {
     const fetchAllSubmissions = async () => {
         const { data } = await supabase
             .from('submissions')
-            .select('*, artist:profiles!artist_id(full_name), playlist:playlists(name, curator:profiles!curator_id(full_name))')
+            .select('*, artist:profiles!artist_id(full_name, email), playlist:playlists(name, curator:profiles!curator_id(full_name))')
             .order('created_at', { ascending: false });
         if (data) setAllSubmissions(data);
     };
@@ -2419,6 +2450,15 @@ export default function AdminDashboard() {
                                                     <span>{new Date(sub.created_at).toLocaleDateString()}</span>
                                                 </div>
                                                 <div className="flex items-center justify-start sm:justify-end gap-2 shrink-0">
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        className="h-8 gap-2 border-white/10 hover:border-green-500/50 hover:text-green-400"
+                                                        onClick={() => { setFeaturedEmailSub(sub); setFeaturedEmailCategory("artist-of-the-week"); }}
+                                                        title="Send featured questionnaire email"
+                                                    >
+                                                        <Send className="w-3.5 h-3.5" /> Featured
+                                                    </Button>
                                                     {sub.status === 'accepted' && (
                                                         <Button
                                                             size="sm"
@@ -2494,6 +2534,44 @@ export default function AdminDashboard() {
                                     }
                                 }} disabled={adminIsSaving}>
                                     {adminIsSaving ? "Saving..." : "Save Changes"}
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+                )
+            }
+
+            {/* SEND FEATURED EMAIL MODAL */}
+            {
+                featuredEmailSub && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in">
+                        <div className="bg-zinc-900 border border-white/10 w-full max-w-md mx-4 p-6 rounded-lg space-y-4 max-h-[90vh] overflow-y-auto">
+                            <h3 className="text-xl font-bold text-white">Send featured email</h3>
+                            <p className="text-sm text-gray-400">
+                                To <strong className="text-white">{featuredEmailSub.artist?.full_name || "Unknown"}</strong>
+                                {featuredEmailSub.artist?.email ? ` (${featuredEmailSub.artist.email})` : " (no email on file)"}
+                                {" "}for &ldquo;{featuredEmailSub.song_title}&rdquo;. A branded questionnaire email will be sent, and a featured draft will be created if one does not exist yet.
+                            </p>
+                            <div className="space-y-2">
+                                <label className="text-xs text-gray-400 mb-1 block">Category</label>
+                                {[
+                                    { value: "artist-of-the-week", label: "Artist of the Week" },
+                                    { value: "rising-artist", label: "Rising Artist" },
+                                    { value: "artist-of-the-season", label: "Artist of the Season" },
+                                ].map(opt => (
+                                    <button
+                                        key={opt.value}
+                                        onClick={() => setFeaturedEmailCategory(opt.value as typeof featuredEmailCategory)}
+                                        className={`w-full text-left px-4 py-3 rounded-lg border transition-colors ${featuredEmailCategory === opt.value ? "border-green-500 bg-green-500/10 text-white" : "border-white/10 text-gray-300 hover:border-white/30"}`}
+                                    >
+                                        <span className="font-bold">{opt.label}</span>
+                                    </button>
+                                ))}
+                            </div>
+                            <div className="flex justify-end gap-2 pt-4">
+                                <Button variant="ghost" onClick={() => setFeaturedEmailSub(null)}>Cancel</Button>
+                                <Button className="bg-green-600" onClick={sendFeaturedEmail} disabled={sendingFeaturedEmail || !featuredEmailSub.artist?.email}>
+                                    {sendingFeaturedEmail ? "Sending..." : "Send email"}
                                 </Button>
                             </div>
                         </div>
