@@ -918,6 +918,18 @@ export default function AdminDashboard() {
 
         let trackingSlug = null;
         if (action === 'accepted') {
+            // Playlist-first gate: the track must be on the Spotify playlist
+            // BEFORE the status flips, because accepting emails the artist
+            // immediately and they will check the playlist. (A live Spotify
+            // check isn't possible: the server has no Spotify API credentials,
+            // so this is an explicit confirmation at the point of action.)
+            const playlistName = allPlaylists.find(p => p.id === sub.playlist_id)?.name || 'the playlist';
+            const artistName = sub.artist?.full_name || 'the artist';
+            const confirmed = confirm(
+                `Accept "${sub.song_title || 'Untitled'}" for ${playlistName}?\n\n${artistName} will be emailed right away. Only accept if the track is already on the Spotify playlist.`
+            );
+            if (!confirmed) return;
+
             const cleanTitle = (sub.song_title || 'track').replace(/[^a-z0-9]/gi, '-').toLowerCase();
             trackingSlug = `${cleanTitle}-${Math.random().toString(36).substring(2, 7)}`;
         }
@@ -1198,12 +1210,6 @@ export default function AdminDashboard() {
             setIsSendingBroadcast(false);
         }
     };
-
-    // If the session died (or never existed), don't leave a blank page behind —
-    // send the user back to login.
-    useEffect(() => {
-        if (!isLoading && !user) router.push("/portal");
-    }, [isLoading, user, router]);
 
     if (isLoading) return <div className="p-10 text-center text-white">Loading Admin...</div>;
 
