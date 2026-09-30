@@ -58,7 +58,6 @@ export const metadata: Metadata = {
     index: true,
     follow: true,
   },
-  manifest: "/manifest.json",
   themeColor: "#0A0A0B",
 };
 

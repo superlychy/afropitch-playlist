@@ -7,16 +7,11 @@ import { useEffect } from "react";
 export function ServiceWorkerRegister() {
   useEffect(() => {
     if (!("serviceWorker" in navigator)) return;
-    const register = () => {
-      navigator.serviceWorker.register("/sw.js").catch(() => {
-        // silent
-      });
-    };
-    if (document.readyState === "complete") {
-      register();
-    } else {
-      window.addEventListener("load", register, { once: true });
-    }
+    // Register immediately on mount: waiting for window "load" delays
+    // activation and can make PWA validators miss the service worker.
+    navigator.serviceWorker.register("/sw.js").catch(() => {
+      // silent
+    });
   }, []);
 
   return null;
