@@ -1,25 +1,8 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, useRef } from "react";
+import React, { createContext, useContext, useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
-
-/**
- * Wipe every Supabase auth cookie in this tab — including stale chunks from a
- * corrupted cookie jar (sb-...-auth-token, .0, .1, ...). gotrue's own signOut
- * can miss those, leaving the tab in a state where re-login silently fails
- * and only an incognito window works. Deleting a missing cookie is a no-op,
- * so this is safe to run on every sign-out.
- */
-function clearAuthCookies() {
-  if (typeof document === "undefined") return;
-  for (const part of document.cookie.split(";")) {
-    const name = part.split("=")[0].trim();
-    if (name.startsWith("sb-") && name.includes("-auth-token")) {
-      document.cookie = `${name}=; Max-Age=0; path=/`;
-    }
-  }
-}
 
 export type UserRole = "artist" | "curator" | "admin" | null;
 
@@ -30,6 +13,8 @@ export interface User {
   role: UserRole;
   balance: number;
   earnings: number;
+  referral_balance: number;
+  referral_code?: string;
   bio?: string;
   instagram?: string;
   twitter?: string;
@@ -60,10 +45,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
-  // Where the SIGNED_OUT handler should send the user. Set before a
-  // programmatic signOut that has its own destination (logout, blocked
-  // account). When null, a dead session redirects to /portal?session=expired.
-  const signOutRedirectRef = useRef<string | null>(null);
 
   const syncProfile = async (session: any, mounted: boolean) => {
     try {
@@ -83,12 +64,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Blocked accounts cannot stay signed in.
         if ((profile as any).is_blocked) {
           console.warn("Blocked account attempted to sign in:", profile.id);
-          signOutRedirectRef.current = "/portal?blocked=1";
           await supabase.auth.signOut();
           if (mounted) {
             setUser(null);
             setIsLoading(false);
           }
+          router.push("/portal?blocked=1");
           return;
         }
         setUser({
@@ -101,6 +82,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           role: (profile.role as UserRole) || "artist",
           balance: Number(profile.balance) || 0,
           earnings: 0,
+          referral_balance: Number(profile.referral_balance) || 0,
+          referral_code: profile.referral_code || undefined,
           bio: profile.bio,
           instagram: profile.instagram,
           twitter: profile.twitter,
@@ -126,6 +109,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           role: role as UserRole,
           balance: 0,
           earnings: 0,
+          referral_balance: 0,
           created_at: session.user.created_at,
         });
       }
@@ -139,6 +123,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           role: "artist",
           balance: 0,
           earnings: 0,
+          referral_balance: 0,
           created_at: session.user.created_at,
         });
       }
@@ -165,13 +150,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setUser(null);
           setIsLoading(false);
         }
-        // Cleanup: nuke leftover auth cookies so a corrupted jar can never
-        // trap this tab, then send the user somewhere useful instead of
-        // leaving a blank/hung page behind.
-        clearAuthCookies();
-        const dest = signOutRedirectRef.current;
-        signOutRedirectRef.current = null;
-        router.push(dest || "/portal?session=expired");
       }
     });
 
@@ -180,6 +158,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       subscription.unsubscribe();
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Referral attribution: if the user arrived via someone's /ref/[code] link,
+  // attach the referral once, then clear the cookie.
+  useEffect(() => {
+    if (!user?.id) return;
+    const match = document.cookie.match(/(?:^|; )afropitch_ref=([^;]*)/);
+    const code = match ? decodeURIComponent(match[1]) : "";
+    if (!code) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/referral/attribute", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ code }),
+        });
+        if (!cancelled && res.ok) {
+          document.cookie =
+            "afropitch_ref=; Max-Age=0; path=/; SameSite=Lax";
+        }
+      } catch {
+        // Attribution is best-effort; the cookie persists for a later retry.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
 
   const login = async (email: string, password: string): Promise<UserRole> => {
     setIsLoading(true);
@@ -248,10 +254,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const logout = async () => {
-    signOutRedirectRef.current = "/portal";
     await supabase.auth.signOut();
     setUser(null);
-    // The SIGNED_OUT handler performs the redirect.
+    router.push("/portal");
   };
 
   const loadFunds = (amount: number) => {
@@ -290,14 +295,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           prev
             ? {
                 ...prev,
-                name: profile.full_name || prev.name,
-                email: profile.email || prev.email,
                 balance: Number(profile.balance),
+                referral_balance: Number(profile.referral_balance) || 0,
+                referral_code: profile.referral_code || prev.referral_code,
                 role: profile.role,
-                bio: profile.bio ?? prev.bio,
-                instagram: profile.instagram ?? prev.instagram,
-                twitter: profile.twitter ?? prev.twitter,
-                website: profile.website ?? prev.website,
               }
             : null
         );

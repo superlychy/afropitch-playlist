@@ -266,6 +266,10 @@ function SubmitForm() {
 
   const { total, discount: discountAmount } = calculateTotal();
 
+  // Wallet + referral balance can both pay for submissions.
+  const spendableBalance = (user?.balance || 0) + (user?.referral_balance || 0);
+  const referralCovers = Math.min(user?.referral_balance || 0, total);
+
   // Validate song link
   const isValidSongLink = (url: string): boolean => {
     try {
@@ -946,7 +950,7 @@ function SubmitForm() {
                         <p className="text-xs text-gray-400">
                           Balance:{" "}
                           {user
-                            ? `${pricingConfig.currency}${user.balance.toLocaleString()}`
+                            ? `${pricingConfig.currency}${user.balance.toLocaleString()}${user.referral_balance > 0 ? ` + ${pricingConfig.currency}${user.referral_balance.toLocaleString()} referral` : ""}`
                             : "Login to view"}
                         </p>
                       </div>
@@ -960,7 +964,7 @@ function SubmitForm() {
                         Login
                       </Button>
                     ) : (
-                      user.balance < total && (
+                      spendableBalance < total && (
                         <Button
                           size="sm"
                           variant="outline"
@@ -980,7 +984,7 @@ function SubmitForm() {
                   disabled={
                     isSubmitting ||
                     !user ||
-                    (total > 0 && user.balance < total)
+                    (total > 0 && spendableBalance < total)
                   }
                 >
                   {isSubmitting ? (
@@ -992,10 +996,12 @@ function SubmitForm() {
                     <span>
                       {!user
                         ? "Login to Pay"
-                        : total > 0 && user.balance < total
+                        : total > 0 && spendableBalance < total
                         ? "Insufficient Balance"
                         : total === 0
                         ? "SUBMIT FREE"
+                        : referralCovers > 0
+                        ? `PAY ${pricingConfig.currency}${total.toLocaleString()} (${pricingConfig.currency}${referralCovers.toLocaleString()} referral)`
                         : `PAY ${pricingConfig.currency}${total.toLocaleString()}`}
                     </span>
                   )}

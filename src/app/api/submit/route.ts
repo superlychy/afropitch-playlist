@@ -1,27 +1,41 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { createClient as createAuthClient } from "@/lib/supabase-server";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+const REFERRAL_REWARD = 1000;
+
 export async function POST(req: Request) {
   try {
+    // --- Authenticate the caller; never trust a client-supplied user id ---
+    const auth = await createAuthClient();
+    const {
+      data: { user },
+    } = await auth.auth.getUser();
+    if (!user) {
+      return NextResponse.json(
+        { success: false, error: "Please login to submit." },
+        { status: 401 }
+      );
+    }
+    const user_id = user.id;
+
     const body = await req.json();
     const {
-      user_id,
       playlist_ids,
       song_title,
       artist_name,
       song_link,
       tier,
       total_amount,
-      email,
     } = body;
 
     // --- Validation ---
-    if (!user_id || !playlist_ids?.length || !song_title || !song_link || !artist_name) {
+    if (!playlist_ids?.length || !song_title || !song_link || !artist_name) {
       return NextResponse.json(
         { success: false, error: "Missing required fields" },
         { status: 400 }
@@ -75,10 +89,10 @@ export async function POST(req: Request) {
       );
     }
 
-    // --- Fetch current balance (atomic check) ---
+    // --- Fetch current balances (atomic check) ---
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
-      .select("balance")
+      .select("balance, referral_balance")
       .eq("id", user_id)
       .single();
 
@@ -90,7 +104,14 @@ export async function POST(req: Request) {
     }
 
     const currentBalance = Number(profile.balance);
-    if (total_amount > 0 && currentBalance < total_amount) {
+    const currentReferralBalance = Number(profile.referral_balance) || 0;
+
+    // Referral balance is spent first, wallet covers the remainder.
+    const fromReferral =
+      total_amount > 0 ? Math.min(currentReferralBalance, total_amount) : 0;
+    const fromWallet = total_amount > 0 ? total_amount - fromReferral : 0;
+
+    if (total_amount > 0 && currentBalance < fromWallet) {
       return NextResponse.json(
         { success: false, error: "Insufficient wallet balance" },
         { status: 400 }
@@ -146,13 +167,17 @@ export async function POST(req: Request) {
       );
     }
 
-    // --- ATOMIC: Deduct wallet + insert submissions + record transaction ---
+    // --- ATOMIC: Deduct balances + insert submissions + record transaction ---
     if (total_amount > 0) {
       const { error: deductError } = await supabase
         .from("profiles")
-        .update({ balance: currentBalance - total_amount })
+        .update({
+          balance: currentBalance - fromWallet,
+          referral_balance: currentReferralBalance - fromReferral,
+        })
         .eq("id", user_id)
-        .eq("balance", currentBalance); // Optimistic lock: only update if balance hasn't changed
+        .eq("balance", currentBalance) // Optimistic lock
+        .eq("referral_balance", currentReferralBalance);
 
       if (deductError) {
         return NextResponse.json(
@@ -164,15 +189,19 @@ export async function POST(req: Request) {
       // Verify deduction worked (optimistic lock check)
       const { data: newProfile } = await supabase
         .from("profiles")
-        .select("balance")
+        .select("balance, referral_balance")
         .eq("id", user_id)
         .single();
 
-      if (!newProfile || Number(newProfile.balance) !== currentBalance - total_amount) {
+      if (
+        !newProfile ||
+        Number(newProfile.balance) !== currentBalance - fromWallet ||
+        Number(newProfile.referral_balance) !== currentReferralBalance - fromReferral
+      ) {
         // Rollback
         await supabase
           .from("profiles")
-          .update({ balance: currentBalance })
+          .update({ balance: currentBalance, referral_balance: currentReferralBalance })
           .eq("id", user_id);
 
         return NextResponse.json(
@@ -203,11 +232,11 @@ export async function POST(req: Request) {
       .insert(submissions);
 
     if (insertError) {
-      // Rollback wallet deduction
+      // Rollback balance deduction
       if (total_amount > 0) {
         await supabase
           .from("profiles")
-          .update({ balance: currentBalance })
+          .update({ balance: currentBalance, referral_balance: currentReferralBalance })
           .eq("id", user_id);
       }
       return NextResponse.json(
@@ -222,8 +251,35 @@ export async function POST(req: Request) {
         user_id,
         amount: -total_amount,
         type: "payment",
-        description: `Submission Fee: ${playlist_ids.length} Playlists${discount > 0 ? ` (10% bulk discount)` : ""}`,
+        description: `Submission Fee: ${playlist_ids.length} Playlists${discount > 0 ? ` (10% bulk discount)` : ""}${fromReferral > 0 ? ` (${fromReferral.toLocaleString()} from referral balance)` : ""}`,
       });
+    }
+
+    // --- Referral qualification: first PAID submission credits the referrer ---
+    // The UPDATE only succeeds for a pending row, so the reward is granted
+    // exactly once per referee no matter how many submissions follow.
+    if (total_amount > 0) {
+      const { data: qualified } = await supabase
+        .from("referrals")
+        .update({ status: "qualified", qualified_at: new Date().toISOString() })
+        .eq("referee_id", user_id)
+        .eq("status", "pending")
+        .select("referrer_id");
+
+      if (qualified && qualified.length > 0) {
+        const referrerId = qualified[0].referrer_id;
+        await supabase.rpc("credit_referral_balance", {
+          p_user_id: referrerId,
+          p_amount: REFERRAL_REWARD,
+        });
+
+        await supabase.from("transactions").insert({
+          user_id: referrerId,
+          amount: REFERRAL_REWARD,
+          type: "earning",
+          description: `Referral reward: ${artist_name} paid for their first submission`,
+        });
+      }
     }
 
     return NextResponse.json({ success: true });
