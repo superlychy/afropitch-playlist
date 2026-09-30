@@ -1,9 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-// Tracked outbound redirect for Spotify links.
-// Validates the destination (open-redirect protection), logs the click
-// best-effort, then 302s to Spotify. Never blocks the redirect on a DB error.
+// Tracked outbound redirect for streaming-platform links.
+// Validates the destination against an explicit allowlist (open-redirect
+// protection), logs the click best-effort, bumps the submission's stream
+// counter (IP-deduped), then 302s. Never blocks the redirect on a DB error.
+const ALLOWED_HOSTS = new Set([
+  "open.spotify.com",
+  "www.spotify.com",
+  "music.apple.com",
+  "audiomack.com",
+  "www.audiomack.com",
+  "boomplay.com",
+  "www.boomplay.com",
+]);
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export async function GET(req: NextRequest) {
   const to = req.nextUrl.searchParams.get("to") || "";
   const kind = req.nextUrl.searchParams.get("kind") || "link";
@@ -15,7 +28,7 @@ export async function GET(req: NextRequest) {
   } catch {
     return NextResponse.json({ error: "Invalid destination" }, { status: 400 });
   }
-  if (!/^(open|www)\.spotify\.com$/.test(dest.hostname)) {
+  if (!ALLOWED_HOSTS.has(dest.hostname)) {
     return NextResponse.json({ error: "Destination not allowed" }, { status: 400 });
   }
 
@@ -30,6 +43,12 @@ export async function GET(req: NextRequest) {
       ref_id: ref?.slice(0, 100) ?? null,
       source: req.headers.get("referer")?.slice(0, 300) ?? null,
     });
+    // Count it as a stream on the submission (IP-deduped firewall RPC).
+    if (ref && UUID_RE.test(ref)) {
+      const forwarded = req.headers.get("x-forwarded-for");
+      const ip = forwarded ? forwarded.split(",")[0].trim() : (req.headers.get("x-real-ip") || "unknown");
+      await supabase.rpc("increment_clicks", { submission_id: ref, ip_address: ip });
+    }
   } catch {
     // Logging must never break the redirect.
   }

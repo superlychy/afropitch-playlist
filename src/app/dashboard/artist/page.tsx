@@ -14,6 +14,7 @@ import { supabase } from "@/lib/supabase";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import dynamic from "next/dynamic";
+import SmartLinkCard from "./SmartLinkCard";
 import { TransactionsList } from "@/components/TransactionsList";
 import { ArtistMixingOrders } from "@/components/ArtistMixingOrders";
 
@@ -27,6 +28,10 @@ interface Submission {
   created_at: string;
   clicks: number;
   tracking_slug: string | null;
+  apple_music_url: string | null;
+  audiomack_url: string | null;
+  boomplay_url: string | null;
+  cover_art_url: string | null;
   ranking_boosted_at: string | null;
   feedback: string | null;
   playlist: {
@@ -90,11 +95,8 @@ export default function ArtistDashboard() {
 
   // Notifications
   const [showNotifications, setShowNotifications] = useState(false);
-  const [personalNotifications, setPersonalNotifications] = useState<any[]>([]);
-  const [broadcasts, setBroadcasts] = useState<any[]>([]);
+  const [notifications, setNotifications] = useState<any[]>([]);
   const [expandedNotificationId, setExpandedNotificationId] = useState<string | null>(null);
-
-  const unreadCount = personalNotifications.filter((n) => !n.is_read).length;
 
   const toggleNotification = (id: string) => {
     setExpandedNotificationId((prev) => (prev === id ? null : id));
@@ -102,26 +104,17 @@ export default function ArtistDashboard() {
 
   useEffect(() => {
     if (user) {
-      fetchSubmissions();
-      fetchPersonalNotifications();
-      fetchBroadcasts();
-    }
-  }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Initialize the profile form only when the modal opens — never while the
-  // user is typing. (It used to re-run on every auth token refresh, which
-  // silently wiped in-progress edits and made saving feel stuck/broken.)
-  useEffect(() => {
-    if (showProfile && user) {
       setProfileName(user.name || "");
       setProfileEmail(user.email || "");
       setProfileBio(user.bio || "");
       setProfileIg(user.instagram || "");
       setProfileTwitter(user.twitter || "");
       setProfileWeb(user.website || "");
+      fetchSubmissions();
+      fetchNotifications();
       fetchBankDetails();
     }
-  }, [showProfile]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchBankDetails = async () => {
     if (!user) return;
@@ -184,18 +177,7 @@ export default function ArtistDashboard() {
     setIsWithdrawing(false);
   };
 
-  const fetchPersonalNotifications = async () => {
-    if (!user) return;
-    const { data } = await supabase
-      .from("notifications")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false })
-      .limit(20);
-    if (data) setPersonalNotifications(data);
-  };
-
-  const fetchBroadcasts = async () => {
+  const fetchNotifications = async () => {
     if (!user) return;
     let query = supabase
       .from("broadcasts")
@@ -207,42 +189,8 @@ export default function ArtistDashboard() {
     }
 
     const { data } = await query.order("created_at", { ascending: false }).limit(20);
-    if (data) setBroadcasts(data);
+    if (data) setNotifications(data);
   };
-
-  const markNotificationsRead = async () => {
-    if (!user) return;
-    const unreadIds = personalNotifications.filter((n) => !n.is_read).map((n) => n.id);
-    if (unreadIds.length === 0) return;
-    // Optimistic: clear the dot immediately, persist in the background.
-    setPersonalNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
-    await supabase.from("notifications").update({ is_read: true }).in("id", unreadIds).eq("user_id", user.id);
-  };
-
-  // Mark personal notifications as read once the user has seen the list.
-  useEffect(() => {
-    if (showNotifications) markNotificationsRead();
-  }, [showNotifications]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Live personal notifications — the bell dot updates the moment one arrives.
-  useEffect(() => {
-    if (!user) return;
-    const channel = supabase
-      .channel(`artist-notifications-${user.id}`)
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` },
-        (payload) => {
-          const n = payload.new as any;
-          setPersonalNotifications((prev) => [n, ...prev].slice(0, 20));
-          toast("🔔 " + (n.title || "New notification"), "info");
-        }
-      )
-      .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchSubmissions = async () => {
     if (!user) return;
@@ -265,36 +213,28 @@ export default function ArtistDashboard() {
   const handleUpdateProfile = async () => {
     if (!user) return;
     setIsUpdatingProfile(true);
-    try {
-      const { error } = await supabase
-        .from("profiles")
-        .update({
-          full_name: profileName,
-          bio: profileBio,
-          instagram: profileIg,
-          twitter: profileTwitter,
-          website: profileWeb,
-          bank_name: bankName,
-          account_number: accountNumber,
-          account_name: accountName,
-        })
-        .eq("id", user.id);
 
-      if (error) {
-        toast("Error updating profile: " + error.message, "error");
-      } else {
-        toast("Profile saved!", "success");
-        setShowProfile(false);
-        // Refresh local user so the new name/bio shows immediately —
-        // previously the dashboard kept showing the old values until a refresh.
-        await refreshUser();
-      }
-    } catch (e: any) {
-      toast("Could not save your profile. Please check your connection and try again.", "error");
-    } finally {
-      // Always release the button — a stuck spinner here was the reported bug.
-      setIsUpdatingProfile(false);
+    const { error } = await supabase
+      .from("profiles")
+      .update({
+        full_name: profileName,
+        bio: profileBio,
+        instagram: profileIg,
+        twitter: profileTwitter,
+        website: profileWeb,
+        bank_name: bankName,
+        account_number: accountNumber,
+        account_name: accountName,
+      })
+      .eq("id", user.id);
+
+    if (error) {
+      toast("Error updating profile: " + error.message, "error");
+    } else {
+      toast("Profile saved!", "success");
+      setShowProfile(false);
     }
+    setIsUpdatingProfile(false);
   };
 
   // Support Functions
@@ -357,65 +297,19 @@ export default function ArtistDashboard() {
     if (data) setChatMessages(data);
   };
 
-  // Live support replies — new messages on the open ticket appear instantly,
-  // without closing and reopening the chat.
-  useEffect(() => {
-    if (!activeTicket) return;
-    const channel = supabase
-      .channel(`support-chat-${activeTicket.id}`)
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "support_messages", filter: `ticket_id=eq.${activeTicket.id}` },
-        (payload) => {
-          const msg = payload.new as any;
-          setChatMessages((prev) => {
-            if (prev.some((m) => m.id === msg.id)) return prev; // skip our own echo
-            return [...prev, msg];
-          });
-        }
-      )
-      .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [activeTicket]);
-
-  const chatEndRef = useRef<HTMLDivElement>(null);
-
-  // Keep the chat pinned to the newest message.
-  useEffect(() => {
-    if (supportView === "chat") chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [chatMessages, supportView]);
-
   const sendChatMessage = async () => {
     if (!chatInput.trim() || !activeTicket || !user) return;
     const text = chatInput;
     setChatInput("");
-    // Optimistic message so the chat feels instant — rolled back if the send fails.
-    const tempId = `temp-${Date.now()}`;
     setChatMessages((prev) => [
       ...prev,
-      { id: tempId, ticket_id: activeTicket.id, sender_id: user.id, message: text, created_at: new Date().toISOString() },
+      { id: Math.random(), ticket_id: activeTicket.id, sender_id: user.id, message: text, created_at: new Date().toISOString() },
     ]);
-    const { data, error } = await supabase
-      .from("support_messages")
-      .insert({
-        ticket_id: activeTicket.id,
-        sender_id: user.id,
-        message: text,
-      })
-      .select()
-      .single();
-    if (error || !data) {
-      setChatMessages((prev) => prev.filter((m) => m.id !== tempId));
-      toast("Message failed to send. Please try again.", "error");
-      return;
-    }
-    // Swap the optimistic message for the real row (also guards against a
-    // realtime duplicate if the live event arrived first).
-    setChatMessages((prev) =>
-      prev.filter((m) => m.id !== data.id).map((m) => (m.id === tempId ? data : m))
-    );
+    await supabase.from("support_messages").insert({
+      ticket_id: activeTicket.id,
+      sender_id: user.id,
+      message: text,
+    });
   };
 
   // ============================================
@@ -507,12 +401,6 @@ export default function ArtistDashboard() {
     [refreshUser, toast]
   );
 
-  // If the session died (or never existed), don't leave a blank page behind —
-  // send the user back to login.
-  useEffect(() => {
-    if (!isLoading && !user) router.push("/portal");
-  }, [isLoading, user, router]);
-
   if (isLoading) return <div className="p-8 text-center text-gray-500">Loading dashboard...</div>;
   if (!user) return null;
 
@@ -546,7 +434,7 @@ export default function ArtistDashboard() {
             onClick={() => setShowNotifications(true)}
           >
             <Bell className="w-5 h-5 text-gray-400" />
-            {unreadCount > 0 && <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full animate-pulse" />}
+            {notifications.length > 0 && <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full animate-pulse" />}
           </Button>
 
           <Button variant="outline" size="icon" className="border-white/10 hover:bg-white/10 h-10 w-10 shrink-0" title="Contact Support" onClick={() => setShowSupport(true)}>
@@ -643,38 +531,7 @@ export default function ArtistDashboard() {
                     </div>
                   </div>
                   {sub.status === "accepted" && sub.tracking_slug && (
-                    <div className="mt-3 bg-gradient-to-br from-green-900/30 to-black border border-green-500/20 rounded-lg p-3 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <p className="text-[10px] font-bold text-green-400 uppercase tracking-widest flex items-center gap-1">
-                          <TrendingUp className="w-3 h-3" /> Viral Tracker
-                        </p>
-                        <span className="text-[10px] font-bold text-white bg-green-500/20 px-2 py-0.5 rounded-full">
-                          {sub.clicks || 0}/100
-                        </span>
-                      </div>
-                      <div className="h-2 w-full bg-black/50 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-gradient-to-r from-green-600 to-green-400 transition-all duration-1000"
-                          style={{ width: `${Math.min(((sub.clicks || 0) / 100) * 100, 100)}%` }}
-                        />
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <div className="flex-1 bg-black/60 rounded px-2 py-1.5 text-[10px] sm:text-xs text-gray-300 truncate select-all border border-white/5 font-mono">
-                          https://afropitchplay.best/track/{sub.tracking_slug}
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 px-2 text-[10px] text-green-400 hover:text-green-300 shrink-0 border border-green-500/20"
-                          onClick={() => {
-                              navigator.clipboard.writeText(`https://afropitchplay.best/track/${sub.tracking_slug}`);
-                              toast("Tracking link copied!", "success");
-                          }}
-                        >
-                          Copy
-                        </Button>
-                      </div>
-                    </div>
+                    <SmartLinkCard submission={sub} onSaved={fetchSubmissions} />
                   )}
                   {(sub.status === "declined" || sub.status === "rejected" || sub.status === "archived") && sub.feedback && (
                     <div className="mt-3 p-2 bg-red-900/20 border border-red-500/20 rounded">
@@ -741,12 +598,14 @@ export default function ArtistDashboard() {
                   </Button>
                 )}
               </div>
-              <button
+              <Button
+                variant="outline"
+                className="w-full mt-3 border-green-500/30 text-green-400 hover:bg-green-500/10"
                 onClick={() => setShowWithdraw(true)}
-                className="w-full mt-3 text-[11px] text-gray-600 hover:text-gray-400 underline underline-offset-4 transition-colors"
               >
-                Need your funds? Request a payout
-              </button>
+                <Wallet className="w-4 h-4 mr-2" /> Withdraw Funds
+              </Button>
+              <p className="text-[10px] text-center text-gray-500 mt-2">Minimum withdrawal: {pricingConfig.currency}5,000</p>
             </CardContent>
           </Card>
 
@@ -905,7 +764,7 @@ export default function ArtistDashboard() {
                     {chatMessages.map((msg, idx) => {
                       const isMe = msg.sender_id === user?.id;
                       return (
-                        <div key={msg.id || idx} className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
+                        <div key={idx} className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
                           <div className={`max-w-[75%] p-3 rounded-xl text-sm ${isMe ? "bg-green-600 text-white rounded-br-none" : "bg-zinc-700 text-gray-200 rounded-bl-none"}`}>
                             <p>{msg.message}</p>
                             <p className="text-[10px] opacity-50 mt-1 text-right">{new Date(msg.created_at).toLocaleTimeString()}</p>
@@ -913,7 +772,6 @@ export default function ArtistDashboard() {
                         </div>
                       );
                     })}
-                    <div ref={chatEndRef} />
                   </div>
                   <div className="p-3 bg-zinc-900 border-t border-white/10 flex gap-2">
                     <Input value={chatInput} onChange={(e) => setChatInput(e.target.value)} placeholder="Type a message..." className="bg-zinc-800 border-zinc-700" onKeyDown={(e) => e.key === "Enter" && sendChatMessage()} />
@@ -930,8 +788,8 @@ export default function ArtistDashboard() {
 
       {/* Profile Modal */}
       {showProfile && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in p-4">
-          <div className="bg-zinc-900 border border-white/10 p-6 rounded-lg w-full max-w-md space-y-4 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-zinc-900 border border-white/10 p-6 rounded-lg w-full max-w-md space-y-4">
             <h3 className="font-bold text-white text-lg">Artist Profile</h3>
             <div className="space-y-2">
               <Label>Bio / Pitch</Label>
@@ -952,7 +810,7 @@ export default function ArtistDashboard() {
               <Input value={profileWeb} onChange={(e) => setProfileWeb(e.target.value)} placeholder="https://" />
             </div>
             <div className="pt-2 border-t border-white/10">
-              <p className="text-xs text-gray-500 mb-3">Bank details for withdrawals.</p>
+              <p className="text-xs text-gray-500 mb-3">Bank details — used for withdrawals.</p>
               <div className="space-y-2">
                 <Label>Bank Name</Label>
                 <Input value={bankName} onChange={(e) => setBankName(e.target.value)} placeholder="e.g. GTBank" />
@@ -970,9 +828,7 @@ export default function ArtistDashboard() {
             </div>
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="ghost" onClick={() => setShowProfile(false)}>Cancel</Button>
-              <Button className="bg-green-600" onClick={handleUpdateProfile} disabled={isUpdatingProfile}>
-                {isUpdatingProfile ? "Saving..." : "Save Profile"}
-              </Button>
+              <Button className="bg-green-600" onClick={handleUpdateProfile} disabled={isUpdatingProfile}>Save Profile</Button>
             </div>
           </div>
         </div>
@@ -990,8 +846,8 @@ export default function ArtistDashboard() {
                 <XCircle className="w-6 h-6" />
               </Button>
             </div>
-            <div className="space-y-6">
-              {personalNotifications.length === 0 && broadcasts.length === 0 && (
+            <div className="space-y-4">
+              {notifications.length === 0 && (
                 <div className="bg-white/5 p-4 rounded border border-white/5">
                   <h4 className="font-bold text-white mb-1">👋 Welcome to AfroPitch!</h4>
                   <p className="text-sm text-gray-400 mb-2">
@@ -1000,41 +856,21 @@ export default function ArtistDashboard() {
                   <p className="text-[10px] text-gray-600">Just now</p>
                 </div>
               )}
-              {personalNotifications.length > 0 && (
-                <div className="space-y-3">
-                  <h4 className="text-xs font-bold text-gray-500 uppercase tracking-widest">Your updates</h4>
-                  {personalNotifications.map((n) => (
-                    <div key={n.id} className={`p-4 rounded border ${n.is_read ? "bg-white/5 border-white/5" : "bg-green-500/10 border-green-500/30"}`}>
-                      <h4 className="font-bold text-white mb-1 flex items-center gap-2">
-                        {!n.is_read && <span className="w-2 h-2 bg-green-500 rounded-full shrink-0" />}
-                        <span>{n.title}</span>
-                      </h4>
-                      <p className="text-sm text-gray-400 whitespace-pre-wrap">{n.message}</p>
-                      <p className="text-[10px] text-gray-600 mt-2">{new Date(n.created_at).toLocaleDateString()}</p>
+              {notifications.map((n, i) => {
+                const isExpanded = expandedNotificationId === n.id;
+                return (
+                  <div key={n.id || i} className="bg-white/5 p-4 rounded border border-white/5 cursor-pointer hover:bg-white/10 transition-colors" onClick={() => toggleNotification(n.id)}>
+                    <h4 className="font-bold text-white mb-1 flex justify-between items-start">
+                      <span>{n.subject}</span>
+                      <span className="text-[10px] text-gray-500 font-normal ml-2 shrink-0 border border-white/10 px-1.5 py-0.5 rounded uppercase tracking-wider">{isExpanded ? "Collapse" : "Read"}</span>
+                    </h4>
+                    <div className={`text-sm text-gray-400 whitespace-pre-wrap ${isExpanded ? "" : "line-clamp-2"}`}>
+                      {n.message ? n.message.replace(/<[^>]*>?/gm, " ").replace(/\s+/g, " ").trim() : ""}
                     </div>
-                  ))}
-                </div>
-              )}
-              {broadcasts.length > 0 && (
-                <div className="space-y-3">
-                  <h4 className="text-xs font-bold text-gray-500 uppercase tracking-widest">Announcements</h4>
-                  {broadcasts.map((n, i) => {
-                    const isExpanded = expandedNotificationId === n.id;
-                    return (
-                      <div key={n.id || i} className="bg-white/5 p-4 rounded border border-white/5 cursor-pointer hover:bg-white/10 transition-colors" onClick={() => toggleNotification(n.id)}>
-                        <h4 className="font-bold text-white mb-1 flex justify-between items-start">
-                          <span>{n.subject}</span>
-                          <span className="text-[10px] text-gray-500 font-normal ml-2 shrink-0 border border-white/10 px-1.5 py-0.5 rounded uppercase tracking-wider">{isExpanded ? "Collapse" : "Read"}</span>
-                        </h4>
-                        <div className={`text-sm text-gray-400 whitespace-pre-wrap ${isExpanded ? "" : "line-clamp-2"}`}>
-                          {n.message ? n.message.replace(/<[^>]*>?/gm, " ").replace(/\s+/g, " ").trim() : ""}
-                        </div>
-                        <p className="text-[10px] text-gray-600 mt-2">{new Date(n.created_at).toLocaleDateString()}</p>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
+                    <p className="text-[10px] text-gray-600 mt-2">{new Date(n.created_at).toLocaleDateString()}</p>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
