@@ -7,7 +7,7 @@ import { useToast } from "@/components/ui/toast";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { BarChart3, TrendingUp, Music, Users, Trophy, DollarSign, ShieldAlert, CheckCircle, XCircle, MessageSquare, LogOut, Bell, Plus, Search, Loader2, Send, RefreshCw, Zap, Eye } from "lucide-react";
+import { BarChart3, TrendingUp, Music, Users, Trophy, DollarSign, ShieldAlert, CheckCircle, XCircle, MessageSquare, LogOut, Bell, Plus, Search, Loader2, Send, RefreshCw, Zap, Eye, Play } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { TransactionsList } from "@/components/TransactionsList";
 import { pricingConfig } from "@/../config/pricing";
@@ -203,7 +203,14 @@ export default function AdminDashboard() {
 
     // Featured email state (send branded questionnaire email from a submission row)
     const [featuredEmailSub, setFeaturedEmailSub] = useState<any | null>(null);
-    const [featuredEmailCategory, setFeaturedEmailCategory] = useState<"artist-of-the-week" | "rising-artist" | "artist-of-the-season">("artist-of-the-week");
+    // Song preview state (Spotify 30s embed in the playlist submissions tab)
+    const [previewSong, setPreviewSong] = useState<any | null>(null);
+
+    const spotifyEmbedUrl = (link: string | null | undefined): string | null => {
+        if (!link) return null;
+        const m = link.match(/open\.spotify\.com\/(track|album|playlist)\/([A-Za-z0-9]+)/);
+        return m ? `https://open.spotify.com/embed/${m[1]}/${m[2]}` : null;
+    };    const [featuredEmailCategory, setFeaturedEmailCategory] = useState<"artist-of-the-week" | "rising-artist" | "artist-of-the-season">("artist-of-the-week");
     const [sendingFeaturedEmail, setSendingFeaturedEmail] = useState(false);
 
     const sendFeaturedEmail = async () => {
@@ -1796,9 +1803,14 @@ export default function AdminDashboard() {
                                                             <p className="text-sm text-white font-bold truncate pr-6">{song.artist?.full_name || 'Unknown Artist'}</p>
                                                             <p className="text-xs text-gray-400 truncate">{song.song_title || 'Untitled Track'}</p>
                                                         </div>
-                                                        <a href={song.song_link} target="_blank" rel="noopener noreferrer" className="p-2 bg-white/5 rounded-full hover:bg-white/20 transition-colors text-blue-400">
-                                                            <Music className="w-4 h-4" />
-                                                        </a>
+                                                        <div className="flex items-center gap-2">
+                                                            <button onClick={() => setPreviewSong(song)} className="p-2 bg-green-600/20 rounded-full hover:bg-green-600/40 transition-colors text-green-400" title="Play 30s preview">
+                                                                <Play className="w-4 h-4" />
+                                                            </button>
+                                                            <a href={song.song_link} target="_blank" rel="noopener noreferrer" className="p-2 bg-white/5 rounded-full hover:bg-white/20 transition-colors text-blue-400" title="Open in Spotify">
+                                                                <Music className="w-4 h-4" />
+                                                            </a>
+                                                        </div>
                                                     </div>
 
                                                     <div className="grid grid-cols-3 gap-2 mt-auto">
@@ -2450,6 +2462,7 @@ export default function AdminDashboard() {
                                                     <span>{new Date(sub.created_at).toLocaleDateString()}</span>
                                                 </div>
                                                 <div className="flex items-center justify-start sm:justify-end gap-2 shrink-0">
+                                                    {sub.status !== 'declined' && sub.status !== 'archived' && (
                                                     <Button
                                                         size="sm"
                                                         variant="outline"
@@ -2459,6 +2472,7 @@ export default function AdminDashboard() {
                                                     >
                                                         <Send className="w-3.5 h-3.5" /> Featured
                                                     </Button>
+                                                    )}
                                                     {sub.status === 'accepted' && (
                                                         <Button
                                                             size="sm"
@@ -2539,6 +2553,32 @@ export default function AdminDashboard() {
                         </div>
                     </div>
                 )
+            }
+
+            {/* SONG PREVIEW MODAL (Spotify 30s embed) */}
+            {
+                previewSong && (() => {
+                    const embed = spotifyEmbedUrl(previewSong.song_link);
+                    return (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in" onClick={() => setPreviewSong(null)}>
+                            <div className="w-full max-w-sm mx-4" onClick={e => e.stopPropagation()}>
+                                <p className="text-white font-bold mb-1 truncate">{previewSong.song_title || "Untitled Track"}</p>
+                                <p className="text-xs text-gray-400 mb-3 truncate">{previewSong.artist?.full_name || "Unknown Artist"}</p>
+                                {embed ? (
+                                    <iframe src={embed} width="100%" height="152" frameBorder="0" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy" className="rounded-xl" title="Song preview" />
+                                ) : (
+                                    <div className="bg-zinc-900 border border-white/10 rounded-xl p-6 text-center">
+                                        <p className="text-gray-400 text-sm mb-3">No playable preview for this link.</p>
+                                        <a href={previewSong.song_link} target="_blank" rel="noopener noreferrer" className="text-green-400 text-sm font-bold underline">Open in Spotify</a>
+                                    </div>
+                                )}
+                                <div className="flex justify-end mt-3">
+                                    <Button variant="ghost" onClick={() => setPreviewSong(null)}>Close</Button>
+                                </div>
+                            </div>
+                        </div>
+                    );
+                })()
             }
 
             {/* SEND FEATURED EMAIL MODAL */}
