@@ -628,12 +628,21 @@ export default function ArtistDashboard() {
           </div>
 
           {/* ===== Smart links (mobile cards) ===== */}
-          {smartLinkSubs.length > 0 && (
-            <section id="smart-links" className="pt-4 scroll-mt-20">
-              <div className="flex justify-between items-center mb-2.5">
-                <h2 className="text-[15px] font-bold">Your smart links</h2>
+          <section id="smart-links" className="pt-4 scroll-mt-20">
+            <div className="flex justify-between items-center mb-2.5">
+              <h2 className="text-[15px] font-bold">Your smart links</h2>
+            </div>
+            {smartLinkSubs.length === 0 ? (
+              <div className="bg-[#141417] border border-dashed border-white/10 rounded-2xl p-6 text-center">
+                <Link2 className="w-8 h-8 mx-auto text-zinc-600 mb-2" />
+                <p className="text-zinc-400 text-sm">No smart links yet.</p>
+                <p className="text-zinc-600 text-xs mt-1">Submit your music to get a shareable smart link page with all your streaming platforms.</p>
+                <button onClick={() => router.push("/submit")} className="text-[#22C55E] text-sm font-bold mt-2">
+                  Submit your music
+                </button>
               </div>
-              {smartLinkSubs.map((s) => (
+            ) : (
+              smartLinkSubs.map((s) => (
                 <SmartLinkCard
                   key={s.id}
                   variant="card"
@@ -641,9 +650,9 @@ export default function ArtistDashboard() {
                   stats={linkStats[s.id] || {}}
                   onSaved={() => { fetchSubmissions(); fetchLinkStats(); }}
                 />
-              ))}
-            </section>
-          )}
+              ))
+            )}
+          </section>
 
           {/* ===== Recent submissions ===== */}
           <section id="submissions" className="pt-4 scroll-mt-20">

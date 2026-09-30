@@ -7,12 +7,12 @@ import { useToast } from "@/components/ui/toast";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Music, Users, Trophy, DollarSign, ShieldAlert, CheckCircle, XCircle, MessageSquare, LogOut, Bell, Plus, Search, Loader2, Send, RefreshCw, Zap, Eye } from "lucide-react";
+import { Music, Users, Trophy, DollarSign, ShieldAlert, CheckCircle, XCircle, MessageSquare, LogOut, Bell, Plus, Search, Loader2, Send, RefreshCw, Zap, Eye, ChevronLeft } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { TransactionsList } from "@/components/TransactionsList";
 import { pricingConfig } from "@/../config/pricing";
 import AnalyticsPage from "./analytics/page";
-import { AdminActivityFeed } from "@/components/AdminActivityFeed";
+import { AdminAnalytics } from "@/components/admin/AdminAnalytics";
 import { AdminMessageForm } from "@/components/AdminMessageForm";
 import { CustomEmailForm } from "@/components/CustomEmailForm";
 import { AdminInbox } from "@/components/AdminInbox";
@@ -141,6 +141,7 @@ export default function AdminDashboard() {
     // Nav chrome state
     const [showMoreSheet, setShowMoreSheet] = useState(false);
     const [headerSearch, setHeaderSearch] = useState("");
+    const [showNotifications, setShowNotifications] = useState(false);
 
     // Financial Stats — sourced from real DB data
     const [finStats, setFinStats] = useState({
@@ -1401,7 +1402,7 @@ export default function AdminDashboard() {
                         <h1 className="text-[19px] font-extrabold text-white">Admin</h1>
                     </div>
                     <button
-                        onClick={() => navigate("overview")}
+                        onClick={() => setShowNotifications(v => !v)}
                         aria-label="Notifications"
                         className="w-11 h-11 rounded-[14px] bg-[#141417] border border-white/[0.08] flex items-center justify-center relative"
                     >
@@ -1413,6 +1414,88 @@ export default function AdminDashboard() {
                         )}
                     </button>
                 </header>
+
+                {/* Notifications panel (mobile + desktop) */}
+                {showNotifications && (
+                    <>
+                        <div className="fixed inset-0 z-40" onClick={() => setShowNotifications(false)} />
+                        <div className="fixed z-50 top-[68px] lg:top-[72px] right-4 lg:right-8 w-[320px] max-w-[calc(100vw-2rem)] bg-[#141417] border border-white/[0.1] rounded-2xl shadow-2xl shadow-black/60 overflow-hidden">
+                            <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.08]">
+                                <h3 className="text-sm font-extrabold text-white flex items-center gap-2">
+                                    <Bell className="w-4 h-4 text-[#EAB308]" /> Notifications
+                                </h3>
+                                <button onClick={() => setShowNotifications(false)} className="text-[#71717A] hover:text-white" aria-label="Close notifications">
+                                    <XCircle className="w-5 h-5" />
+                                </button>
+                            </div>
+                            <div className="p-2 max-h-[70vh] overflow-y-auto">
+                                {totalAlerts === 0 && (
+                                    <p className="text-sm text-[#71717A] text-center py-8 px-4">All caught up. Nothing needs your attention right now.</p>
+                                )}
+                                {pendingSubmissionsCount > 0 && (
+                                    <button
+                                        onClick={() => { setShowNotifications(false); navigate("submissions"); }}
+                                        className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-white/[0.06] text-left"
+                                    >
+                                        <span className="w-9 h-9 rounded-xl bg-amber-500/15 border border-amber-500/25 flex items-center justify-center shrink-0">
+                                            <Music className="w-4 h-4 text-amber-400" />
+                                        </span>
+                                        <span className="flex-1 min-w-0">
+                                            <span className="block text-sm font-bold text-white">{pendingSubmissionsCount} pending submission{pendingSubmissionsCount === 1 ? "" : "s"}</span>
+                                            <span className="block text-xs text-[#71717A]">Songs waiting for your review</span>
+                                        </span>
+                                        <ChevronLeft className="w-4 h-4 text-[#71717A] rotate-180 shrink-0" />
+                                    </button>
+                                )}
+                                {pendingWithdrawalsCount > 0 && (
+                                    <button
+                                        onClick={() => { setShowNotifications(false); navigate("withdrawals"); }}
+                                        className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-white/[0.06] text-left"
+                                    >
+                                        <span className="w-9 h-9 rounded-xl bg-red-500/15 border border-red-500/25 flex items-center justify-center shrink-0">
+                                            <Wallet className="w-4 h-4 text-red-400" />
+                                        </span>
+                                        <span className="flex-1 min-w-0">
+                                            <span className="block text-sm font-bold text-white">{pendingWithdrawalsCount} withdrawal request{pendingWithdrawalsCount === 1 ? "" : "s"}</span>
+                                            <span className="block text-xs text-[#71717A]">{formatNaira(finStats.pendingWithdrawals)} awaiting approval</span>
+                                        </span>
+                                        <ChevronLeft className="w-4 h-4 text-[#71717A] rotate-180 shrink-0" />
+                                    </button>
+                                )}
+                                {(pendingCurators.length + curatorApplications.length) > 0 && (
+                                    <button
+                                        onClick={() => { setShowNotifications(false); navigate("applications"); }}
+                                        className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-white/[0.06] text-left"
+                                    >
+                                        <span className="w-9 h-9 rounded-xl bg-blue-500/15 border border-blue-500/25 flex items-center justify-center shrink-0">
+                                            <UserPlus className="w-4 h-4 text-blue-400" />
+                                        </span>
+                                        <span className="flex-1 min-w-0">
+                                            <span className="block text-sm font-bold text-white">{pendingCurators.length + curatorApplications.length} curator application{(pendingCurators.length + curatorApplications.length) === 1 ? "" : "s"}</span>
+                                            <span className="block text-xs text-[#71717A]">New applications to verify</span>
+                                        </span>
+                                        <ChevronLeft className="w-4 h-4 text-[#71717A] rotate-180 shrink-0" />
+                                    </button>
+                                )}
+                                {openTicketsCount > 0 && (
+                                    <button
+                                        onClick={() => { setShowNotifications(false); navigate("support"); }}
+                                        className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-white/[0.06] text-left"
+                                    >
+                                        <span className="w-9 h-9 rounded-xl bg-purple-500/15 border border-purple-500/25 flex items-center justify-center shrink-0">
+                                            <MessageSquare className="w-4 h-4 text-purple-400" />
+                                        </span>
+                                        <span className="flex-1 min-w-0">
+                                            <span className="block text-sm font-bold text-white">{openTicketsCount} open support ticket{openTicketsCount === 1 ? "" : "s"}</span>
+                                            <span className="block text-xs text-[#71717A]">Users waiting for a reply</span>
+                                        </span>
+                                        <ChevronLeft className="w-4 h-4 text-[#71717A] rotate-180 shrink-0" />
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    </>
+                )}
 
                 {/* Desktop header */}
                 <header className="hidden lg:flex sticky top-0 z-20 bg-[#0A0A0B]/95 backdrop-blur border-b border-white/[0.08] px-7 py-4 items-center gap-4">
@@ -1435,7 +1518,7 @@ export default function AdminDashboard() {
                         />
                     </div>
                     <button
-                        onClick={() => navigate("overview")}
+                        onClick={() => setShowNotifications(v => !v)}
                         aria-label="Notifications"
                         className="w-11 h-11 rounded-[14px] bg-[#141417] border border-white/[0.08] flex items-center justify-center relative"
                     >
@@ -1714,63 +1797,7 @@ export default function AdminDashboard() {
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
-                                {/* LIVE ACTIVITY */}
-                                <AdminActivityFeed />
-
-                                {/* TOP SONGS */}
-                                <Card className="bg-[#141417] border-white/[0.08]">
-                                    <CardHeader>
-                                        <CardTitle className="text-white flex items-center gap-2"><Trophy className="w-5 h-5 text-yellow-500" /> Top Songs</CardTitle>
-                                    </CardHeader>
-                                    <CardContent>
-                                        <div className="space-y-4">
-                                            {topCampaigns.length === 0 && <p className="text-gray-500 text-sm">No campaigns data available.</p>}
-                                            {topCampaigns.map((c, idx) => (
-                                                <div key={c.id} className="flex items-center justify-between p-3 bg-white/5 rounded border border-white/5">
-                                                    <div className="flex items-center gap-4 min-w-0">
-                                                        <div className="font-bold text-lg text-white/20 w-6 shrink-0">#{idx + 1}</div>
-                                                        <div className="min-w-0">
-                                                            <p className="font-bold text-white truncate">{c.song_title}</p>
-                                                            <p className="text-xs text-gray-400">by {c.artist?.full_name || 'Unknown'}</p>
-                                                            {c.playlist && <p className="text-[10px] text-green-400">on {c.playlist.name}</p>}
-                                                        </div>
-                                                    </div>
-                                                    <div className="text-right">
-                                                        <span className="block font-bold text-green-500">{c.clicks || 0} clicks</span>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </CardContent>
-                                </Card>
-
-                                {/* TOP PLAYLISTS */}
-                                <Card className="bg-[#141417] border-white/[0.08]">
-                                    <CardHeader>
-                                        <CardTitle className="text-white flex items-center gap-2"><Music className="w-5 h-5 text-purple-500" /> Top Playlists</CardTitle>
-                                    </CardHeader>
-                                    <CardContent>
-                                        <div className="space-y-4">
-                                            {topPlaylists.length === 0 && <p className="text-gray-500 text-sm">No playlist data available.</p>}
-                                            {topPlaylists.map((p, idx) => (
-                                                <div key={p.playlist_id} className="flex items-center justify-between p-3 bg-white/5 rounded border border-white/5">
-                                                    <div className="flex items-center gap-4 min-w-0">
-                                                        <div className="font-bold text-lg text-white/20 w-6 shrink-0">#{idx + 1}</div>
-                                                        <div className="min-w-0">
-                                                            <p className="font-bold text-white truncate">{p.playlist_name}</p>
-                                                            <p className="text-xs text-gray-400">Curator: {p.curator_name || 'Unknown'}</p>
-                                                        </div>
-                                                    </div>
-                                                    <div className="text-right">
-                                                        <span className="block font-bold text-purple-500">{p.total_clicks || 0} clicks</span>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            </div>
+                            <AdminAnalytics topPlaylists={topPlaylists} topSongs={topCampaigns} />
                         </div>
                     )}
 

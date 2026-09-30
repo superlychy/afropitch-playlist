@@ -1159,7 +1159,7 @@ export default function CuratorDashboard() {
                         <div className="bg-[#141417] border border-white/10 rounded-[20px] p-5">
                             <h3 className="text-sm font-bold text-zinc-400 mb-3">Profile avatar</h3>
                             <div className="grid grid-cols-4 gap-4 max-w-xs">
-                                {['/avatars/curator_avatar_1.png', '/avatars/curator_avatar_2.png', '/avatars/curator_avatar_3.png', '/avatars/curator_avatar_4.png'].map((src, idx) => (
+                                {['/avatars/curator_avatar_1.jpg', '/avatars/curator_avatar_2.jpg', '/avatars/curator_avatar_3.jpg', '/avatars/curator_avatar_4.jpg'].map((src, idx) => (
                                     <div
                                         key={idx}
                                         onClick={() => setProfileAvatar(src)}

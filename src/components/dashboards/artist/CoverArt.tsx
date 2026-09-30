@@ -1,9 +1,11 @@
 "use client";
 
+import { useState } from "react";
 import { Music2 } from "lucide-react";
 
 // Song artwork: the real Spotify cover when available, otherwise the
 // branded AfroPitch gradient placeholder with a music icon.
+// A broken/expired cover URL also falls back to the placeholder.
 export function CoverArt({
   src,
   alt,
@@ -15,14 +17,15 @@ export function CoverArt({
   size?: number;
   rounded?: number;
 }) {
+  const [failed, setFailed] = useState(false);
   const style = {
     width: size,
     height: size,
     borderRadius: rounded,
   } as const;
-  if (src) {
+  if (src && !failed) {
     // eslint-disable-next-line @next/next/no-img-element
-    return <img src={src} alt={alt} style={style} className="shrink-0 object-cover" loading="lazy" />;
+    return <img src={src} alt={alt} style={style} className="shrink-0 object-cover" loading="lazy" onError={() => setFailed(true)} />;
   }
   return (
     <div
