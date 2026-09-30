@@ -9,6 +9,7 @@ import { AuthProvider } from "@/context/AuthContext";
 import { UserActivityTracker } from "@/components/UserActivityTracker";
 import { ErrorReporter } from "@/components/ErrorReporter";
 import { ToastProvider } from "@/components/ui/toast";
+import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteConfig.url),
@@ -57,6 +58,8 @@ export const metadata: Metadata = {
     index: true,
     follow: true,
   },
+  manifest: "/manifest.json",
+  themeColor: "#0A0A0B",
 };
 
 export default function RootLayout({
@@ -78,6 +81,7 @@ export default function RootLayout({
             <AnalyticsTracker />
             <UserActivityTracker />
             <ErrorReporter />
+            <ServiceWorkerRegister />
           </ToastProvider>
         </AuthProvider>
         <script

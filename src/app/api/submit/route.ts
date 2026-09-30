@@ -1,27 +1,36 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { createClient as createAuthClient } from "@/lib/supabase-server";
+import { getSpotifyArtwork } from "@/lib/spotifyArt";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+const VALID_DOMAINS = [
+  "open.spotify.com",
+  "spotify.com",
+  "music.apple.com",
+  "audiomack.com",
+  "soundcloud.com",
+  "boomplay.com",
+  "youtube.com",
+  "youtu.be",
+];
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
+    // Authenticate the caller; never trust a client-supplied user id.
+    const auth = await createAuthClient();
     const {
-      user_id,
-      playlist_ids,
-      song_title,
-      artist_name,
-      song_link,
-      tier,
-      total_amount,
-      email,
-    } = body;
+      data: { user },
+    } = await auth.auth.getUser();
+    if (!user) {
+      return NextResponse.json(
+        { success: false, error: "Please login to submit." },
+        { status: 401 }
+      );
+    }
 
-    // --- Validation ---
-    if (!user_id || !playlist_ids?.length || !song_title || !song_link || !artist_name) {
+    const body = await req.json();
+    const { playlist_ids, song_title, artist_name, song_link, tier } = body;
+
+    if (!playlist_ids?.length || !song_title || !song_link || !artist_name) {
       return NextResponse.json(
         { success: false, error: "Missing required fields" },
         { status: 400 }
@@ -29,20 +38,8 @@ export async function POST(req: Request) {
     }
 
     // Validate song link format
-    const validDomains = [
-      "open.spotify.com",
-      "spotify.com",
-      "music.apple.com",
-      "audiomack.com",
-      "soundcloud.com",
-      "boomplay.com",
-      "youtube.com",
-      "youtu.be",
-      "audiomack.com",
-    ];
-    const linkUrl = song_link.toLowerCase();
-    const isValidLink = validDomains.some((d) => linkUrl.includes(d));
-    if (!isValidLink) {
+    const linkUrl = String(song_link).toLowerCase();
+    if (!VALID_DOMAINS.some((d) => linkUrl.includes(d))) {
       return NextResponse.json(
         {
           success: false,
@@ -53,180 +50,68 @@ export async function POST(req: Request) {
       );
     }
 
-    // --- Check for duplicate submissions (same artist, same song, same playlist) ---
-    const { data: existing } = await supabase
-      .from("submissions")
-      .select("id, playlist_id")
-      .eq("artist_id", user_id)
-      .eq("song_title", song_title)
-      .in("playlist_id", playlist_ids);
+    // All pricing, balance checks, deduction, submission inserts, and referral
+    // qualification happen atomically inside the RPC. The RPC identifies the
+    // caller via auth.uid(), so it is called on the user's own session client
+    // (not the service role). Any client-supplied total is ignored: the
+    // server prices every playlist itself.
 
-    if (existing && existing.length > 0) {
-      const existingPlaylistIds = existing.map((e: any) => e.playlist_id);
-      const duplicatePlaylists = playlist_ids.filter((id: string) =>
-        existingPlaylistIds.includes(id)
-      );
-      return NextResponse.json(
-        {
-          success: false,
-          error: `You've already submitted "${song_title}" to ${duplicatePlaylists.length} of the selected playlists.`,
-        },
-        { status: 409 }
-      );
+    // Best-effort cover art: fetched from Spotify's public oEmbed endpoint so
+    // review queue cards can show the real artwork. A failure here must never
+    // fail the submission, so it is guarded by try/catch inside and out.
+    let art: string | null = null;
+    try {
+      art = await getSpotifyArtwork(song_link);
+    } catch {
+      art = null;
     }
 
-    // --- Fetch current balance (atomic check) ---
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select("balance")
-      .eq("id", user_id)
-      .single();
-
-    if (profileError || !profile) {
-      return NextResponse.json(
-        { success: false, error: "User profile not found" },
-        { status: 404 }
-      );
-    }
-
-    const currentBalance = Number(profile.balance);
-    if (total_amount > 0 && currentBalance < total_amount) {
-      return NextResponse.json(
-        { success: false, error: "Insufficient wallet balance" },
-        { status: 400 }
-      );
-    }
-
-    // --- Calculate per-item costs (matching client logic) ---
-    const { data: playlistsData } = await supabase
-      .from("playlists")
-      .select("id, type, submission_fee")
-      .in("id", playlist_ids);
-
-    const pricingTiers: Record<string, number> = {
-      standard: 3000,
-      express: 5000,
-      exclusive: 13500,
-    };
-
-    let paidTotal = 0;
-    let paidCount = 0;
-    const perItemCosts: Record<string, number> = {};
-
-    for (const pid of playlist_ids) {
-      const pl = playlistsData?.find((p: any) => p.id === pid);
-      let cost = 0;
-      if (pl) {
-        if (pl.type === "exclusive") cost = pricingTiers.exclusive;
-        else if (pl.type === "express") cost = pricingTiers.express;
-        else if (pl.type === "free") cost = 0;
-        else cost = pricingTiers[tier] || pricingTiers.standard;
-      }
-      perItemCosts[pid] = cost;
-      if (cost > 0) {
-        paidTotal += cost;
-        paidCount++;
-      }
-    }
-
-    // Bulk discount
-    const discount = paidCount >= 7 ? Math.floor(paidTotal * 0.1) : 0;
-    const discountPerItem = paidCount > 0 ? discount / paidCount : 0;
-
-    const finalTotal = paidTotal - discount;
-
-    // Verify amount matches what client calculated (within rounding)
-    if (total_amount > 0 && Math.abs(finalTotal - total_amount) > 1) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Amount mismatch. Please try again.",
-        },
-        { status: 400 }
-      );
-    }
-
-    // --- ATOMIC: Deduct wallet + insert submissions + record transaction ---
-    if (total_amount > 0) {
-      const { error: deductError } = await supabase
-        .from("profiles")
-        .update({ balance: currentBalance - total_amount })
-        .eq("id", user_id)
-        .eq("balance", currentBalance); // Optimistic lock: only update if balance hasn't changed
-
-      if (deductError) {
-        return NextResponse.json(
-          { success: false, error: "Balance changed. Please try again." },
-          { status: 409 }
-        );
-      }
-
-      // Verify deduction worked (optimistic lock check)
-      const { data: newProfile } = await supabase
-        .from("profiles")
-        .select("balance")
-        .eq("id", user_id)
-        .single();
-
-      if (!newProfile || Number(newProfile.balance) !== currentBalance - total_amount) {
-        // Rollback
-        await supabase
-          .from("profiles")
-          .update({ balance: currentBalance })
-          .eq("id", user_id);
-
-        return NextResponse.json(
-          { success: false, error: "Payment processing failed. Please try again." },
-          { status: 500 }
-        );
-      }
-    }
-
-    // Insert submissions
-    const submissions = playlist_ids.map((playlistId: string) => {
-      const cost = perItemCosts[playlistId] || 0;
-      const finalCost = cost > 0 ? Math.max(0, cost - discountPerItem) : 0;
-      return {
-        artist_id: user_id,
-        playlist_id: playlistId,
-        song_title,
-        artist_name,
-        song_link,
-        tier,
-        amount_paid: finalCost,
-        status: "pending",
-      };
+    const { data, error } = await auth.rpc("submit_with_payment", {
+      p_playlist_ids: playlist_ids,
+      p_song_title: song_title,
+      p_artist_name: artist_name,
+      p_song_link: song_link,
+      p_tier: tier || "standard",
+      p_cover_art_url: art,
     });
 
-    const { error: insertError } = await supabase
-      .from("submissions")
-      .insert(submissions);
-
-    if (insertError) {
-      // Rollback wallet deduction
-      if (total_amount > 0) {
-        await supabase
-          .from("profiles")
-          .update({ balance: currentBalance })
-          .eq("id", user_id);
-      }
+    if (error) {
+      console.error("submit_with_payment RPC error:", error);
       return NextResponse.json(
-        { success: false, error: "Failed to save submissions. Please try again." },
+        { success: false, error: "An unexpected error occurred" },
         { status: 500 }
       );
     }
 
-    // Record transaction
-    if (total_amount > 0) {
-      await supabase.from("transactions").insert({
-        user_id,
-        amount: -total_amount,
-        type: "payment",
-        description: `Submission Fee: ${playlist_ids.length} Playlists${discount > 0 ? ` (10% bulk discount)` : ""}`,
-      });
+    if (!data || data.ok !== true) {
+      const errMap: Record<string, [string, number]> = {
+        not_authenticated: ["Please login to submit.", 401],
+        missing_playlists: ["Missing required fields", 400],
+        missing_fields: ["Missing required fields", 400],
+        profile_not_found: ["User profile not found", 404],
+        duplicate: [
+          "You've already submitted this song to one of the selected playlists.",
+          409,
+        ],
+        insufficient: ["Insufficient balance", 400],
+      };
+      const [message, status] = errMap[data?.error] || [
+        "An unexpected error occurred",
+        500,
+      ];
+      return NextResponse.json(
+        { success: false, error: message },
+        { status }
+      );
     }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({
+      success: true,
+      charged_total: data.charged_total,
+      from_referral: data.from_referral,
+      from_wallet: data.from_wallet,
+      referral_qualified: data.referral_qualified,
+    });
   } catch (err: any) {
     console.error("Submission API error:", err);
     return NextResponse.json(

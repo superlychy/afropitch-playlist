@@ -30,6 +30,8 @@ export interface User {
   role: UserRole;
   balance: number;
   earnings: number;
+  referral_balance: number;
+  referral_code?: string;
   bio?: string;
   instagram?: string;
   twitter?: string;
@@ -101,6 +103,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           role: (profile.role as UserRole) || "artist",
           balance: Number(profile.balance) || 0,
           earnings: 0,
+          referral_balance: Number(profile.referral_balance) || 0,
+          referral_code: profile.referral_code || undefined,
           bio: profile.bio,
           instagram: profile.instagram,
           twitter: profile.twitter,
@@ -126,6 +130,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           role: role as UserRole,
           balance: 0,
           earnings: 0,
+          referral_balance: 0,
           created_at: session.user.created_at,
         });
       }
@@ -139,6 +144,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           role: "artist",
           balance: 0,
           earnings: 0,
+          referral_balance: 0,
           created_at: session.user.created_at,
         });
       }
@@ -180,6 +186,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       subscription.unsubscribe();
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Referral attribution: if the user arrived via someone's /ref/[code] link,
+  // attach the referral once, then clear the cookie.
+  useEffect(() => {
+    if (!user?.id) return;
+    const match = document.cookie.match(/(?:^|; )afropitch_ref=([^;]*)/);
+    const code = match ? decodeURIComponent(match[1]) : "";
+    if (!code) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/referral/attribute", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ code }),
+        });
+        if (!cancelled && res.ok) {
+          document.cookie =
+            "afropitch_ref=; Max-Age=0; path=/; SameSite=Lax";
+        }
+      } catch {
+        // Attribution is best-effort; the cookie persists for a later retry.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
 
   const login = async (email: string, password: string): Promise<UserRole> => {
     setIsLoading(true);
@@ -293,6 +327,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 name: profile.full_name || prev.name,
                 email: profile.email || prev.email,
                 balance: Number(profile.balance),
+                referral_balance: Number(profile.referral_balance) || 0,
+                referral_code: profile.referral_code || prev.referral_code,
                 role: profile.role,
                 bio: profile.bio ?? prev.bio,
                 instagram: profile.instagram ?? prev.instagram,

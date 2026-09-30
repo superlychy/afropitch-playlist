@@ -3,19 +3,24 @@
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/components/ui/toast";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useRef, useCallback } from "react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { useEffect, useState, useRef, useCallback, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Wallet, Plus, CreditCard, History, Settings, HelpCircle, Send, LogOut, XCircle, ChevronLeft, Bell } from "lucide-react";
-import { pricingConfig } from "@/../config/pricing";
-import { Copy, ExternalLink, BarChart3, TrendingUp, AlertCircle, Star, AudioWaveform } from "lucide-react";
-import { supabase } from "@/lib/supabase";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Wallet, Plus, Settings, HelpCircle, Send, LogOut, XCircle, ChevronLeft, Bell,
+  Home, Link2, User, TrendingUp, AlertCircle, AudioWaveform,
+  Music2, Users, Search,
+} from "lucide-react";
+import { pricingConfig } from "@/../config/pricing";
+import { supabase } from "@/lib/supabase";
 import dynamic from "next/dynamic";
 import { TransactionsList } from "@/components/TransactionsList";
 import { ArtistMixingOrders } from "@/components/ArtistMixingOrders";
+import { ReferralCard } from "@/components/ReferralCard";
+import { CoverArt } from "@/components/dashboards/artist/CoverArt";
+import { SmartLinkCard } from "@/components/dashboards/artist/SmartLinkCard";
 
 const PayWithPaystack = dynamic(() => import("@/components/PaystackButton"), { ssr: false });
 
@@ -25,10 +30,14 @@ interface Submission {
   status: string;
   amount_paid: number;
   created_at: string;
-  clicks: number;
+  clicks: number | null;
   tracking_slug: string | null;
   ranking_boosted_at: string | null;
   feedback: string | null;
+  cover_art_url: string | null;
+  apple_music_url: string | null;
+  audiomack_url: string | null;
+  boomplay_url: string | null;
   playlist: {
     name: string;
     curator: { full_name: string } | null;
@@ -36,13 +45,13 @@ interface Submission {
 }
 
 export default function ArtistDashboard() {
-  const { user, loadFunds, deductFunds, isLoading, logout, refreshUser } = useAuth();
+  const { user, deductFunds, isLoading, logout, refreshUser } = useAuth();
   const { toast } = useToast();
   const router = useRouter();
   const [amount, setAmount] = useState("");
   const amountRef = useRef("");
   const userRef = useRef(user);
-  
+
   // Update userRef whenever user changes
   useEffect(() => {
     userRef.current = user;
@@ -88,13 +97,16 @@ export default function ArtistDashboard() {
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [loadingSubmissions, setLoadingSubmissions] = useState(true);
 
+  // Per-platform smart-link click stats, fetched once (not once per card).
+  const [linkStats, setLinkStats] = useState<Record<string, Record<string, number>>>({});
+
+  // Desktop search
+  const [searchQuery, setSearchQuery] = useState("");
+
   // Notifications
   const [showNotifications, setShowNotifications] = useState(false);
-  const [personalNotifications, setPersonalNotifications] = useState<any[]>([]);
-  const [broadcasts, setBroadcasts] = useState<any[]>([]);
+  const [notifications, setNotifications] = useState<any[]>([]);
   const [expandedNotificationId, setExpandedNotificationId] = useState<string | null>(null);
-
-  const unreadCount = personalNotifications.filter((n) => !n.is_read).length;
 
   const toggleNotification = (id: string) => {
     setExpandedNotificationId((prev) => (prev === id ? null : id));
@@ -102,26 +114,18 @@ export default function ArtistDashboard() {
 
   useEffect(() => {
     if (user) {
-      fetchSubmissions();
-      fetchPersonalNotifications();
-      fetchBroadcasts();
-    }
-  }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Initialize the profile form only when the modal opens — never while the
-  // user is typing. (It used to re-run on every auth token refresh, which
-  // silently wiped in-progress edits and made saving feel stuck/broken.)
-  useEffect(() => {
-    if (showProfile && user) {
       setProfileName(user.name || "");
       setProfileEmail(user.email || "");
       setProfileBio(user.bio || "");
       setProfileIg(user.instagram || "");
       setProfileTwitter(user.twitter || "");
       setProfileWeb(user.website || "");
+      fetchSubmissions();
+      fetchLinkStats();
+      fetchNotifications();
       fetchBankDetails();
     }
-  }, [showProfile]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchBankDetails = async () => {
     if (!user) return;
@@ -184,18 +188,7 @@ export default function ArtistDashboard() {
     setIsWithdrawing(false);
   };
 
-  const fetchPersonalNotifications = async () => {
-    if (!user) return;
-    const { data } = await supabase
-      .from("notifications")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false })
-      .limit(20);
-    if (data) setPersonalNotifications(data);
-  };
-
-  const fetchBroadcasts = async () => {
+  const fetchNotifications = async () => {
     if (!user) return;
     let query = supabase
       .from("broadcasts")
@@ -207,42 +200,8 @@ export default function ArtistDashboard() {
     }
 
     const { data } = await query.order("created_at", { ascending: false }).limit(20);
-    if (data) setBroadcasts(data);
+    if (data) setNotifications(data);
   };
-
-  const markNotificationsRead = async () => {
-    if (!user) return;
-    const unreadIds = personalNotifications.filter((n) => !n.is_read).map((n) => n.id);
-    if (unreadIds.length === 0) return;
-    // Optimistic: clear the dot immediately, persist in the background.
-    setPersonalNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
-    await supabase.from("notifications").update({ is_read: true }).in("id", unreadIds).eq("user_id", user.id);
-  };
-
-  // Mark personal notifications as read once the user has seen the list.
-  useEffect(() => {
-    if (showNotifications) markNotificationsRead();
-  }, [showNotifications]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Live personal notifications — the bell dot updates the moment one arrives.
-  useEffect(() => {
-    if (!user) return;
-    const channel = supabase
-      .channel(`artist-notifications-${user.id}`)
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` },
-        (payload) => {
-          const n = payload.new as any;
-          setPersonalNotifications((prev) => [n, ...prev].slice(0, 20));
-          toast("🔔 " + (n.title || "New notification"), "info");
-        }
-      )
-      .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchSubmissions = async () => {
     if (!user) return;
@@ -257,44 +216,48 @@ export default function ArtistDashboard() {
     if (error) {
       console.error("Error fetching submissions:", error);
     } else {
-      setSubmissions(data as any);
+      setSubmissions((data as unknown as Submission[]) || []);
     }
     setLoadingSubmissions(false);
+  };
+
+  const fetchLinkStats = async () => {
+    const { data } = await supabase.rpc("get_my_link_stats");
+    if (data) {
+      const grouped: Record<string, Record<string, number>> = {};
+      for (const row of data as { submission_id: string; platform: string; clicks: number }[]) {
+        if (!grouped[row.submission_id]) grouped[row.submission_id] = {};
+        grouped[row.submission_id][row.platform] = Number(row.clicks);
+      }
+      setLinkStats(grouped);
+    }
   };
 
   const handleUpdateProfile = async () => {
     if (!user) return;
     setIsUpdatingProfile(true);
-    try {
-      const { error } = await supabase
-        .from("profiles")
-        .update({
-          full_name: profileName,
-          bio: profileBio,
-          instagram: profileIg,
-          twitter: profileTwitter,
-          website: profileWeb,
-          bank_name: bankName,
-          account_number: accountNumber,
-          account_name: accountName,
-        })
-        .eq("id", user.id);
 
-      if (error) {
-        toast("Error updating profile: " + error.message, "error");
-      } else {
-        toast("Profile saved!", "success");
-        setShowProfile(false);
-        // Refresh local user so the new name/bio shows immediately —
-        // previously the dashboard kept showing the old values until a refresh.
-        await refreshUser();
-      }
-    } catch (e: any) {
-      toast("Could not save your profile. Please check your connection and try again.", "error");
-    } finally {
-      // Always release the button — a stuck spinner here was the reported bug.
-      setIsUpdatingProfile(false);
+    const { error } = await supabase
+      .from("profiles")
+      .update({
+        full_name: profileName,
+        bio: profileBio,
+        instagram: profileIg,
+        twitter: profileTwitter,
+        website: profileWeb,
+        bank_name: bankName,
+        account_number: accountNumber,
+        account_name: accountName,
+      })
+      .eq("id", user.id);
+
+    if (error) {
+      toast("Error updating profile: " + error.message, "error");
+    } else {
+      toast("Profile saved!", "success");
+      setShowProfile(false);
     }
+    setIsUpdatingProfile(false);
   };
 
   // Support Functions
@@ -357,65 +320,19 @@ export default function ArtistDashboard() {
     if (data) setChatMessages(data);
   };
 
-  // Live support replies — new messages on the open ticket appear instantly,
-  // without closing and reopening the chat.
-  useEffect(() => {
-    if (!activeTicket) return;
-    const channel = supabase
-      .channel(`support-chat-${activeTicket.id}`)
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "support_messages", filter: `ticket_id=eq.${activeTicket.id}` },
-        (payload) => {
-          const msg = payload.new as any;
-          setChatMessages((prev) => {
-            if (prev.some((m) => m.id === msg.id)) return prev; // skip our own echo
-            return [...prev, msg];
-          });
-        }
-      )
-      .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [activeTicket]);
-
-  const chatEndRef = useRef<HTMLDivElement>(null);
-
-  // Keep the chat pinned to the newest message.
-  useEffect(() => {
-    if (supportView === "chat") chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [chatMessages, supportView]);
-
   const sendChatMessage = async () => {
     if (!chatInput.trim() || !activeTicket || !user) return;
     const text = chatInput;
     setChatInput("");
-    // Optimistic message so the chat feels instant — rolled back if the send fails.
-    const tempId = `temp-${Date.now()}`;
     setChatMessages((prev) => [
       ...prev,
-      { id: tempId, ticket_id: activeTicket.id, sender_id: user.id, message: text, created_at: new Date().toISOString() },
+      { id: Math.random(), ticket_id: activeTicket.id, sender_id: user.id, message: text, created_at: new Date().toISOString() },
     ]);
-    const { data, error } = await supabase
-      .from("support_messages")
-      .insert({
-        ticket_id: activeTicket.id,
-        sender_id: user.id,
-        message: text,
-      })
-      .select()
-      .single();
-    if (error || !data) {
-      setChatMessages((prev) => prev.filter((m) => m.id !== tempId));
-      toast("Message failed to send. Please try again.", "error");
-      return;
-    }
-    // Swap the optimistic message for the real row (also guards against a
-    // realtime duplicate if the live event arrived first).
-    setChatMessages((prev) =>
-      prev.filter((m) => m.id !== data.id).map((m) => (m.id === tempId ? data : m))
-    );
+    await supabase.from("support_messages").insert({
+      ticket_id: activeTicket.id,
+      sender_id: user.id,
+      message: text,
+    });
   };
 
   // ============================================
@@ -493,230 +410,392 @@ export default function ArtistDashboard() {
       // Clear the payment form immediately
       setAmount("");
       setLockedAmount(0);
-      
+
       // Small delay to ensure webhook has processed in the database
       await new Promise(resolve => setTimeout(resolve, 500));
-      
+
       // Refresh user balance
       await refreshUser();
-      
+
       console.log("✅ Payment complete - balance should now show updated amount");
-      
+
       paystackLockRef.current = false;
     },
     [refreshUser, toast]
   );
 
-  // If the session died (or never existed), don't leave a blank page behind —
-  // send the user back to login.
-  useEffect(() => {
-    if (!isLoading && !user) router.push("/portal");
-  }, [isLoading, user, router]);
-
   if (isLoading) return <div className="p-8 text-center text-gray-500">Loading dashboard...</div>;
   if (!user) return null;
 
+  // ---------- Derived display values ----------
+  const initials = ((user.name || user.email || "A").trim().slice(0, 2) || "A").toUpperCase();
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+  const todayLabel = new Date().toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" });
+  const acceptedCount = submissions.filter((s) => s.status === "accepted").length;
+  const totalTaps = submissions.reduce((n, s) => n + (s.clicks || 0), 0);
+  const smartLinkSubs = submissions.filter((s) => s.tracking_slug);
+  const topSmartLink = [...smartLinkSubs].sort((a, b) => (b.clicks || 0) - (a.clicks || 0))[0] || null;
+  const smartLinkCopy = (slug: string) => {
+    const url = typeof window !== "undefined" ? `${window.location.origin}/track/${slug}` : `/track/${slug}`;
+    navigator.clipboard.writeText(url);
+    toast("Smart link copied!", "success");
+  };
+
+  const q = searchQuery.trim().toLowerCase();
+  const filtered = submissions.filter((s) =>
+    q ? s.song_title.toLowerCase().includes(q) || (s.playlist?.name || "").toLowerCase().includes(q) : true
+  );
+
+  const scrollTo = (id: string) =>
+    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+
+  const pillClass = (status: string) =>
+    status === "accepted"
+      ? "bg-[#22C55E]/15 text-[#22C55E]"
+      : status === "declined" || status === "rejected"
+      ? "bg-[#EF4444]/15 text-[#EF4444]"
+      : status === "archived"
+      ? "bg-white/10 text-zinc-400"
+      : "bg-[#EAB308]/15 text-[#EAB308]";
+
+  const subDate = (iso: string) =>
+    new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+
+  const sidebarNav: { label: string; icon: ReactNode; action: () => void; active?: boolean; badge?: number }[] = [
+    { label: "Home", icon: <Home className="w-[18px] h-[18px]" />, action: () => window.scrollTo({ top: 0, behavior: "smooth" }), active: true },
+    { label: "Submit music", icon: <Music2 className="w-[18px] h-[18px]" />, action: () => router.push("/submit") },
+    { label: "Smart links", icon: <Link2 className="w-[18px] h-[18px]" />, action: () => scrollTo("smart-links"), badge: smartLinkSubs.length || undefined },
+    { label: "Refer & earn", icon: <Users className="w-[18px] h-[18px]" />, action: () => scrollTo("referral") },
+    { label: "Mixing orders", icon: <AudioWaveform className="w-[18px] h-[18px]" />, action: () => scrollTo("mixing") },
+    { label: "Wallet", icon: <Wallet className="w-[18px] h-[18px]" />, action: () => scrollTo("wallet") },
+    { label: "Support", icon: <HelpCircle className="w-[18px] h-[18px]" />, action: () => setShowSupport(true) },
+    { label: "Settings", icon: <Settings className="w-[18px] h-[18px]" />, action: () => setShowProfile(true) },
+  ];
+
   return (
-    <div className="container mx-auto px-3 sm:px-4 max-w-5xl py-6 sm:py-12 relative">
-      {/* Header - Mobile Optimized */}
-      <div className="flex flex-col gap-4 mb-6 sm:mb-8">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-white">Artist Dashboard</h1>
-          <p className="text-gray-400 text-sm sm:text-base">
-            Welcome back, <span className="text-green-500">{user.name || "Artist"}</span>. Manage your budget and track submissions.
-          </p>
+    <div className="min-h-screen bg-[#0A0A0B] text-white" id="top">
+      {/* ===== Desktop sidebar (lg+) ===== */}
+      <aside className="hidden lg:flex fixed left-0 top-0 bottom-0 w-[248px] shrink-0 border-r border-white/[0.08] px-[14px] py-[22px] flex-col gap-1 z-30 bg-[#0A0A0B]">
+        <div className="flex items-center gap-2.5 px-2.5 pb-5 font-extrabold text-lg">
+          <span className="w-[34px] h-[34px] rounded-[10px] bg-gradient-to-br from-[#22C55E] to-[#0E7A3D] flex items-center justify-center text-[18px] text-[#04120a] font-black">A</span>
+          AfroPitch
         </div>
-        {/* Mobile-first action buttons */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <Button
-            className="bg-green-600 hover:bg-green-700 font-bold flex-1 sm:flex-none h-10 flex items-center justify-center gap-2 shadow-lg shadow-green-900/30 text-sm"
-            onClick={() => {
-              document.getElementById("top-up-amount")?.focus();
-              document.getElementById("wallet-card")?.scrollIntoView({ behavior: "smooth", block: "center" });
-            }}
+        {sidebarNav.map((n) => (
+          <button
+            key={n.label}
+            onClick={n.action}
+            className={`flex items-center gap-3 px-3 py-[11px] rounded-xl text-sm font-semibold w-full text-left transition-colors ${
+              n.active ? "bg-[#22C55E]/10 text-[#22C55E]" : "text-zinc-400 hover:bg-white/5 hover:text-white"
+            }`}
           >
-            <Wallet className="w-4 h-4" /> <span className="hidden xs:inline">Top Up</span> Wallet
-          </Button>
-
-          <Button
-            variant="outline"
-            size="icon"
-            className="border-white/10 hover:bg-white/10 h-10 w-10 relative shrink-0"
-            title="Notifications"
-            onClick={() => setShowNotifications(true)}
-          >
-            <Bell className="w-5 h-5 text-gray-400" />
-            {unreadCount > 0 && <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full animate-pulse" />}
-          </Button>
-
-          <Button variant="outline" size="icon" className="border-white/10 hover:bg-white/10 h-10 w-10 shrink-0" title="Contact Support" onClick={() => setShowSupport(true)}>
-            <HelpCircle className="w-5 h-5 text-gray-400" />
-          </Button>
-          <Button variant="outline" size="icon" className="border-white/10 hover:bg-white/10 h-10 w-10 shrink-0" title="Manage Profile" onClick={() => setShowProfile(true)}>
-            <Settings className="w-5 h-5 text-gray-400" />
-          </Button>
-          <Button variant="outline" size="icon" className="border-white/10 hover:bg-red-500/20 h-10 w-10 shrink-0 group" title="Logout" onClick={logout}>
-            <LogOut className="w-5 h-5 text-gray-400 group-hover:text-red-500" />
-          </Button>
-        </div>
-      </div>
-
-      {/* Rising notification */}
-      {submissions.some((s) => s.ranking_boosted_at) && (
-        <div className="mb-6 w-full bg-gradient-to-r from-green-900/50 to-green-600/20 border border-green-500/30 p-3 sm:p-4 rounded-xl flex items-start gap-3 sm:gap-4 animate-in slide-in-from-top-4">
-          <div className="bg-green-500 p-2 rounded-full mt-1 shrink-0 animate-pulse">
-            <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-black" />
-          </div>
-          <div>
-            <h3 className="font-bold text-white text-base sm:text-lg">Your Music is Rising!</h3>
-            <p className="text-gray-300 text-xs sm:text-sm">
-              Curators have flagged your song as a top performer.
-              <span className="block mt-1 text-green-400 font-bold">
-                Share your playlist links and follow us on Spotify to keep the momentum going!
-              </span>
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* Submit CTA - Mobile Optimized */}
-      <div className="grid grid-cols-1 mb-6 sm:mb-8">
-        <Card className="bg-gradient-to-br from-green-900/40 to-black border-green-500/30">
-          <CardContent className="p-4 sm:p-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-6">
-            <div className="space-y-1 sm:space-y-2">
-              <h2 className="text-lg sm:text-2xl font-bold text-white">Submit New Music</h2>
-              <p className="text-gray-400 text-sm">Get your tracks on top playlists.</p>
+            {n.icon}
+            {n.label}
+            {n.badge ? (
+              <span className="ml-auto bg-[#22C55E] text-[#04120a] text-[11px] font-extrabold rounded-full px-2 py-[2px]">{n.badge}</span>
+            ) : null}
+          </button>
+        ))}
+        <div className="mt-auto">
+          <div className="flex items-center gap-2.5 bg-[#141417] border border-white/[0.08] rounded-[14px] p-2.5">
+            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#22C55E] to-[#0E7A3D] flex items-center justify-center font-extrabold text-[#04120a] text-[13px] shrink-0">
+              {initials}
             </div>
-            <Button size="lg" className="w-full sm:w-auto bg-green-600 hover:bg-green-700 font-bold text-base sm:text-lg px-6 sm:px-8 py-4 sm:py-6 shadow-lg shadow-green-900/20" onClick={() => router.push("/submit")}>
-              Start Campaign
-            </Button>
-          </CardContent>
-        </Card>
+            <div className="flex-1 min-w-0">
+              <strong className="text-[13px] block truncate">{user.name || "Artist"}</strong>
+              <small className="text-zinc-500 text-[11px] block truncate">{user.email}</small>
+            </div>
+            <button onClick={logout} title="Logout" className="text-zinc-500 hover:text-red-400 p-1.5 shrink-0">
+              <LogOut className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      </aside>
+
+      {/* ===== Mobile topbar (below lg) ===== */}
+      <div className="lg:hidden sticky top-0 z-20 bg-[#0A0A0B]/90 backdrop-blur-md border-b border-white/[0.08] px-4 py-3.5 flex items-center gap-3">
+        <div className="w-[42px] h-[42px] rounded-full bg-gradient-to-br from-[#22C55E] to-[#0E7A3D] flex items-center justify-center font-extrabold text-[16px] text-[#04120a] shrink-0">
+          {initials}
+        </div>
+        <div className="flex-1 min-w-0">
+          <small className="text-zinc-500 text-xs block">{greeting}</small>
+          <strong className="text-base truncate block">{user.name || "Artist"}</strong>
+        </div>
+        <button
+          onClick={() => setShowNotifications(true)}
+          title="Notifications"
+          className="w-10 h-10 rounded-xl border border-white/[0.08] bg-[#141417] flex items-center justify-center relative shrink-0"
+        >
+          <Bell className="w-5 h-5 text-zinc-400" />
+          {notifications.length > 0 && <span className="absolute top-[9px] right-[10px] w-2 h-2 rounded-full bg-[#EF4444] border-2 border-[#0A0A0B]" />}
+        </button>
+        <button
+          onClick={() => setShowSupport(true)}
+          title="Support"
+          className="w-10 h-10 rounded-xl border border-white/[0.08] bg-[#141417] flex items-center justify-center shrink-0"
+        >
+          <HelpCircle className="w-5 h-5 text-zinc-400" />
+        </button>
       </div>
 
-      {/* Main Content Grid - Mobile First */}
-      <div className="flex flex-col gap-6 sm:gap-8">
-        {/* Submissions */}
-        <div className="space-y-4">
-          <h2 className="text-lg sm:text-xl font-bold text-white flex items-center gap-2">
-            <History className="w-5 h-5 text-gray-400" /> Recent Submissions
-          </h2>
-          {loadingSubmissions ? (
-            <p className="text-gray-500">Loading submissions...</p>
-          ) : submissions.length === 0 ? (
-            <Card className="bg-white/5 border-dashed border-white/10 p-6 sm:p-8 text-center">
-              <p className="text-gray-400 text-sm">No submissions yet.</p>
-              <Button variant="link" className="text-green-500" onClick={() => router.push("/submit")}>
-                Create your first campaign
-              </Button>
-            </Card>
-          ) : (
-            <div className="space-y-3">
-              {submissions.map((sub) => (
-                <div key={sub.id} className="bg-white/5 border border-white/5 rounded-xl p-3 sm:p-4 hover:bg-white/10 transition-colors">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                      <div className="bg-black/30 w-10 h-10 sm:w-12 sm:h-12 rounded-lg flex items-center justify-center text-white/20 shrink-0">
-                        <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6" />
-                      </div>
-                      <div className="min-w-0">
-                        <h4 className="font-bold text-white text-sm sm:text-base truncate">{sub.song_title}</h4>
-                        <p className="text-xs text-gray-400 truncate">{sub.playlist?.name || "Unknown"}</p>
-                        <p className="text-[10px] text-gray-500">{new Date(sub.created_at).toLocaleDateString()}</p>
-                      </div>
-                    </div>
-                    <div className="flex sm:flex-col sm:text-right items-center gap-2 shrink-0">
-                      <span className={`inline-block px-2 py-1 rounded text-[10px] uppercase font-bold ${
-                        sub.status === "accepted"
-                          ? "bg-green-500/20 text-green-500"
-                          : sub.status === "declined" || sub.status === "rejected"
-                          ? "bg-red-500/20 text-red-500"
-                          : sub.status === "archived"
-                          ? "bg-zinc-500/20 text-zinc-400"
-                          : "bg-yellow-500/20 text-yellow-500"
-                      }`}>
-                        {sub.status}
-                      </span>
-                      <p className="text-sm font-bold text-white">
-                        {pricingConfig.currency}{sub.amount_paid}
-                      </p>
-                    </div>
-                  </div>
-                  {sub.status === "accepted" && sub.tracking_slug && (
-                    <div className="mt-3 bg-gradient-to-br from-green-900/30 to-black border border-green-500/20 rounded-lg p-3 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <p className="text-[10px] font-bold text-green-400 uppercase tracking-widest flex items-center gap-1">
-                          <TrendingUp className="w-3 h-3" /> Viral Tracker
-                        </p>
-                        <span className="text-[10px] font-bold text-white bg-green-500/20 px-2 py-0.5 rounded-full">
-                          {sub.clicks || 0}/100
-                        </span>
-                      </div>
-                      <div className="h-2 w-full bg-black/50 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-gradient-to-r from-green-600 to-green-400 transition-all duration-1000"
-                          style={{ width: `${Math.min(((sub.clicks || 0) / 100) * 100, 100)}%` }}
-                        />
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <div className="flex-1 bg-black/60 rounded px-2 py-1.5 text-[10px] sm:text-xs text-gray-300 truncate select-all border border-white/5 font-mono">
-                          https://afropitchplay.best/track/{sub.tracking_slug}
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 px-2 text-[10px] text-green-400 hover:text-green-300 shrink-0 border border-green-500/20"
-                          onClick={() => {
-                              navigator.clipboard.writeText(`https://afropitchplay.best/track/${sub.tracking_slug}`);
-                              toast("Tracking link copied!", "success");
-                          }}
-                        >
-                          Copy
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                  {(sub.status === "declined" || sub.status === "rejected" || sub.status === "archived") && sub.feedback && (
-                    <div className="mt-3 p-2 bg-red-900/20 border border-red-500/20 rounded">
-                      <p className="text-[10px] text-red-200">
-                        <span className="font-bold text-red-400">Reason:</span> {sub.feedback}
-                      </p>
-                    </div>
-                  )}
-                  {(sub.status === "declined" || sub.status === "rejected" || sub.status === "archived") && (
-                    <div className="mt-3">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="border-green-500/40 text-green-400 hover:bg-green-500 hover:text-black rounded-xl text-xs"
-                        onClick={() => router.push(`/mixing?song=${encodeURIComponent(sub.song_title)}&submission=${sub.id}`)}
-                      >
-                        <AudioWaveform className="w-3.5 h-3.5 mr-1" /> Get it professionally mixed
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              ))}</div>
-          )}
+      {/* ===== Main column ===== */}
+      <div className="lg:pl-[248px]">
+        {/* Desktop topbar */}
+        <div className="hidden lg:flex items-center gap-3.5 px-8 pt-[26px] mb-[26px]">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">{greeting}, {user.name || "Artist"}</h1>
+            <p className="text-zinc-500 text-[13px] mt-0.5">{todayLabel} · Here is how your music is doing</p>
+          </div>
+          <div className="ml-auto relative">
+            <Search className="w-4 h-4 text-zinc-500 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search submissions..."
+              className="bg-[#141417] border border-white/[0.08] rounded-xl pl-10 pr-3.5 py-2.5 w-[280px] text-[13px] text-white placeholder:text-zinc-500 outline-none focus:border-[#22C55E]/50"
+            />
+          </div>
+          <button
+            onClick={() => setShowNotifications(true)}
+            title="Notifications"
+            className="w-[42px] h-[42px] rounded-xl border border-white/[0.08] bg-[#141417] flex items-center justify-center relative shrink-0"
+          >
+            <Bell className="w-5 h-5 text-zinc-400" />
+            {notifications.length > 0 && <span className="absolute top-[10px] right-[11px] w-2 h-2 rounded-full bg-[#EF4444] border-2 border-[#0A0A0B]" />}
+          </button>
         </div>
 
-        <ArtistMixingOrders />
+        <div className="px-4 lg:px-8 pb-28 lg:pb-10">
+          {/* ===== Stats ===== */}
+          <div className="grid grid-cols-3 lg:grid-cols-4 gap-2 lg:gap-3.5 mb-4 lg:mb-[22px]">
+            <div className="bg-[#141417] border border-white/[0.08] rounded-2xl lg:rounded-[18px] p-3 lg:p-[18px]">
+              <span className="text-[11px] lg:text-xs text-zinc-400 lg:uppercase lg:tracking-wider lg:text-zinc-500">Submissions</span>
+              <b className="text-xl lg:text-[30px] block tracking-tight lg:my-1.5">{submissions.length}</b>
+            </div>
+            <div className="bg-[#141417] border border-white/[0.08] rounded-2xl lg:rounded-[18px] p-3 lg:p-[18px]">
+              <span className="text-[11px] lg:text-xs text-zinc-400 lg:uppercase lg:tracking-wider lg:text-zinc-500">Accepted</span>
+              <b className="text-xl lg:text-[30px] block tracking-tight lg:my-1.5">{acceptedCount}</b>
+            </div>
+            <div className="bg-[#141417] border border-white/[0.08] rounded-2xl lg:rounded-[18px] p-3 lg:p-[18px]">
+              <span className="text-[11px] lg:text-xs text-zinc-400 lg:uppercase lg:tracking-wider lg:text-zinc-500">Link taps</span>
+              <b className="text-xl lg:text-[30px] block tracking-tight lg:my-1.5">{totalTaps.toLocaleString()}</b>
+            </div>
+            <button
+              onClick={() => scrollTo("wallet")}
+              className="hidden lg:block text-left bg-gradient-to-br from-[#14532D] to-[#052E16] border border-[#22C55E]/30 rounded-[18px] p-[18px] hover:border-[#22C55E]/60 transition-colors"
+            >
+              <span className="text-xs text-zinc-500 uppercase tracking-wider">Wallet balance</span>
+              <b className="text-[30px] block tracking-tight my-1.5">{pricingConfig.currency}{user.balance.toLocaleString()}</b>
+              <span className="text-[#22C55E] text-xs font-bold">Top up</span>
+            </button>
+          </div>
 
-        {/* Wallet Column - Mobile First */}
-        <div className="space-y-4 sm:space-y-6" id="wallet-card">
-          <Card className="bg-zinc-900 border-white/10 overflow-hidden">
-            <div className="bg-gradient-to-r from-green-900/40 to-black p-4 sm:p-6 border-b border-green-500/10">
-              <h3 className="text-xs font-medium text-gray-400 uppercase tracking-widest mb-1 sm:mb-2 flex items-center gap-2">
-                <Wallet className="w-4 h-4 text-green-500" /> Available Balance
-              </h3>
-              <div className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
-                {pricingConfig.currency}
-                {user.balance.toLocaleString()}
+          {/* ===== Rising banner ===== */}
+          {submissions.some((s) => s.ranking_boosted_at) && (
+            <div className="mb-4 lg:mb-[22px] w-full bg-gradient-to-r from-[#14532D] to-[#052E16] border border-[#22C55E]/30 p-3.5 sm:p-4 rounded-2xl flex items-start gap-3 sm:gap-4">
+              <div className="bg-[#22C55E] p-2 rounded-full mt-0.5 shrink-0">
+                <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-[#04120a]" />
+              </div>
+              <div>
+                <h3 className="font-bold text-white text-base sm:text-lg">Your music is rising</h3>
+                <p className="text-zinc-300 text-xs sm:text-sm">
+                  Curators flagged your song as a top performer.
+                  <span className="block mt-1 text-[#22C55E] font-bold">
+                    Share your playlist links and follow us on Spotify to keep the momentum going.
+                  </span>
+                </p>
               </div>
             </div>
-            <CardContent className="p-4 sm:p-6">
-              <h4 className="text-sm font-medium text-gray-300 mb-3 flex items-center gap-2">
-                <Plus className="w-4 h-4 text-green-500" /> Top Up Wallet
+          )}
+
+          {/* ===== Submit CTA ===== */}
+          <div className="mb-4 lg:mb-[18px] bg-gradient-to-br from-[#14532D] via-[#052E16] to-[#0A0A0B] border border-[#22C55E]/30 rounded-[20px] lg:rounded-[18px] p-[18px] lg:p-5 flex items-center gap-3.5">
+            <div className="flex-1">
+              <h3 className="text-[17px] font-bold mb-1">Submit new music</h3>
+              <p className="text-xs lg:text-[13px] text-[#BBF7D0]">Get on 18 real playlists across Africa</p>
+            </div>
+            <button
+              onClick={() => router.push("/submit")}
+              className="bg-[#22C55E] hover:bg-[#1aa34e] text-[#04120a] font-extrabold text-sm px-5 py-[13px] rounded-[14px] lg:rounded-xl whitespace-nowrap"
+            >
+              Start
+            </button>
+          </div>
+
+          {/* ===== Smart links (mobile cards) ===== */}
+          {smartLinkSubs.length > 0 && (
+            <section id="smart-links" className="pt-4 scroll-mt-20">
+              <div className="flex justify-between items-center mb-2.5">
+                <h2 className="text-[15px] font-bold">Your smart links</h2>
+              </div>
+              {smartLinkSubs.map((s) => (
+                <SmartLinkCard
+                  key={s.id}
+                  variant="card"
+                  submission={s}
+                  stats={linkStats[s.id] || {}}
+                  onSaved={() => { fetchSubmissions(); fetchLinkStats(); }}
+                />
+              ))}
+            </section>
+          )}
+
+          {/* ===== Recent submissions ===== */}
+          <section id="submissions" className="pt-4 scroll-mt-20">
+            <div className="flex justify-between items-center mb-2.5">
+              <h2 className="text-[15px] lg:text-base font-bold">Recent submissions</h2>
+            </div>
+            {loadingSubmissions ? (
+              <p className="text-zinc-500 text-sm">Loading submissions...</p>
+            ) : filtered.length === 0 ? (
+              <div className="bg-[#141417] border border-dashed border-white/10 rounded-2xl p-6 sm:p-8 text-center">
+                <p className="text-zinc-400 text-sm">{q ? "No submissions match your search." : "No submissions yet."}</p>
+                {!q && (
+                  <button onClick={() => router.push("/submit")} className="text-[#22C55E] text-sm font-bold mt-2">
+                    Create your first campaign
+                  </button>
+                )}
+              </div>
+            ) : (
+              <>
+                {/* Mobile cards */}
+                <div className="lg:hidden">
+                  {filtered.map((sub) => (
+                    <div key={sub.id} className="bg-[#141417] border border-white/[0.08] rounded-2xl p-3 mb-2.5">
+                      <div className="flex gap-2.5 items-center">
+                        <CoverArt src={sub.cover_art_url} alt={sub.song_title} size={44} rounded={10} />
+                        <div className="flex-1 min-w-0">
+                          <h4 className="text-sm font-bold truncate">{sub.song_title}</h4>
+                          <p className="text-[11px] text-zinc-500 truncate">
+                            {sub.playlist?.name || "Unknown"} · {subDate(sub.created_at)}
+                          </p>
+                        </div>
+                        <span className={`text-[10px] font-extrabold uppercase tracking-wide px-2.5 py-[5px] rounded-full shrink-0 ${pillClass(sub.status)}`}>
+                          {sub.status}
+                        </span>
+                      </div>
+                      {(sub.status === "declined" || sub.status === "rejected" || sub.status === "archived") && sub.feedback && (
+                        <div className="mt-2 text-xs text-zinc-400 bg-[#EF4444]/5 border border-[#EF4444]/15 rounded-[10px] px-2.5 py-2">
+                          <b className="text-red-300">Curator:</b> {sub.feedback}
+                        </div>
+                      )}
+                      {(sub.status === "declined" || sub.status === "rejected" || sub.status === "archived") && (
+                        <button
+                          onClick={() => router.push(`/mixing?song=${encodeURIComponent(sub.song_title)}&submission=${sub.id}`)}
+                          className="mt-2.5 w-full border border-[#22C55E]/40 bg-[#22C55E]/[0.08] text-[#22C55E] rounded-xl py-[11px] text-[13px] font-bold"
+                        >
+                          Get it professionally mixed
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Desktop panel rows */}
+                <div className="hidden lg:block bg-[#141417] border border-white/[0.08] rounded-[20px] p-5">
+                  <div className="lg:grid lg:grid-cols-[1.7fr_1fr] lg:gap-[18px] lg:items-start">
+                    <div>
+                      {filtered.map((sub) => (
+                        <div key={sub.id} className="flex items-center gap-3.5 p-3 border border-white/[0.08] rounded-[14px] mb-2.5 bg-[#1B1B1F]">
+                          <CoverArt src={sub.cover_art_url} alt={sub.song_title} size={52} rounded={12} />
+                          <div className="flex-1 min-w-0">
+                            <h4 className="text-sm font-bold truncate">{sub.song_title}</h4>
+                            <p className="text-xs text-zinc-500 truncate">{sub.playlist?.name || "Unknown"} · {subDate(sub.created_at)}</p>
+                            {(sub.status === "declined" || sub.status === "rejected" || sub.status === "archived") && sub.feedback && (
+                              <p className="text-xs text-zinc-400 mt-1 truncate" title={sub.feedback}>
+                                <span className="text-red-300 font-bold">Curator:</span> {sub.feedback}
+                              </p>
+                            )}
+                          </div>
+                          <div className="text-right shrink-0">
+                            <b className="text-[#22C55E] text-base block">{sub.clicks || 0}</b>
+                            <span className="text-[11px] text-zinc-500">taps</span>
+                          </div>
+                          <span className={`text-[10px] font-extrabold uppercase tracking-wide px-3 py-1.5 rounded-full shrink-0 ${pillClass(sub.status)}`}>
+                            {sub.status}
+                          </span>
+                          {sub.status === "accepted" && sub.tracking_slug ? (
+                            <button
+                              onClick={() => smartLinkCopy(sub.tracking_slug as string)}
+                              className="border border-white/[0.08] bg-[#141417] hover:bg-white/5 text-white rounded-[10px] px-3.5 py-2 text-xs font-bold shrink-0"
+                            >
+                              Smart link
+                            </button>
+                          ) : (sub.status === "declined" || sub.status === "rejected" || sub.status === "archived") ? (
+                            <button
+                              onClick={() => router.push(`/mixing?song=${encodeURIComponent(sub.song_title)}&submission=${sub.id}`)}
+                              className="border border-[#22C55E]/40 text-[#22C55E] hover:bg-[#22C55E]/10 rounded-[10px] px-3.5 py-2 text-xs font-bold shrink-0"
+                            >
+                              Get it mixed
+                            </button>
+                          ) : (
+                            <span className="text-sm font-bold text-white shrink-0">{pricingConfig.currency}{sub.amount_paid}</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Desktop right column */}
+                    <div className="space-y-[18px]">
+                      {topSmartLink && (
+                        <SmartLinkCard
+                          variant="panel"
+                          submission={topSmartLink}
+                          stats={linkStats[topSmartLink.id] || {}}
+                          onSaved={() => { fetchSubmissions(); fetchLinkStats(); }}
+                        />
+                      )}
+                      <section id="referral" className="scroll-mt-20">
+                        <div className="bg-[#141417] border border-[#22C55E]/30 rounded-[20px] p-1">
+                          <ReferralCard />
+                        </div>
+                      </section>
+                      <section id="mixing" className="scroll-mt-20">
+                        <ArtistMixingOrders />
+                      </section>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+          </section>
+
+          {/* ===== Mobile: referral + mixing (desktop shows them in the right column) ===== */}
+          <section className="pt-4 lg:hidden">
+            <ReferralCard />
+          </section>
+          <section className="pt-4 lg:hidden">
+            <ArtistMixingOrders />
+          </section>
+
+          {/* ===== Wallet ===== */}
+          <section id="wallet" className="pt-4 scroll-mt-20">
+            <div className="flex justify-between items-center mb-2.5">
+              <h2 className="text-[15px] lg:text-base font-bold">Wallet</h2>
+            </div>
+            <div className="bg-gradient-to-br from-[#14532D] to-[#052E16] border border-[#22C55E]/30 rounded-[20px] p-[18px] mb-3">
+              <small className="text-[#BBF7D0] text-[11px] uppercase tracking-[1px]">Available balance</small>
+              <div className="text-[32px] font-extrabold tracking-tight my-1 mb-3">
+                {pricingConfig.currency}{user.balance.toLocaleString()}
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => { scrollTo("wallet"); setTimeout(() => document.getElementById("top-up-amount")?.focus(), 400); }}
+                  className="flex-1 bg-[#22C55E] hover:bg-[#1aa34e] text-[#04120a] rounded-xl py-3 font-extrabold text-[13px]"
+                >
+                  Top up
+                </button>
+                <button
+                  onClick={() => setShowWithdraw(true)}
+                  className="flex-1 bg-white/10 hover:bg-white/15 text-white rounded-xl py-3 font-extrabold text-[13px]"
+                >
+                  Withdraw
+                </button>
+              </div>
+            </div>
+            <div className="bg-[#141417] border border-white/[0.08] rounded-[20px] p-4 lg:p-5 mb-3">
+              <h4 className="text-sm font-bold text-zinc-200 mb-3 flex items-center gap-2">
+                <Plus className="w-4 h-4 text-[#22C55E]" /> Top up wallet
               </h4>
               <div className="space-y-3">
                 <Input
@@ -737,62 +816,73 @@ export default function ArtistDashboard() {
                   />
                 ) : (
                   <Button className="w-full bg-white/5 text-gray-500 cursor-not-allowed hover:bg-white/5">
-                    Enter Amount
+                    Enter amount
                   </Button>
                 )}
               </div>
-              <button
-                onClick={() => setShowWithdraw(true)}
-                className="w-full mt-3 text-[11px] text-gray-600 hover:text-gray-400 underline underline-offset-4 transition-colors"
-              >
-                Need your funds? Request a payout
-              </button>
-            </CardContent>
-          </Card>
-
-          <div className="pt-2">
-            <div className="flex items-center justify-between mb-3 sm:mb-4">
-              <h2 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
-                <History className="w-5 h-5 text-gray-400" /> Wallet History
-              </h2>
+              <p className="text-[10px] text-center text-zinc-500 mt-2">Minimum withdrawal: {pricingConfig.currency}5,000</p>
             </div>
-            <TransactionsList userId={user.id} allowedTypes={["deposit", "refund", "withdrawal"]} />
-          </div>
+            <div className="pt-1">
+              <h2 className="text-[15px] lg:text-base font-bold text-white mb-2.5">Wallet history</h2>
+              <TransactionsList userId={user.id} allowedTypes={["deposit", "refund", "withdrawal"]} />
+            </div>
+          </section>
         </div>
+
+        {/* ===== Mobile bottom tab bar ===== */}
+        <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-[#101013]/95 backdrop-blur-md border-t border-white/[0.08] grid grid-cols-5 px-1 pt-2 pb-5 z-30">
+          <button onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} className="flex flex-col items-center gap-[3px] text-[10px] text-[#22C55E] font-semibold bg-none border-none">
+            <Home className="w-[22px] h-[22px]" />Home
+          </button>
+          <button onClick={() => scrollTo("smart-links")} className="flex flex-col items-center gap-[3px] text-[10px] text-zinc-500 font-semibold bg-none border-none">
+            <Link2 className="w-[22px] h-[22px]" />Links
+          </button>
+          <button onClick={() => router.push("/submit")} className="flex flex-col items-center gap-[3px] text-[10px] text-zinc-500 font-semibold bg-none border-none" aria-label="Submit music">
+            <span className="w-[52px] h-[52px] -mt-6 rounded-full bg-[#22C55E] text-[#04120a] flex items-center justify-center border-4 border-[#0A0A0B]">
+              <Plus className="w-6 h-6" strokeWidth={2.5} />
+            </span>
+          </button>
+          <button onClick={() => scrollTo("wallet")} className="flex flex-col items-center gap-[3px] text-[10px] text-zinc-500 font-semibold bg-none border-none">
+            <Wallet className="w-[22px] h-[22px]" />Wallet
+          </button>
+          <button onClick={() => setShowProfile(true)} className="flex flex-col items-center gap-[3px] text-[10px] text-zinc-500 font-semibold bg-none border-none">
+            <User className="w-[22px] h-[22px]" />Profile
+          </button>
+        </nav>
       </div>
 
-      {/* Withdraw Modal */}
+      {/* ===== Withdraw Modal ===== */}
       {showWithdraw && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-zinc-900 border border-white/10 p-6 rounded-lg w-full max-w-md space-y-4">
-            <h3 className="font-bold text-white text-lg">Request Payout</h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm px-4">
+          <div className="bg-[#141417] border border-white/[0.08] p-6 rounded-2xl w-full max-w-md space-y-4 max-h-[90vh] overflow-y-auto">
+            <h3 className="font-bold text-white text-lg">Request payout</h3>
 
             {(!bankName || !accountNumber) ? (
               <div className="py-8 text-center space-y-4">
-                <div className="p-4 bg-yellow-500/10 rounded-full inline-block">
-                  <AlertCircle className="w-8 h-8 text-yellow-500" />
+                <div className="p-4 bg-[#EAB308]/10 rounded-full inline-block">
+                  <AlertCircle className="w-8 h-8 text-[#EAB308]" />
                 </div>
-                <p className="text-gray-300">Please add your bank details in settings before withdrawing.</p>
-                <Button className="w-full bg-white text-black" onClick={() => { setShowWithdraw(false); setShowProfile(true); }}>
-                  Go to Settings
+                <p className="text-zinc-300 text-sm">Please add your bank details in settings before withdrawing.</p>
+                <Button className="w-full bg-white text-black hover:bg-zinc-200" onClick={() => { setShowWithdraw(false); setShowProfile(true); }}>
+                  Go to settings
                 </Button>
               </div>
             ) : (
               <>
                 <div className="py-4 space-y-4">
-                  <div className="p-4 bg-white/5 rounded border border-white/10 text-sm">
-                    <p className="text-gray-400 text-xs mb-1">Transfer Destination</p>
+                  <div className="p-4 bg-white/5 rounded-xl border border-white/10 text-sm">
+                    <p className="text-zinc-400 text-xs mb-1">Transfer destination</p>
                     <p className="font-bold text-white">{bankName}</p>
-                    <p className="text-gray-300">{accountNumber} • {accountName}</p>
-                    <Button variant="link" className="text-green-500 text-xs h-auto p-0 mt-2" onClick={() => { setShowWithdraw(false); setShowProfile(true); }}>
-                      Change Account
+                    <p className="text-zinc-300">{accountNumber} · {accountName}</p>
+                    <Button variant="link" className="text-[#22C55E] text-xs h-auto p-0 mt-2" onClick={() => { setShowWithdraw(false); setShowProfile(true); }}>
+                      Change account
                     </Button>
                   </div>
 
                   <div className="space-y-2">
-                    <Label>Amount to Withdraw</Label>
+                    <Label>Amount to withdraw</Label>
                     <div className="relative">
-                      <span className="absolute left-3 top-3 text-gray-500">{pricingConfig.currency}</span>
+                      <span className="absolute left-3 top-3 text-zinc-500">{pricingConfig.currency}</span>
                       <Input
                         type="number"
                         placeholder="0.00"
@@ -801,8 +891,8 @@ export default function ArtistDashboard() {
                         className="pl-8 bg-black/40 border-white/10 text-white"
                       />
                     </div>
-                    <p className="text-xs text-gray-500">Available: {pricingConfig.currency}{user?.balance?.toLocaleString()}</p>
-                    <p className="text-xs text-gray-500">Minimum withdrawal: {pricingConfig.currency}5,000</p>
+                    <p className="text-xs text-zinc-500">Available: {pricingConfig.currency}{user?.balance?.toLocaleString()}</p>
+                    <p className="text-xs text-zinc-500">Minimum withdrawal: {pricingConfig.currency}5,000</p>
                   </div>
                   <div className="space-y-2">
                     <Label>Reason for withdrawal</Label>
@@ -816,8 +906,8 @@ export default function ArtistDashboard() {
                 </div>
                 <div className="flex justify-end gap-2">
                   <Button variant="ghost" onClick={() => setShowWithdraw(false)}>Cancel</Button>
-                  <Button className="bg-green-600" onClick={handleWithdraw} disabled={isWithdrawing || !withdrawAmount}>
-                    {isWithdrawing ? "Processing..." : "Submit Request"}
+                  <Button className="bg-[#22C55E] hover:bg-[#1aa34e] text-[#04120a]" onClick={handleWithdraw} disabled={isWithdrawing || !withdrawAmount}>
+                    {isWithdrawing ? "Processing..." : "Submit request"}
                   </Button>
                 </div>
               </>
@@ -826,37 +916,37 @@ export default function ArtistDashboard() {
         </div>
       )}
 
-      {/* Support Modal - Mobile Optimized */}
+      {/* ===== Support Modal ===== */}
       {showSupport && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-zinc-900 border border-white/10 w-full sm:max-w-md md:max-w-xl h-[80vh] sm:h-[600px] flex flex-col rounded-t-xl sm:rounded-xl shadow-2xl overflow-hidden">
-            <div className="p-4 border-b border-white/10 flex justify-between items-center bg-zinc-900">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-sm">
+          <div className="bg-[#141417] border border-white/[0.08] w-full sm:max-w-md md:max-w-xl h-[80vh] sm:h-[600px] flex flex-col rounded-t-2xl sm:rounded-2xl shadow-2xl overflow-hidden">
+            <div className="p-4 border-b border-white/10 flex justify-between items-center bg-[#141417]">
               <h3 className="font-bold text-white text-base sm:text-lg flex items-center gap-2">
-                <HelpCircle className="w-5 h-5 text-green-500" /> Support Center
+                <HelpCircle className="w-5 h-5 text-[#22C55E]" /> Support center
               </h3>
               <Button variant="ghost" size="icon" onClick={() => setShowSupport(false)}>
-                <XCircle className="w-6 h-6 text-gray-400" />
+                <XCircle className="w-6 h-6 text-zinc-400" />
               </Button>
             </div>
-            <div className="flex-1 overflow-hidden flex flex-col bg-zinc-900">
+            <div className="flex-1 overflow-hidden flex flex-col bg-[#141417]">
               {supportView === "list" && (
                 <div className="p-4 flex flex-col h-full">
                   <div className="flex justify-between items-center mb-4">
-                    <h4 className="text-white font-bold">My Tickets</h4>
-                    <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={() => setSupportView("create")}>
-                      <Plus className="w-4 h-4 mr-1" /> New Ticket
+                    <h4 className="text-white font-bold">My tickets</h4>
+                    <Button size="sm" className="bg-[#22C55E] hover:bg-[#1aa34e] text-[#04120a]" onClick={() => setSupportView("create")}>
+                      <Plus className="w-4 h-4 mr-1" /> New ticket
                     </Button>
                   </div>
                   <div className="flex-1 overflow-y-auto space-y-2">
-                    {supportTickets.length === 0 && <p className="text-center text-gray-500 py-10">No tickets found.</p>}
+                    {supportTickets.length === 0 && <p className="text-center text-zinc-500 py-10">No tickets found.</p>}
                     {supportTickets.map((t) => (
-                      <div key={t.id} onClick={() => openTicketChat(t)} className="p-3 bg-white/5 border border-white/5 rounded cursor-pointer hover:bg-white/10">
+                      <div key={t.id} onClick={() => openTicketChat(t)} className="p-3 bg-white/5 border border-white/5 rounded-xl cursor-pointer hover:bg-white/10">
                         <div className="flex justify-between items-start">
                           <span className="font-bold text-white block">{t.subject}</span>
-                          <span className={`text-[10px] px-2 py-0.5 rounded uppercase ${t.status === "open" ? "bg-green-500/20 text-green-500" : "bg-gray-500/20 text-gray-500"}`}>{t.status}</span>
+                          <span className={`text-[10px] px-2 py-0.5 rounded uppercase ${t.status === "open" ? "bg-[#22C55E]/20 text-[#22C55E]" : "bg-zinc-500/20 text-zinc-500"}`}>{t.status}</span>
                         </div>
-                        <p className="text-xs text-gray-400 mt-1 line-clamp-1">{t.message}</p>
-                        <p className="text-[10px] text-gray-500 mt-2">{new Date(t.created_at).toLocaleDateString()}</p>
+                        <p className="text-xs text-zinc-400 mt-1 line-clamp-1">{t.message}</p>
+                        <p className="text-[10px] text-zinc-500 mt-2">{new Date(t.created_at).toLocaleDateString()}</p>
                       </div>
                     ))}
                   </div>
@@ -869,22 +959,22 @@ export default function ArtistDashboard() {
                     <Button variant="ghost" size="sm" onClick={() => setSupportView("list")}>
                       <ChevronLeft className="w-4 h-4" />
                     </Button>
-                    <h4 className="text-white font-bold">New Ticket</h4>
+                    <h4 className="text-white font-bold">New ticket</h4>
                   </div>
                   <div className="space-y-4">
                     <div className="space-y-2">
                       <Label>Subject</Label>
-                      <Input value={supportSubject} onChange={(e) => setSupportSubject(e.target.value)} placeholder="e.g. Payment Issue" />
+                      <Input value={supportSubject} onChange={(e) => setSupportSubject(e.target.value)} placeholder="e.g. Payment issue" className="bg-black/40 border-white/10 text-white" />
                     </div>
                     <div className="space-y-2">
                       <Label>Message</Label>
-                      <Textarea className="min-h-[150px]" value={supportMessage} onChange={(e) => setSupportMessage(e.target.value)} placeholder="Describe your issue..." />
+                      <Textarea className="min-h-[150px] bg-black/40 border-white/10 text-white" value={supportMessage} onChange={(e) => setSupportMessage(e.target.value)} placeholder="Describe your issue..." />
                     </div>
                   </div>
                   <div className="flex justify-end gap-2 mt-auto pt-4">
                     <Button variant="ghost" onClick={() => setSupportView("list")}>Cancel</Button>
-                    <Button className="bg-green-600" onClick={createTicket} disabled={isSubmittingTicket}>
-                      <Send className="w-4 h-4 mr-2" /> Submit Ticket
+                    <Button className="bg-[#22C55E] hover:bg-[#1aa34e] text-[#04120a]" onClick={createTicket} disabled={isSubmittingTicket}>
+                      <Send className="w-4 h-4 mr-2" /> Submit ticket
                     </Button>
                   </div>
                 </div>
@@ -892,32 +982,31 @@ export default function ArtistDashboard() {
 
               {supportView === "chat" && activeTicket && (
                 <div className="flex flex-col h-full">
-                  <div className="p-3 border-b border-white/10 flex items-center gap-3 bg-zinc-800/50">
+                  <div className="p-3 border-b border-white/10 flex items-center gap-3 bg-white/5">
                     <Button variant="ghost" size="sm" onClick={() => setSupportView("list")}>
                       <ChevronLeft className="w-4 h-4" />
                     </Button>
                     <div>
                       <h4 className="text-white font-bold text-sm">{activeTicket.subject}</h4>
-                      <p className="text-[10px] text-gray-400">Ticket ID: {activeTicket.id.slice(0, 8)}</p>
+                      <p className="text-[10px] text-zinc-400">Ticket ID: {activeTicket.id.slice(0, 8)}</p>
                     </div>
                   </div>
                   <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-black/20">
                     {chatMessages.map((msg, idx) => {
                       const isMe = msg.sender_id === user?.id;
                       return (
-                        <div key={msg.id || idx} className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
-                          <div className={`max-w-[75%] p-3 rounded-xl text-sm ${isMe ? "bg-green-600 text-white rounded-br-none" : "bg-zinc-700 text-gray-200 rounded-bl-none"}`}>
+                        <div key={idx} className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
+                          <div className={`max-w-[75%] p-3 rounded-xl text-sm ${isMe ? "bg-[#22C55E] text-[#04120a] rounded-br-none font-medium" : "bg-zinc-700 text-zinc-200 rounded-bl-none"}`}>
                             <p>{msg.message}</p>
                             <p className="text-[10px] opacity-50 mt-1 text-right">{new Date(msg.created_at).toLocaleTimeString()}</p>
                           </div>
                         </div>
                       );
                     })}
-                    <div ref={chatEndRef} />
                   </div>
-                  <div className="p-3 bg-zinc-900 border-t border-white/10 flex gap-2">
-                    <Input value={chatInput} onChange={(e) => setChatInput(e.target.value)} placeholder="Type a message..." className="bg-zinc-800 border-zinc-700" onKeyDown={(e) => e.key === "Enter" && sendChatMessage()} />
-                    <Button size="icon" className="bg-green-600" onClick={sendChatMessage}>
+                  <div className="p-3 bg-[#141417] border-t border-white/10 flex gap-2">
+                    <Input value={chatInput} onChange={(e) => setChatInput(e.target.value)} placeholder="Type a message..." className="bg-[#1B1B1F] border-white/10 text-white" onKeyDown={(e) => e.key === "Enter" && sendChatMessage()} />
+                    <Button size="icon" className="bg-[#22C55E] hover:bg-[#1aa34e] text-[#04120a]" onClick={sendChatMessage}>
                       <Send className="w-4 h-4" />
                     </Button>
                   </div>
@@ -928,113 +1017,103 @@ export default function ArtistDashboard() {
         </div>
       )}
 
-      {/* Profile Modal */}
+      {/* ===== Profile Modal ===== */}
       {showProfile && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in p-4">
-          <div className="bg-zinc-900 border border-white/10 p-6 rounded-lg w-full max-w-md space-y-4 max-h-[90vh] overflow-y-auto">
-            <h3 className="font-bold text-white text-lg">Artist Profile</h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm px-4">
+          <div className="bg-[#141417] border border-white/[0.08] p-6 rounded-2xl w-full max-w-md space-y-4 max-h-[90vh] overflow-y-auto">
+            <h3 className="font-bold text-white text-lg">Artist profile</h3>
             <div className="space-y-2">
-              <Label>Bio / Pitch</Label>
-              <Textarea value={profileBio} onChange={(e) => setProfileBio(e.target.value)} placeholder="Short bio for curators..." />
+              <Label>Bio / pitch</Label>
+              <Textarea value={profileBio} onChange={(e) => setProfileBio(e.target.value)} placeholder="Short bio for curators..." className="bg-black/40 border-white/10 text-white" />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Instagram</Label>
-                <Input value={profileIg} onChange={(e) => setProfileIg(e.target.value)} placeholder="@username" />
+                <Input value={profileIg} onChange={(e) => setProfileIg(e.target.value)} placeholder="@username" className="bg-black/40 border-white/10 text-white" />
               </div>
               <div className="space-y-2">
                 <Label>Twitter</Label>
-                <Input value={profileTwitter} onChange={(e) => setProfileTwitter(e.target.value)} placeholder="@username" />
+                <Input value={profileTwitter} onChange={(e) => setProfileTwitter(e.target.value)} placeholder="@username" className="bg-black/40 border-white/10 text-white" />
               </div>
             </div>
             <div className="space-y-2">
               <Label>Website / EPK</Label>
-              <Input value={profileWeb} onChange={(e) => setProfileWeb(e.target.value)} placeholder="https://" />
+              <Input value={profileWeb} onChange={(e) => setProfileWeb(e.target.value)} placeholder="https://" className="bg-black/40 border-white/10 text-white" />
             </div>
             <div className="pt-2 border-t border-white/10">
-              <p className="text-xs text-gray-500 mb-3">Bank details for withdrawals.</p>
+              <p className="text-xs text-zinc-500 mb-3">Bank details, used for withdrawals.</p>
               <div className="space-y-2">
-                <Label>Bank Name</Label>
-                <Input value={bankName} onChange={(e) => setBankName(e.target.value)} placeholder="e.g. GTBank" />
+                <Label>Bank name</Label>
+                <Input value={bankName} onChange={(e) => setBankName(e.target.value)} placeholder="e.g. GTBank" className="bg-black/40 border-white/10 text-white" />
               </div>
               <div className="grid grid-cols-2 gap-4 mt-3">
                 <div className="space-y-2">
-                  <Label>Account Number</Label>
-                  <Input value={accountNumber} onChange={(e) => setAccountNumber(e.target.value)} placeholder="0123456789" />
+                  <Label>Account number</Label>
+                  <Input value={accountNumber} onChange={(e) => setAccountNumber(e.target.value)} placeholder="0123456789" className="bg-black/40 border-white/10 text-white" />
                 </div>
                 <div className="space-y-2">
-                  <Label>Account Name</Label>
-                  <Input value={accountName} onChange={(e) => setAccountName(e.target.value)} placeholder="Full name" />
+                  <Label>Account name</Label>
+                  <Input value={accountName} onChange={(e) => setAccountName(e.target.value)} placeholder="Full name" className="bg-black/40 border-white/10 text-white" />
                 </div>
               </div>
             </div>
-            <div className="flex justify-end gap-2 pt-2">
-              <Button variant="ghost" onClick={() => setShowProfile(false)}>Cancel</Button>
-              <Button className="bg-green-600" onClick={handleUpdateProfile} disabled={isUpdatingProfile}>
-                {isUpdatingProfile ? "Saving..." : "Save Profile"}
-              </Button>
+            <div className="flex justify-between items-center pt-1">
+              <div className="flex gap-1">
+                <Button variant="ghost" size="sm" className="text-zinc-400" onClick={() => { setShowProfile(false); setShowSupport(true); }}>
+                  <HelpCircle className="w-4 h-4 mr-1" /> Support
+                </Button>
+                <Button variant="ghost" size="sm" className="text-zinc-400 hover:text-red-400" onClick={logout}>
+                  <LogOut className="w-4 h-4 mr-1" /> Log out
+                </Button>
+              </div>
+              <div className="flex gap-2">
+                <Button variant="ghost" onClick={() => setShowProfile(false)}>Cancel</Button>
+                <Button className="bg-[#22C55E] hover:bg-[#1aa34e] text-[#04120a]" onClick={handleUpdateProfile} disabled={isUpdatingProfile}>
+                  {isUpdatingProfile ? "Saving..." : "Save profile"}
+                </Button>
+              </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Notifications Modal */}
+      {/* ===== Notifications Modal ===== */}
       {showNotifications && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-zinc-900 border border-white/10 w-full max-w-md p-6 rounded-lg space-y-6 max-h-[80vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm px-4">
+          <div className="bg-[#141417] border border-white/[0.08] w-full max-w-md p-6 rounded-2xl space-y-6 max-h-[80vh] overflow-y-auto">
             <div className="flex justify-between items-center pb-4 border-b border-white/10">
               <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                <Bell className="w-5 h-5 text-yellow-500" /> Updates
+                <Bell className="w-5 h-5 text-[#EAB308]" /> Updates
               </h3>
               <Button variant="ghost" size="icon" onClick={() => setShowNotifications(false)}>
                 <XCircle className="w-6 h-6" />
               </Button>
             </div>
-            <div className="space-y-6">
-              {personalNotifications.length === 0 && broadcasts.length === 0 && (
-                <div className="bg-white/5 p-4 rounded border border-white/5">
-                  <h4 className="font-bold text-white mb-1">👋 Welcome to AfroPitch!</h4>
-                  <p className="text-sm text-gray-400 mb-2">
-                    We&apos;re excited to have you here. Start by browsing playlists and submitting your first track.
+            <div className="space-y-4">
+              {notifications.length === 0 && (
+                <div className="bg-white/5 p-4 rounded-xl border border-white/5">
+                  <h4 className="font-bold text-white mb-1">Welcome to AfroPitch</h4>
+                  <p className="text-sm text-zinc-400 mb-2">
+                    We are excited to have you here. Start by browsing playlists and submitting your first track.
                   </p>
-                  <p className="text-[10px] text-gray-600">Just now</p>
+                  <p className="text-[10px] text-zinc-600">Just now</p>
                 </div>
               )}
-              {personalNotifications.length > 0 && (
-                <div className="space-y-3">
-                  <h4 className="text-xs font-bold text-gray-500 uppercase tracking-widest">Your updates</h4>
-                  {personalNotifications.map((n) => (
-                    <div key={n.id} className={`p-4 rounded border ${n.is_read ? "bg-white/5 border-white/5" : "bg-green-500/10 border-green-500/30"}`}>
-                      <h4 className="font-bold text-white mb-1 flex items-center gap-2">
-                        {!n.is_read && <span className="w-2 h-2 bg-green-500 rounded-full shrink-0" />}
-                        <span>{n.title}</span>
-                      </h4>
-                      <p className="text-sm text-gray-400 whitespace-pre-wrap">{n.message}</p>
-                      <p className="text-[10px] text-gray-600 mt-2">{new Date(n.created_at).toLocaleDateString()}</p>
+              {notifications.map((n, i) => {
+                const isExpanded = expandedNotificationId === n.id;
+                return (
+                  <div key={n.id || i} className="bg-white/5 p-4 rounded-xl border border-white/5 cursor-pointer hover:bg-white/10 transition-colors" onClick={() => toggleNotification(n.id)}>
+                    <h4 className="font-bold text-white mb-1 flex justify-between items-start">
+                      <span>{n.subject}</span>
+                      <span className="text-[10px] text-zinc-500 font-normal ml-2 shrink-0 border border-white/10 px-1.5 py-0.5 rounded uppercase tracking-wider">{isExpanded ? "Collapse" : "Read"}</span>
+                    </h4>
+                    <div className={`text-sm text-zinc-400 whitespace-pre-wrap ${isExpanded ? "" : "line-clamp-2"}`}>
+                      {n.message ? n.message.replace(/<[^>]*>?/gm, " ").replace(/\s+/g, " ").trim() : ""}
                     </div>
-                  ))}
-                </div>
-              )}
-              {broadcasts.length > 0 && (
-                <div className="space-y-3">
-                  <h4 className="text-xs font-bold text-gray-500 uppercase tracking-widest">Announcements</h4>
-                  {broadcasts.map((n, i) => {
-                    const isExpanded = expandedNotificationId === n.id;
-                    return (
-                      <div key={n.id || i} className="bg-white/5 p-4 rounded border border-white/5 cursor-pointer hover:bg-white/10 transition-colors" onClick={() => toggleNotification(n.id)}>
-                        <h4 className="font-bold text-white mb-1 flex justify-between items-start">
-                          <span>{n.subject}</span>
-                          <span className="text-[10px] text-gray-500 font-normal ml-2 shrink-0 border border-white/10 px-1.5 py-0.5 rounded uppercase tracking-wider">{isExpanded ? "Collapse" : "Read"}</span>
-                        </h4>
-                        <div className={`text-sm text-gray-400 whitespace-pre-wrap ${isExpanded ? "" : "line-clamp-2"}`}>
-                          {n.message ? n.message.replace(/<[^>]*>?/gm, " ").replace(/\s+/g, " ").trim() : ""}
-                        </div>
-                        <p className="text-[10px] text-gray-600 mt-2">{new Date(n.created_at).toLocaleDateString()}</p>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
+                    <p className="text-[10px] text-zinc-600 mt-2">{new Date(n.created_at).toLocaleDateString()}</p>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
