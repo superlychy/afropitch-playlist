@@ -1,7 +1,7 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { Resend } from 'resend';
-import { getTransactionReceiptTemplate, getSongApprovedTemplate, getSongDeclinedTemplate, getSupportTicketTemplate, getSupportTicketReceivedTemplate, getSupportTicketAdminTemplate, getCuratorApprovedTemplate, getCuratorRejectedTemplate, getCuratorVerifiedTemplate, getMixingMessageTemplate, getMixingRefundRequestTemplate, getMixingRefundDeniedTemplate } from './templates.ts';
+import { brandedEmail, getTransactionReceiptTemplate, getSongApprovedTemplate, getSongDeclinedTemplate, getSupportTicketTemplate, getSupportTicketReceivedTemplate, getSupportTicketAdminTemplate, getCuratorApprovedTemplate, getCuratorRejectedTemplate, getCuratorVerifiedTemplate, getMixingMessageTemplate, getMixingRefundRequestTemplate, getMixingRefundDeniedTemplate } from './templates.ts';
 
 const resend = new Resend(Deno.env.get('RESEND_API_KEY'));
 const supabase = createClient(
@@ -162,9 +162,8 @@ async function handleSubmissionInsert(record: any) {
 
     // 4. Send Email to Curator
     const subject = `New Submission: ${record.song_title} for ${playlist.name}`;
-    const html = `
-        <div style="font-family: sans-serif; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 8px;">
-            <h2 style="color: #16a34a;">New Song Submission!</h2>
+    const html = brandedEmail(`
+            <h2 style="color: #16a34a; margin-top: 0;">New Song Submission!</h2>
             <p>Hi ${curator.full_name},</p>
             <p>You have received a new submission from <strong>${artistName}</strong> for your playlist <strong>${playlist.name}</strong>.</p>
             <div style="background: #f9f9f9; padding: 15px; border-radius: 5px; margin: 15px 0;">
@@ -175,11 +174,7 @@ async function handleSubmissionInsert(record: any) {
             <div style="text-align: center; margin-top: 20px;">
                 <a href="${SITE_URL}/dashboard/curator" style="background:#16a34a;color:white;padding:12px 24px;text-decoration:none;border-radius:5px;font-weight:bold;">Review Submission</a>
             </div>
-             <p style="font-size: 12px; color: #777; text-align: center; margin-top: 30px;">
-                &copy; ${new Date().getFullYear()} AfroPitch Playlist.
-            </p>
-        </div>
-    `;
+    `);
 
     await sendEmail(curator.email, subject, html);
 }
@@ -238,19 +233,14 @@ async function handleRankingBoost(record: any) {
     const trackingLink = record.tracking_slug ? `${SITE_URL}/track/${record.tracking_slug}` : `${SITE_URL}/dashboard/artist`;
 
     const subject = `Your song "${record.song_title}" is trending on ${playlistName} 🚀`;
-    const html = `
-        <div style="font-family: sans-serif; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 8px;">
-            <h2 style="color: #16a34a;">Great news!</h2>
+    const html = brandedEmail(`
+            <h2 style="color: #16a34a; margin-top: 0;">Great news!</h2>
             <p>Your song <strong>${record.song_title}</strong> has just climbed up the rankings on <strong>${playlistName}</strong>.</p>
             <p>We are pushing it to more listeners right now. Please keep sharing your tracking link to boost your ranking even higher and trend!</p>
             <div style="text-align: center; margin-top: 30px;">
                 <a href="${trackingLink}" style="background:#16a34a;color:white;padding:14px 28px;text-decoration:none;border-radius:30px;font-weight:bold;font-size:16px;">View & Share Link</a>
             </div>
-            <p style="font-size: 13px; color: #777; text-align: center; margin-top: 40px;">
-                &copy; ${new Date().getFullYear()} AfroPitch Playlist.
-            </p>
-        </div>
-    `;
+    `);
 
     await sendEmail(user.email, subject, html);
 }
@@ -265,11 +255,11 @@ async function handleWithdrawalUpdate(record: any) {
     if (!user || !user.email) return;
 
     const subject = `Withdrawal Update: ${record.status.toUpperCase()}`;
-    const html = `
-    <h1>Withdrawal Update</h1>
+    const html = brandedEmail(`
+    <h2 style="margin-top: 0;">Withdrawal Update</h2>
     <p>Your withdrawal request for ${CURRENCY}${record.amount} has been <strong>${record.status}</strong>.</p>
     <p>Please check your dashboard for details.</p>
-    `;
+    `);
     // reusing generic or creating simple one.
     // Since I have transaction receipt, that covers the financial movement. 
     // This is just a status alert.
@@ -555,18 +545,15 @@ async function handleBroadcast(record: any) {
                 };
             }
 
-            const html = `
-            <div style="font-family: sans-serif; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 8px;">
-                <h2 style="color: #16a34a;">${subject}</h2>
+            const html = brandedEmail(`
+                <h2 style="color: #16a34a; margin-top: 0;">${subject}</h2>
                 <div style="font-size: 16px; line-height: 1.5;">${htmlBody}</div>
                 <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
                 <p style="font-size: 12px; color: #777; text-align: center;">
-                    You received this message from AfroPitch Admin.<br/>
-                    &copy; ${new Date().getFullYear()} AfroPitch Playlist.
+                    You received this message from AfroPitch Admin.
                 </p>
                 ${unsubFooter}
-            </div>
-        `;
+        `);
 
             await sendEmail(email, subject, html, listUnsubHeaders);
             sentCount++;

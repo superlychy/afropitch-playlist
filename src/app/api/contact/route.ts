@@ -2,6 +2,7 @@
 import { NextResponse } from 'next/server';
 import { Resend } from 'resend';
 import { createClient } from '@supabase/supabase-js';
+import { brandedEmail } from '@/lib/email-template';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'superlychy@gmail.com';
@@ -41,9 +42,8 @@ export async function POST(request: Request) {
             from: `AfroPitch Contact <${SENDER_EMAIL}>`,
             to: [ADMIN_EMAIL],
             subject: `Contact Form: ${subject}`,
-            html: `
-        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 8px;">
-          <h1 style="color: #16a34a;">New Contact Form Message</h1>
+            html: brandedEmail(`
+          <h2 style="color: #16a34a; margin-top: 0;">New Contact Form Message</h2>
           <div style="background: #f9f9f9; padding: 15px; border-radius: 5px; margin: 15px 0;">
             <p style="margin: 5px 0;"><strong>From:</strong> ${email}</p>
             <p style="margin: 5px 0;"><strong>Subject:</strong> ${subject}</p>
@@ -55,8 +55,7 @@ export async function POST(request: Request) {
           <p style="font-size: 12px; color: #777; text-align: center;">
             Reply directly to this email to respond to ${email}
           </p>
-        </div>
-      `,
+      `),
             replyTo: email
         });
 

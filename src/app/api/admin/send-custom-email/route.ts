@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { Resend } from 'resend';
 import { createClient } from '@supabase/supabase-js';
+import { brandedEmail } from '@/lib/email-template';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -63,21 +64,9 @@ export async function POST(request: Request) {
             from: `AfroPitch <${from}>`,
             to: [to],
             subject: subject,
-            html: `
-                <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 8px;">
-                    <div style="background: linear-gradient(135deg, #16a34a 0%, #15803d 100%); padding: 20px; border-radius: 8px 8px 0 0; text-align: center;">
-                        <h1 style="color: white; margin: 0;">AfroPitch Play</h1>
-                    </div>
-                    <div style="padding: 30px 20px; background: white;">
-                        <div style="white-space: pre-wrap; color: #333;">${message.replace(/\n/g, '<br>')}</div>
-                    </div>
-                    <div style="background: #f5f5f5; padding: 15px; border-radius: 0 0 8px 8px; text-align: center;">
-                        <p style="color: #999; font-size: 12px; margin: 0;">
-                            © 2026 AfroPitch Play. All rights reserved.
-                        </p>
-                    </div>
-                </div>
-            `,
+            html: brandedEmail(`
+                <div style="white-space: pre-wrap; color: #333;">${message.replace(/\n/g, '<br>')}</div>
+            `),
             replyTo: from
         });
 

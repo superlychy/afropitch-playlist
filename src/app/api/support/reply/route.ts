@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { Resend } from 'resend';
 import { createClient } from '@supabase/supabase-js';
+import { brandedEmail } from '@/lib/email-template';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 const SENDER_EMAIL = 'contact@afropitchplay.best';
@@ -89,14 +90,13 @@ export async function POST(request: Request) {
         }
 
         if (toEmail) {
-            const html = `
-                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #111;">
-                    <h2 style="margin-bottom: 4px;">AfroPitch Support replied</h2>
+            const html = brandedEmail(`
+                    <h2 style="margin-top: 0; margin-bottom: 4px;">AfroPitch Support replied</h2>
                     <p style="color: #555; font-size: 14px;">Re: ${esc(ticket.subject || 'your support ticket')}</p>
                     <div style="background: #f5f5f5; border-left: 4px solid #16a34a; padding: 14px 16px; margin: 16px 0; white-space: pre-wrap;">${esc(message)}</div>
                     <p style="color: #555; font-size: 14px;">Need anything else? Just reply to this email and our team will pick it up.</p>
                     <p style="color: #999; font-size: 12px;">- The AfroPitch Team</p>
-                </div>`;
+            `);
             try {
                 await resend.emails.send({
                     from: `AfroPitch Support <${SENDER_EMAIL}>`,
