@@ -907,7 +907,7 @@ export default function CuratorDashboard() {
                     className="w-10 h-10 rounded-xl border border-white/10 bg-[#141417] flex items-center justify-center relative shrink-0"
                 >
                     <Bell className="w-5 h-5 text-zinc-400" />
-                    {notifications.length > 0 && <span className="absolute top-2 right-2.5 w-2 h-2 bg-[#EF4444] rounded-full border-2 border-[#0A0A0B]" />}
+                    {(notifications.length > 0 || pendingReviews.length > 0) && <span className="absolute top-2 right-2.5 w-2 h-2 bg-[#EF4444] rounded-full border-2 border-[#0A0A0B]" />}
                 </button>
             </header>
 
@@ -924,7 +924,7 @@ export default function CuratorDashboard() {
                         className="ml-auto w-[42px] h-[42px] rounded-xl border border-white/10 bg-[#141417] flex items-center justify-center relative"
                     >
                         <Bell className="w-5 h-5 text-zinc-400" />
-                        {notifications.length > 0 && <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-[#EF4444] rounded-full border-2 border-[#0A0A0B]" />}
+                        {(notifications.length > 0 || pendingReviews.length > 0) && <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-[#EF4444] rounded-full border-2 border-[#0A0A0B]" />}
                     </button>
                 </div>
             </div>
@@ -1260,7 +1260,19 @@ export default function CuratorDashboard() {
                             <button onClick={() => setShowNotifications(false)} className="text-zinc-500 hover:text-white"><XCircle className="w-6 h-6" /></button>
                         </div>
                         <div className="space-y-3">
-                            {notifications.length === 0 && (
+                            {pendingReviews.length > 0 && (
+                                <div
+                                    className="bg-[#F59E0B]/10 p-4 rounded-xl border border-[#F59E0B]/30 cursor-pointer hover:bg-[#F59E0B]/15 transition-colors"
+                                    onClick={() => setShowNotifications(false)}
+                                >
+                                    <h4 className="font-bold text-white mb-1 flex items-center gap-2">
+                                        <ListMusic className="w-4 h-4 text-[#F59E0B]" />
+                                        {pendingReviews.length} song{pendingReviews.length === 1 ? "" : "s"} waiting for your review
+                                    </h4>
+                                    <p className="text-sm text-zinc-400">Artists are waiting. Tap to close and start reviewing.</p>
+                                </div>
+                            )}
+                            {notifications.length === 0 && pendingReviews.length === 0 && (
                                 <div className="bg-white/5 p-4 rounded-xl border border-white/5">
                                     <h4 className="font-bold text-white mb-1">Welcome to AfroPitch!</h4>
                                     <p className="text-sm text-zinc-400 mb-2">

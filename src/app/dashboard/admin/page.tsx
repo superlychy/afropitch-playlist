@@ -52,6 +52,8 @@ interface WithdrawalRequest {
     bank_details: string;
     reason: string;
     date: string;
+    processed_at: string | null;
+    paid_reference: string | null;
 }
 
 interface SupportTicket {
@@ -402,7 +404,9 @@ export default function AdminDashboard() {
                     status: w.status,
                     bank_details: `${w.bank_name} - ${w.account_number}${w.account_name ? ` (${w.account_name})` : ''}`,
                     reason: w.reason || '',
-                    date: new Date(w.created_at).toLocaleDateString()
+                    date: new Date(w.created_at).toLocaleDateString(),
+                    processed_at: w.processed_at || null,
+                    paid_reference: w.paid_reference || null
                 })));
             }
 
@@ -477,7 +481,7 @@ export default function AdminDashboard() {
             // 7. Finance Stats — sourced from real DB tables
             const [{ data: depositTxns }, { data: financeWithdrawals }, { data: financeSubs }] = await Promise.all([
                 supabase.from('transactions').select('amount').eq('type', 'deposit'),
-                supabase.from('withdrawals').select('amount, status'),
+                supabase.from('withdrawals').select('amount, status, processed_at'),
                 supabase.from('submissions').select('amount_paid, status, playlist:playlists(curator_id)').gt('amount_paid', 0),
             ]);
 
@@ -515,7 +519,7 @@ export default function AdminDashboard() {
             });
 
             const approvedWithdrawals = financeWithdrawals
-                ?.filter((w: any) => w.status === 'approved')
+                ?.filter((w: any) => w.status === 'approved' && w.processed_at)
                 .reduce((acc, curr) => acc + Number(curr.amount), 0) || 0;
             const pendingWithdrawalAmt = financeWithdrawals
                 ?.filter((w: any) => w.status === 'pending')
@@ -674,10 +678,44 @@ export default function AdminDashboard() {
         }
     };
 
-    const handleWithdrawal = async (id: string, action: 'approve' | 'reject') => {
+    const handleWithdrawal = async (id: string, action: 'approve' | 'reject' | 'mark_paid') => {
         const withdrawal = withdrawals.find(w => w.id === id);
         if (!withdrawal) {
             toast("Withdrawal not found.", "error");
+            return;
+        }
+
+        // Mark as paid: record the transfer reference so approved vs actually-paid is visible
+        if (action === 'mark_paid') {
+            const ref = prompt(`Enter the transfer reference for the ${pricingConfig.currency}${withdrawal.amount.toLocaleString()} payout to ${withdrawal.user_name}:`);
+            if (ref === null) return; // cancelled
+            const reference = ref.trim();
+            if (!reference) {
+                toast("A transfer reference is required to mark a payout as paid.", "error");
+                return;
+            }
+            const prevProcessedAt = withdrawal.processed_at;
+            const prevReference = withdrawal.paid_reference;
+            const paidAt = new Date().toISOString();
+            try {
+                setWithdrawals(prev => prev.map(w => w.id === id ? { ...w, processed_at: paidAt, paid_reference: reference } : w));
+
+                const { error } = await supabase.from('withdrawals').update({
+                    processed_at: paidAt,
+                    processed_by: user?.id || null,
+                    paid_reference: reference
+                }).eq('id', id);
+
+                if (error) {
+                    throw error;
+                }
+
+                toast("Payout marked as paid.", "success");
+            } catch (error: any) {
+                console.error('Error marking payout as paid:', error);
+                toast(`Error marking payout as paid: ${error.message || 'Unknown error'}`, "error");
+                setWithdrawals(prev => prev.map(w => w.id === id ? { ...w, processed_at: prevProcessedAt, paid_reference: prevReference } : w));
+            }
             return;
         }
 
@@ -721,7 +759,7 @@ export default function AdminDashboard() {
                     throw error;
                 }
 
-                toast("Withdrawal approved. Please process the bank transfer manually.", "success");
+                toast("Withdrawal approved. Send the transfer, then mark it as paid.", "success");
             }
         } catch (error: any) {
             console.error(`Error ${action}ing withdrawal:`, error);
@@ -1987,13 +2025,16 @@ export default function AdminDashboard() {
                                                 <div>
                                                     <p className="font-bold text-white flex items-center gap-2">
                                                         {pricingConfig.currency}{w.amount.toLocaleString()}
-                                                        <span className={`text-[10px] px-2 py-0.5 rounded-full uppercase ${w.status === 'pending' ? 'bg-yellow-500 text-black' : w.status === 'approved' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'}`}>
-                                                            {w.status}
+                                                        <span className={`text-[10px] px-2 py-0.5 rounded-full uppercase ${w.status === 'pending' ? 'bg-yellow-500 text-black' : w.status === 'approved' && w.processed_at ? 'bg-green-500 text-white' : w.status === 'approved' ? 'bg-amber-600 text-white' : 'bg-red-500 text-white'}`}>
+                                                            {w.status === 'approved' && w.processed_at ? 'paid' : w.status === 'approved' ? 'approved - unpaid' : w.status}
                                                         </span>
                                                     </p>
                                                     <p className="text-sm text-gray-400">Requested by <span className="text-white">{w.user_name}</span> &middot; {w.date}</p>
                                                     <p className="text-xs text-gray-500 mt-1 font-mono break-all">{w.bank_details}</p>
                                                     {w.reason && <p className="text-xs text-gray-400 mt-1"><span className="text-gray-500">Reason:</span> {w.reason}</p>}
+                                                    {w.status === 'approved' && w.processed_at && (
+                                                        <p className="text-xs text-green-400 mt-1">Paid {new Date(w.processed_at).toLocaleDateString()}{w.paid_reference ? ` · Ref: ${w.paid_reference}` : ''}</p>
+                                                    )}
                                                 </div>
                                             </div>
                                             {w.status === 'pending' && (
@@ -2003,6 +2044,13 @@ export default function AdminDashboard() {
                                                     </Button>
                                                     <Button size="sm" variant="ghost" className="text-red-500 hover:text-red-400 hover:bg-red-500/10" onClick={() => handleWithdrawal(w.id, 'reject')}>
                                                         <XCircle className="w-4 h-4 mr-1" /> Reject
+                                                    </Button>
+                                                </div>
+                                            )}
+                                            {w.status === 'approved' && !w.processed_at && (
+                                                <div className="flex items-center gap-2">
+                                                    <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700" onClick={() => handleWithdrawal(w.id, 'mark_paid')}>
+                                                        <CheckCircle className="w-4 h-4 mr-1" /> Mark as paid
                                                     </Button>
                                                 </div>
                                             )}
