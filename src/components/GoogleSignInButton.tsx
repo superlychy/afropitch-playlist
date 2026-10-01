@@ -50,11 +50,25 @@ export function GoogleSignInButton({ roleHint, onError, className }: Props) {
       } catch {
         /* storage unavailable; welcome page still works */
       }
-      const { error } = await supabase.auth.signInWithOAuth({
+      const inApp =
+        typeof window !== "undefined" && (window as any).AfroPitchApp;
+      const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",
-        options: { redirectTo: `${window.location.origin}/auth/callback` },
+        options: {
+          redirectTo: inApp
+            ? "afropitch://auth/callback"
+            : `${window.location.origin}/auth/callback`,
+          // In the native app Google must open in the real browser (it blocks
+          // WebViews); the afropitch:// deep link brings the callback back.
+          skipBrowserRedirect: !!inApp,
+        },
       });
       if (error) throw error;
+      if (inApp) {
+        if (data?.url) (window as any).AfroPitchApp.openExternal(data.url);
+        else throw new Error("Could not start Google sign-in.");
+        return;
+      }
       // Browser is now navigating to Google; nothing more to do here.
     } catch (e: any) {
       onError?.(e?.message || "Google sign-in failed. Please try again.");

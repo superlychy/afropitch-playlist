@@ -215,6 +215,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, [user?.id]);
 
+  // Native app push registration: when running inside the AfroPitch Android
+  // app with a logged-in user, hand the FCM device token to the server so
+  // submission reviews, payouts, etc. arrive as native push notifications.
+  // Best-effort and idempotent; the server upserts on token.
+  useEffect(() => {
+    if (!user?.id) return;
+    const bridge = (window as any).AfroPitchApp;
+    if (!bridge || typeof bridge.getPushToken !== "function") return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const deviceToken = bridge.getPushToken();
+        if (!deviceToken) return;
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        const accessToken = session?.access_token;
+        if (!accessToken || cancelled) return;
+        await fetch("/api/push/register", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({
+            token: deviceToken,
+            platform: "android",
+            app_version: bridge.getAppVersion ? bridge.getAppVersion() : "3.0",
+          }),
+        });
+      } catch {
+        // Push registration is best-effort; a later login retries it.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
+
   const login = async (email: string, password: string): Promise<UserRole> => {
     setIsLoading(true);
     try {
