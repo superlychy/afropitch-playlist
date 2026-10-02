@@ -19,7 +19,11 @@
 --     chat read-only marked closed.
 --
 -- New statuses: final_pending, final_delivered, refund_pending.
--- (No CHECK constraint on status; new values are free.)
+-- (The pre-existing status CHECK is extended to allow them.)
+
+ALTER TABLE public.mixing_orders DROP CONSTRAINT IF EXISTS mixing_orders_status_check;
+ALTER TABLE public.mixing_orders ADD CONSTRAINT mixing_orders_status_check
+CHECK (status = ANY (ARRAY['awaiting_payment','in_escrow','in_progress','delivered','final_pending','final_delivered','refund_pending','completed','refunded','cancelled']));
 
 -- ---------------------------------------------------------------------------
 -- Columns
