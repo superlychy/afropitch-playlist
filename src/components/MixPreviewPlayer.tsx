@@ -3,9 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 import { Play, Pause, ShieldCheck } from "lucide-react";
 
-export const PREVIEW_MAX_SECONDS = 60;
-// The platform's own voice tag plays 3x inside the 60s preview.
-const TAG_TIMES = [0.5, 20, 40];
+export const PREVIEW_MAX_SECONDS = 30;
+// The platform's own voice tag plays once, at the start of the 30s preview.
+const TAG_TIMES = [0.5];
 
 /** Turn a Google Drive share link into a direct-stream URL for <audio>. */
 export function toDirectAudioUrl(url: string): string {
@@ -119,7 +119,7 @@ export function MixPreviewPlayer({
                     </div>
                     <div className="flex items-center justify-between mt-1.5">
                         <span className="text-xs text-gray-400">
-                            0:{String(secs).padStart(2, "0")} / 1:00 preview
+                            0:{String(secs).padStart(2, "0")} / 0:30 preview
                         </span>
                         <span className="text-[11px] text-gray-500 flex items-center gap-1">
                             <ShieldCheck className="w-3 h-3" /> Watermarked
@@ -127,7 +127,7 @@ export function MixPreviewPlayer({
                     </div>
                 </div>
             </div>
-            {/* No native controls on purpose: no download button, no seeking past the 60s preview. */}
+            {/* No native controls on purpose: no download button, no seeking past the 30s preview. */}
             <audio ref={songRef} src={toDirectAudioUrl(src)} preload="auto" />
             <audio ref={tagRef} src={tagSrc} preload="auto" />
         </div>

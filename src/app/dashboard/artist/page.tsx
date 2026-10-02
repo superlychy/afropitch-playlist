@@ -73,14 +73,10 @@ export default function ArtistDashboard() {
   const [profileWeb, setProfileWeb] = useState("");
   const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
 
-  // Withdraw State
-  const [showWithdraw, setShowWithdraw] = useState(false);
-  const [withdrawAmount, setWithdrawAmount] = useState("");
-  const [withdrawReason, setWithdrawReason] = useState("");
+  // Bank details (used by profile settings; also pre-fills mixing refund forms)
   const [bankName, setBankName] = useState("");
   const [accountNumber, setAccountNumber] = useState("");
   const [accountName, setAccountName] = useState("");
-  const [isWithdrawing, setIsWithdrawing] = useState(false);
 
   // Support Modal State
   const [showSupport, setShowSupport] = useState(false);
@@ -139,59 +135,6 @@ export default function ArtistDashboard() {
       setAccountNumber(data.account_number || "");
       setAccountName(data.account_name || "");
     }
-  };
-
-  const handleWithdraw = async () => {
-    if (!user) return;
-    setIsWithdrawing(true);
-    const amount = parseFloat(withdrawAmount);
-
-    if (isNaN(amount) || amount <= 0) {
-      toast("Please enter a valid amount.", "error");
-      setIsWithdrawing(false);
-      return;
-    }
-
-    if (!withdrawReason.trim()) {
-      toast("Please provide a reason for the withdrawal.", "error");
-      setIsWithdrawing(false);
-      return;
-    }
-
-    if (amount > (user.withdrawable_balance || 0)) {
-      toast("Insufficient funds.", "error");
-      setIsWithdrawing(false);
-      return;
-    }
-
-    if (amount < 5000) {
-      toast("Minimum withdrawal is ₦5,000.", "error");
-      setIsWithdrawing(false);
-      return;
-    }
-
-    const { data, error } = await supabase.rpc("request_payout", {
-      p_user_id: user.id,
-      p_amount: amount,
-      p_bank_name: bankName,
-      p_account_number: accountNumber,
-      p_account_name: accountName,
-      p_reason: withdrawReason,
-    });
-
-    if (error) {
-      console.error("Payout RPC Error:", error);
-      toast("Unable to process payout. Please try again or contact support.", "error");
-    } else if (data && !data.success) {
-      toast("Payout Failed: " + data.message, "error");
-    } else {
-      toast("Withdrawal requested! Processing within 1-24 hours.", "success");
-      if (deductFunds) deductFunds(amount);
-      setShowWithdraw(false);
-      setWithdrawAmount("");
-      setWithdrawReason("");
-    }
-    setIsWithdrawing(false);
   };
 
   const fetchNotifications = async () => {
@@ -799,12 +742,6 @@ export default function ArtistDashboard() {
                 >
                   Top up
                 </button>
-                <button
-                  onClick={() => setShowWithdraw(true)}
-                  className="flex-1 bg-white/10 hover:bg-white/15 text-white rounded-xl py-3 font-extrabold text-[13px]"
-                >
-                  Withdraw
-                </button>
               </div>
             </div>
             <div className="bg-[#141417] border border-white/[0.08] rounded-[20px] p-4 lg:p-5 mb-3">
@@ -834,7 +771,7 @@ export default function ArtistDashboard() {
                   </Button>
                 )}
               </div>
-              <p className="text-[10px] text-center text-zinc-500 mt-2">Minimum withdrawal: {pricingConfig.currency}5,000</p>
+              <p className="text-[10px] text-center text-zinc-500 mt-2">Top-ups are for submissions and mixing. Refunds go straight to your bank account.</p>
             </div>
             <div className="pt-1">
               <h2 className="text-[15px] lg:text-base font-bold text-white mb-2.5">Wallet history</h2>
@@ -864,71 +801,6 @@ export default function ArtistDashboard() {
           </button>
         </nav>
       </div>
-
-      {/* ===== Withdraw Modal ===== */}
-      {showWithdraw && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm px-4">
-          <div className="bg-[#141417] border border-white/[0.08] p-6 rounded-2xl w-full max-w-md space-y-4 max-h-[90vh] overflow-y-auto">
-            <h3 className="font-bold text-white text-lg">Request payout</h3>
-
-            {(!bankName || !accountNumber) ? (
-              <div className="py-8 text-center space-y-4">
-                <div className="p-4 bg-[#EAB308]/10 rounded-full inline-block">
-                  <AlertCircle className="w-8 h-8 text-[#EAB308]" />
-                </div>
-                <p className="text-zinc-300 text-sm">Please add your bank details in settings before withdrawing.</p>
-                <Button className="w-full bg-white text-black hover:bg-zinc-200" onClick={() => { setShowWithdraw(false); setShowProfile(true); }}>
-                  Go to settings
-                </Button>
-              </div>
-            ) : (
-              <>
-                <div className="py-4 space-y-4">
-                  <div className="p-4 bg-white/5 rounded-xl border border-white/10 text-sm">
-                    <p className="text-zinc-400 text-xs mb-1">Transfer destination</p>
-                    <p className="font-bold text-white">{bankName}</p>
-                    <p className="text-zinc-300">{accountNumber} · {accountName}</p>
-                    <Button variant="link" className="text-[#22C55E] text-xs h-auto p-0 mt-2" onClick={() => { setShowWithdraw(false); setShowProfile(true); }}>
-                      Change account
-                    </Button>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Amount to withdraw</Label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-3 text-zinc-500">{pricingConfig.currency}</span>
-                      <Input
-                        type="number"
-                        placeholder="0.00"
-                        value={withdrawAmount}
-                        onChange={e => setWithdrawAmount(e.target.value)}
-                        className="pl-8 bg-black/40 border-white/10 text-white"
-                      />
-                    </div>
-                    <p className="text-xs text-zinc-500">Available: {pricingConfig.currency}{(user?.withdrawable_balance || 0).toLocaleString()}</p>
-                    <p className="text-xs text-zinc-500">Only mixing refunds can be withdrawn. Minimum withdrawal: {pricingConfig.currency}5,000</p>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Reason for withdrawal</Label>
-                    <Textarea
-                      placeholder="e.g. I need the funds for studio time"
-                      value={withdrawReason}
-                      onChange={(e) => setWithdrawReason(e.target.value)}
-                      className="bg-black/40 border-white/10 text-white min-h-[70px]"
-                    />
-                  </div>
-                </div>
-                <div className="flex justify-end gap-2">
-                  <Button variant="ghost" onClick={() => setShowWithdraw(false)}>Cancel</Button>
-                  <Button className="bg-[#22C55E] hover:bg-[#1aa34e] text-[#04120a]" onClick={handleWithdraw} disabled={isWithdrawing || !withdrawAmount}>
-                    {isWithdrawing ? "Processing..." : "Submit request"}
-                  </Button>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      )}
 
       {/* ===== Support Modal ===== */}
       {showSupport && (
