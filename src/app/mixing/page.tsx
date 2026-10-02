@@ -47,11 +47,11 @@ const faqs = [
     },
     {
         q: "What are stems?",
-        a: "Stems are the separate parts of your song \u2014 lead vocals, backing vocals, drums, bass, instruments \u2014 each exported as its own audio file. They give the engineer control over every layer, which is the difference between a quick polish and a true professional mix.",
+        a: "Stems are the separate parts of your song (lead vocals, backing vocals, drums, bass, instruments), each exported as its own audio file. They give the engineer control over every layer, which is the difference between a quick polish and a true professional mix.",
     },
     {
         q: "How do I get my stems from my producer?",
-        a: "Just ask your producer to bounce each track as a separate WAV file, all starting from the same point (bar 1), with nothing on the master bus. Every producer knows how to do this \u2014 it takes a few minutes. The guide on this page walks you through exactly what to tell them.",
+        a: "Just ask your producer to bounce each track as a separate WAV file, all starting from the same point (bar 1), with nothing on the master bus. Every producer knows how to do this. It takes a few minutes. The guide on this page walks you through exactly what to tell them.",
     },
     {
         q: "How will I review the mix?",
@@ -191,7 +191,7 @@ export default function MixingPage() {
                 <p className="text-gray-400 leading-relaxed mb-4">
                     <span className="text-white font-semibold">Stems</span> are the
                     individual parts of your song, each exported as its own audio
-                    file \u2014 for example: lead vocals, backing vocals, drums,
+                    file, for example: lead vocals, backing vocals, drums,
                     bass, synths and effects. Instead of one finished bounce, your
                     engineer gets every layer separately, so each one can be
                     balanced, cleaned and placed properly. That is what turns a
@@ -203,11 +203,11 @@ export default function MixingPage() {
                     </h3>
                     <ol className="space-y-4 text-sm text-gray-400">
                         {[
-                            ["Ask for \u201cstems\u201d by name", "Every producer knows this term. Just say: \u201cPlease bounce each track separately as WAV files.\u201d"],
-                            ["Everything starts at the same point", "Each file must start from bar 1 (00:00) \u2014 even if the instrument only enters later. That way everything lines up perfectly."],
+                            ["Ask for “stems” by name", "Every producer knows this term. Just say: “Please bounce each track separately as WAV files.”"],
+                            ["Everything starts at the same point", "Each file must start from bar 1 (00:00), even if the instrument only enters later. That way everything lines up perfectly."],
                             ["WAV, 24-bit, no master-bus effects", "Tell them to turn off any limiter or compressor on the master bus before bouncing. We need the raw tracks, not a squashed mix."],
-                            ["Label every file clearly", "\u201c01 Lead Vocal.wav\u201d, \u201c02 Backing Vocals.wav\u201d, \u201c03 Drums.wav\u201d\u2026 Clear names mean no guessing and a faster mix."],
-                            ["Zip it and share a Drive link", "Put all the WAVs in one folder, zip it, upload to Google Drive with \u201cAnyone with the link\u201d, and paste the link when you order."],
+                            ["Label every file clearly", "“01 Lead Vocal.wav”, “02 Backing Vocals.wav”, “03 Drums.wav”… Clear names mean no guessing and a faster mix."],
+                            ["Zip it and share a Drive link", "Put all the WAVs in one folder, zip it, upload to Google Drive with “Anyone with the link”, and paste the link when you order."],
                         ].map(([t, d], i) => (
                             <li key={i} className="flex gap-3">
                                 <span className="shrink-0 w-6 h-6 rounded-full bg-green-500/15 text-green-400 text-xs font-bold flex items-center justify-center">
@@ -222,7 +222,7 @@ export default function MixingPage() {
                     </ol>
                 </div>
                 <p className="text-gray-500 text-sm mt-4 text-center">
-                    No stems? No problem \u2014 a clean stereo bounce works for the
+                    No stems? No problem. A clean stereo bounce works for the
                     Demo Polish package. Full Mix and Mix + Master need stems to do
                     the job properly.
                 </p>
