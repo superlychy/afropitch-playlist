@@ -378,7 +378,7 @@ export default function CuratorDashboard() {
         }
 
 
-        if (amount > user.balance) {
+        if (amount > (user.withdrawable_balance || 0)) {
             toast("Insufficient funds.", "error");
             setIsWithdrawing(false);
             return;
@@ -1458,7 +1458,7 @@ export default function CuratorDashboard() {
                                                 className="pl-8 bg-black/40 border-white/10"
                                             />
                                         </div>
-                                        <p className="text-xs text-zinc-500">Available: {pricingConfig.currency}{user?.balance?.toLocaleString()}</p>
+                                        <p className="text-xs text-zinc-500">Available: {pricingConfig.currency}{(user?.withdrawable_balance || 0).toLocaleString()}</p>
                                         <p className="text-xs text-zinc-500">Minimum withdrawal: {pricingConfig.currency}5,000</p>
                                     </div>
                                 </div>

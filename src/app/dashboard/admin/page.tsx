@@ -47,6 +47,7 @@ interface WithdrawalRequest {
     id: string;
     user_id: string;
     user_name: string;
+    user_withdrawable: number;
     amount: number;
     status: 'pending' | 'approved' | 'rejected';
     bank_details: string;
@@ -392,7 +393,7 @@ export default function AdminDashboard() {
             // 2. Fetch Withdrawals (with user names joined)
             const { data: withdrawsJoined } = await supabase
                 .from('withdrawals')
-                .select('*, profiles(full_name)')
+                .select('*, profiles(full_name, withdrawable_balance)')
                 .order('created_at', { ascending: false });
 
             if (withdrawsJoined) {
@@ -400,6 +401,7 @@ export default function AdminDashboard() {
                     id: w.id,
                     user_id: w.user_id,
                     user_name: w.profiles?.full_name || 'Unknown',
+                    user_withdrawable: Number(w.profiles?.withdrawable_balance) || 0,
                     amount: w.amount,
                     status: w.status,
                     bank_details: `${w.bank_name} - ${w.account_number}${w.account_name ? ` (${w.account_name})` : ''}`,
@@ -2029,7 +2031,7 @@ export default function AdminDashboard() {
                                                             {w.status === 'approved' && w.processed_at ? 'paid' : w.status === 'approved' ? 'approved - unpaid' : w.status}
                                                         </span>
                                                     </p>
-                                                    <p className="text-sm text-gray-400">Requested by <span className="text-white">{w.user_name}</span> &middot; {w.date}</p>
+                                                    <p className="text-sm text-gray-400">Requested by <span className="text-white">{w.user_name}</span> &middot; {w.date} &middot; withdrawable {pricingConfig.currency}{w.user_withdrawable.toLocaleString()}</p>
                                                     <p className="text-xs text-gray-500 mt-1 font-mono break-all">{w.bank_details}</p>
                                                     {w.reason && <p className="text-xs text-gray-400 mt-1"><span className="text-gray-500">Reason:</span> {w.reason}</p>}
                                                     {w.status === 'approved' && w.processed_at && (

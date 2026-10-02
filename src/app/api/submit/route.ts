@@ -94,6 +94,7 @@ export async function POST(req: Request) {
           409,
         ],
         insufficient: ["Insufficient balance", 400],
+        not_artist: ["Curators cannot submit songs.", 403],
       };
       const [message, status] = errMap[data?.error] || [
         "An unexpected error occurred",

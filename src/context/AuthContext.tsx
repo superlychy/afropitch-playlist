@@ -29,6 +29,7 @@ export interface User {
   email: string;
   role: UserRole;
   balance: number;
+  withdrawable_balance: number;
   earnings: number;
   referral_balance: number;
   referral_code?: string;
@@ -102,6 +103,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           email: profile.email || session.user.email || "",
           role: (profile.role as UserRole) || "artist",
           balance: Number(profile.balance) || 0,
+          withdrawable_balance: Number(profile.withdrawable_balance) || 0,
           earnings: 0,
           referral_balance: Number(profile.referral_balance) || 0,
           referral_code: profile.referral_code || undefined,
@@ -129,6 +131,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           email: session.user.email || "",
           role: role as UserRole,
           balance: 0,
+          withdrawable_balance: 0,
           earnings: 0,
           referral_balance: 0,
           created_at: session.user.created_at,
@@ -143,6 +146,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           email: session.user.email || "",
           role: "artist",
           balance: 0,
+          withdrawable_balance: 0,
           earnings: 0,
           referral_balance: 0,
           created_at: session.user.created_at,
@@ -334,7 +338,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const deductFunds = (amount: number) => {
     if (!user || user.balance < amount) return false;
-    setUser({ ...user, balance: user.balance - amount });
+    setUser({
+      ...user,
+      balance: user.balance - amount,
+      withdrawable_balance: Math.max(0, (user.withdrawable_balance || 0) - amount),
+    });
     return true;
   };
 
@@ -366,6 +374,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 name: profile.full_name || prev.name,
                 email: profile.email || prev.email,
                 balance: Number(profile.balance),
+                withdrawable_balance: Number(profile.withdrawable_balance) || 0,
                 referral_balance: Number(profile.referral_balance) || 0,
                 referral_code: profile.referral_code || prev.referral_code,
                 role: profile.role,
