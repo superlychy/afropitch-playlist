@@ -52,8 +52,14 @@ function DesktopDropdown({ group }: { group: MenuGroup }) {
                 {group.name}
                 <ChevronDown className={`w-3.5 h-3.5 transition-transform ${open ? "rotate-180" : ""}`} />
             </button>
-            {open && (
-                <div className="absolute left-0 top-full pt-2 w-60">
+            {/* Always rendered in the DOM (hidden with CSS when closed) so crawlers
+                and no-JS clients can discover these links; hover still toggles visibility. */}
+            <div
+                className={`absolute left-0 top-full pt-2 w-60 transition-opacity duration-150 ${
+                    open ? "opacity-100 visible" : "opacity-0 invisible pointer-events-none"
+                }`}
+                aria-hidden={!open}
+            >
                     <div className="rounded-xl border border-white/10 bg-[#0a0a0a]/95 backdrop-blur-md shadow-xl shadow-black/50 p-2">
                         {group.links.map((link) => (
                             <Link
@@ -70,7 +76,6 @@ function DesktopDropdown({ group }: { group: MenuGroup }) {
                         ))}
                     </div>
                 </div>
-            )}
         </div>
     );
 }
@@ -87,8 +92,8 @@ function MobileGroup({ group, onNavigate }: { group: MenuGroup; onNavigate: () =
                 {group.name}
                 <ChevronDown className={`w-4 h-4 transition-transform ${open ? "rotate-180" : ""}`} />
             </button>
-            {open && (
-                <div className="pl-4 pb-1">
+            {/* Always in the DOM (CSS-hidden when collapsed) so crawlers can follow these links. */}
+            <div className={`pl-4 pb-1 ${open ? "block" : "hidden"}`} aria-hidden={!open}>
                     {group.links.map((link) => (
                         <Link
                             key={link.name}
@@ -100,7 +105,6 @@ function MobileGroup({ group, onNavigate }: { group: MenuGroup; onNavigate: () =
                         </Link>
                     ))}
                 </div>
-            )}
         </div>
     );
 }
@@ -186,9 +190,11 @@ export function Navbar() {
                 </div>
             </div>
 
-            {/* Mobile menu */}
-            {isOpen && (
-                <div className="md:hidden bg-background border-b border-white/10 max-h-[80vh] overflow-y-auto">
+            {/* Mobile menu — always in the DOM (CSS-hidden when closed) so crawlers can follow the links. */}
+            <div
+                className={`md:hidden bg-background border-b border-white/10 max-h-[80vh] overflow-y-auto ${isOpen ? "block" : "hidden"}`}
+                aria-hidden={!isOpen}
+            >
                     <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
                         <Link
                             href="/"
@@ -234,7 +240,6 @@ export function Navbar() {
                         )}
                     </div>
                 </div>
-            )}
         </nav>
     );
 }

@@ -63,19 +63,22 @@ export async function generateMetadata({
     if (!feature) return { title: "Featured Artist | AfroPitch" };
 
     const name = feature.artist_name ?? "Featured Artist";
+    // Use the feature's actual tier (e.g. "Artist of the Season", "Artist of the Week", "Rising Artist")
+    // instead of a hardcoded label.
+    const tier = feature.headline?.trim() || "Featured Artist";
     const description =
         feature.bio?.slice(0, 160) ??
         feature.headline ??
-        `${name} is AfroPitch's Featured Artist of the Week. Discover their story, sound, and music.`;
+        `${name} is AfroPitch's ${tier}. Discover their story, sound, and music.`;
     // Artist photo if uploaded, otherwise the song's cover art (set when the draft is created).
     const image = feature.photo_url ?? feature.cover_art_url;
 
     return {
-        title: `${name}: Featured Artist of the Week | AfroPitch`,
+        title: `${name}: ${tier} | AfroPitch`,
         description,
         keywords: [name, "afrobeats artist", "african musician", "featured artist", "AfroPitch", feature.song_title ?? ""].filter(Boolean),
         openGraph: {
-            title: `${name}: Featured Artist of the Week | AfroPitch`,
+            title: `${name}: ${tier} | AfroPitch`,
             description,
             url: `${siteUrl}/featured/${feature.slug}`,
             type: "article",
@@ -83,7 +86,7 @@ export async function generateMetadata({
         },
         twitter: {
             card: "summary_large_image",
-            title: `${name}: Featured Artist of the Week | AfroPitch`,
+            title: `${name}: ${tier} | AfroPitch`,
             description,
             ...(image ? { images: [image] } : {}),
         },
@@ -152,7 +155,7 @@ export default async function FeaturedArtistPage({
             <div className="space-y-8">
                 <div className="text-center space-y-4">
                     <div className="inline-block rounded-full border border-yellow-500/30 bg-yellow-950/30 px-4 py-1.5 text-sm text-yellow-300">
-                        ⭐ Featured Artist of the Week
+                        ⭐ {feature.headline ?? "Featured Artist"}
                     </div>
                     {image && (
                         // eslint-disable-next-line @next/next/no-img-element
