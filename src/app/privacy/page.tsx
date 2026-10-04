@@ -7,7 +7,6 @@ export const metadata: Metadata = {
 };
 
 export default function PrivacyPolicy() {
-    const currentDate = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
     const contactEmail = siteConfig.contact?.email || "admin@afropitchplay.best";
     const websiteUrl = siteConfig.url || "https://afropitchplay.best";
     const country = "Nigeria"; // Inferred
@@ -15,7 +14,7 @@ export default function PrivacyPolicy() {
     return (
         <div className="container mx-auto px-4 py-16 max-w-4xl text-gray-300">
             <h1 className="text-4xl font-bold text-white mb-2">Privacy Policy</h1>
-            <p className="mb-8 text-gray-400">Effective Date: {currentDate}</p>
+            <p className="mb-8 text-gray-400">Effective Date: October 4, 2026</p>
 
             <div className="space-y-8">
                 <section>
@@ -37,7 +36,9 @@ export default function PrivacyPolicy() {
                         <li>Email address</li>
                         <li>Username</li>
                         <li>Payment details (processed via third-party providers)</li>
-                        <li>Bank details (for curator payouts, if applicable)</li>
+                        <li>Bank details (for curator payouts and mixing order refunds, if applicable)</li>
+                        <li>Voice messages you record in mixing order chats (stored by our audio hosting provider and shared with the engineer on your order)</li>
+                        <li>Profile information from Google if you sign in with Google (your name, email address, and profile photo)</li>
                         <li>National Identification Number (NIN) and identity verification documents (for curator verification, where applicable)</li>
                         <li>Song files and file-sharing links you provide (for mixing orders)</li>
                         <li>Country and location information</li>

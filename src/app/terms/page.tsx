@@ -7,7 +7,6 @@ export const metadata: Metadata = {
 };
 
 export default function TermsOfService() {
-    const currentDate = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
     const contactEmail = siteConfig.contact?.email || "admin@afropitchplay.best";
     const websiteUrl = siteConfig.url || "https://afropitchplay.best";
     const country = "Nigeria"; // Inferred from currency usage (₦)
@@ -15,7 +14,7 @@ export default function TermsOfService() {
     return (
         <div className="container mx-auto px-4 py-16 max-w-4xl text-gray-300">
             <h1 className="text-4xl font-bold text-white mb-2">Terms of Service</h1>
-            <p className="mb-8 text-gray-400">Effective Date: {currentDate}</p>
+            <p className="mb-8 text-gray-400">Effective Date: October 4, 2026</p>
 
             <div className="space-y-8">
                 <section>
@@ -176,8 +175,8 @@ export default function TermsOfService() {
                         <li>AfroPitch offers a professional song mixing service with the following packages and typical turnaround times: Demo Polish (₦35,000, about 3 days), Full Mix (₦65,000, about 5 days), and Mix + Master (₦100,000, about 7 days). The price shown at checkout is the price that applies to your order.</li>
                         <li>You pay upfront, but your payment is held in escrow. It is not released to the engineer until you accept the delivered mix.</li>
                         <li>You will receive a watermarked preview of the mix in your dashboard. The full, clean file is released to you only after you accept the mix.</li>
-                        <li>If you are not satisfied with the delivered mix, you may request a refund instead of accepting. The full amount will be refunded to your AfroPitch wallet, which you can withdraw to your bank account under Section 17.</li>
-                        <li>If you neither accept the mix nor request a refund within 3 days of delivery, the order will be automatically completed and the escrowed payment released to the engineer.</li>
+                        <li>If you decline the preview mix, you will receive a 75% refund via manual bank transfer to the bank details you provided when placing the order. If you cancel an order while it is still in escrow (before work begins), you will receive a 95% refund the same way. Refunds are processed manually and may take up to 7 business days to reach your account. AfroPitch retains the remaining percentage as a processing and service fee. Mixing refunds are never credited to your AfroPitch wallet.</li>
+                        <li>After each preview delivery, you have 72 hours to accept it, request adjustments, or decline it. If you take no action within 72 hours, the preview is automatically accepted and the escrowed payment is released to the engineer immediately. Once you accept a preview, the engineer delivers the final mix. You then have a single 3-day revision window, which starts at the first final delivery and does not restart. If you take no action within those 3 days, the order is automatically marked complete, the full file is released to you, and the order chat is closed.</li>
                         <li>Each package includes revision rounds as shown at checkout: Demo Polish includes 1 round, Full Mix includes 2 rounds, and Mix + Master includes 3 rounds.</li>
                         <li>You confirm that you own, or have the rights to, any song files you share for mixing. You are responsible for the file-sharing links you provide (for example, Google Drive links set to “Anyone with the link”); AfroPitch is not responsible if anyone else accesses files you choose to share publicly.</li>
                     </ul>
@@ -188,8 +187,7 @@ export default function TermsOfService() {
                     <ul className="list-disc pl-5 space-y-2">
                         <li>When an artist pays a submission fee, 70% goes to the reviewing curator and 30% is retained by AfroPitch as a platform fee. The amounts shown to you before payment already reflect this split.</li>
                         <li>Curator payouts and wallet withdrawals may be delayed for verification and fraud checks. AfroPitch may withhold payouts where suspicious activity is detected.</li>
-                        <li>The minimum withdrawal amount is ₦5,000. Withdrawals are reviewed and approved by AfroPitch before funds are released to your bank account.</li>
-                        <li>Refunds for mixing orders are credited to your AfroPitch wallet (see Section 16) and may be withdrawn under this section.</li>
+                        <li>Withdrawals are available to curators only. Artists cannot withdraw funds from AfroPitch. The minimum withdrawal amount is ₦5,000. Withdrawals are reviewed and approved by AfroPitch before funds are released to your bank account.</li>
                     </ul>
                 </section>
 
@@ -202,7 +200,18 @@ export default function TermsOfService() {
                 </section>
 
                 <section>
-                    <h2 className="text-2xl font-bold text-white mb-4">19. General</h2>
+                    <h2 className="text-2xl font-bold text-white mb-4">19. Referral rewards</h2>
+                    <ul className="list-disc pl-5 space-y-2">
+                        <li>AfroPitch may offer referral rewards: ₦1,000 for each artist you refer who completes their first paid submission.</li>
+                        <li>Referral rewards are credited to a separate referral balance, which can only be spent on submissions. Referral balances cannot be withdrawn as cash.</li>
+                        <li>When you pay for a submission, your referral balance is used first, then your wallet balance.</li>
+                        <li>Self-referrals are not allowed, and each referred artist qualifies for only one reward.</li>
+                        <li>AfroPitch may change or end the referral program at any time.</li>
+                    </ul>
+                </section>
+
+                <section>
+                    <h2 className="text-2xl font-bold text-white mb-4">20. General</h2>
                     <ul className="list-disc pl-5 space-y-2">
                         <li>Severability: if any part of these Terms is found to be unenforceable, the remaining parts continue in full effect.</li>
                         <li>You may not assign or transfer your rights under these Terms without our written consent.</li>
