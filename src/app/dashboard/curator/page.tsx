@@ -5,7 +5,7 @@ import { useToast } from "@/components/ui/toast";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import { Bell, HelpCircle, Settings, LogOut, CheckCircle, XCircle, Plus, ListMusic, Zap, Send, ChevronLeft, AlertCircle, RefreshCw, Star, TrendingUp, Wallet, Music4 } from "lucide-react";
+import { Bell, HelpCircle, Settings, LogOut, CheckCircle, XCircle, Plus, ListMusic, Zap, Send, ChevronLeft, AlertCircle, RefreshCw, Star, TrendingUp, Wallet, Music4, ShieldCheck } from "lucide-react";
 import { pricingConfig } from "@/../config/pricing";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -37,6 +37,22 @@ export default function CuratorDashboard() {
     const [showAddPlaylist, setShowAddPlaylist] = useState(false);
     const [myPlaylists, setMyPlaylists] = useState<Playlist[]>([]);
     const [stats, setStats] = useState({ revenue: 0, pending: 0, total_reviews: 0 });
+
+    // Playlist verification state
+    const [verificationSongUrl, setVerificationSongUrl] = useState('');
+    const [markingDoneId, setMarkingDoneId] = useState<string | null>(null);
+
+    const markVerificationDone = async (playlistId: string) => {
+        setMarkingDoneId(playlistId);
+        const { error } = await supabase.from('playlists').update({ verification_status: 'pending_review' }).eq('id', playlistId);
+        setMarkingDoneId(null);
+        if (error) {
+            toast("Could not update: " + error.message, "error");
+        } else {
+            setMyPlaylists(prev => prev.map(p => p.id === playlistId ? { ...p, verification_status: 'pending_review' } : p));
+            toast("Done. AfroPitch will verify your playlist shortly.", "success");
+        }
+    };
 
     // Withdraw Modal State
     const [showWithdraw, setShowWithdraw] = useState(false);
@@ -325,6 +341,10 @@ export default function CuratorDashboard() {
 
     useEffect(() => {
         if (user?.id) {
+            // Fetch the verification test song link (admin-set)
+            supabase.from('app_settings').select('value').eq('key', 'curator_verification_song_url').single()
+                .then(({ data }) => { if (data?.value) setVerificationSongUrl(data.value); });
+
             // ... existing profile setters
             setProfileBio(user.bio || "");
             setProfileIg(user.instagram || "");
@@ -1086,7 +1106,42 @@ export default function CuratorDashboard() {
 
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                             {myPlaylists.map((playlist) => (
-                                <PlaylistCard
+                                <div key={playlist.id}>
+                                    {(playlist as any).verification_status === 'unverified' && verificationSongUrl && (
+                                        <div className="mb-3 rounded-2xl border border-purple-500/30 bg-purple-500/10 p-4">
+                                            <p className="text-sm font-bold text-white flex items-center gap-2">
+                                                <ShieldCheck className="w-4 h-4 text-purple-400" /> Verify "{playlist.name}"
+                                            </p>
+                                            <p className="text-xs text-gray-400 mt-1">
+                                                To prove you control this playlist, add this song to it on Spotify, then click Done.
+                                            </p>
+                                            <a href={verificationSongUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-green-400 hover:underline break-all mt-1 block">
+                                                {verificationSongUrl}
+                                            </a>
+                                            <button
+                                                onClick={() => markVerificationDone(playlist.id)}
+                                                disabled={markingDoneId === playlist.id}
+                                                className="mt-3 w-full bg-purple-600 text-white rounded-xl py-2.5 text-sm font-bold hover:bg-purple-700 disabled:opacity-50"
+                                            >
+                                                {markingDoneId === playlist.id ? "Saving..." : "Done, I added it"}
+                                            </button>
+                                        </div>
+                                    )}
+                                    {(playlist as any).verification_status === 'pending_review' && (
+                                        <div className="mb-3 rounded-2xl border border-yellow-500/30 bg-yellow-500/10 p-4">
+                                            <p className="text-sm font-bold text-white">Verification pending</p>
+                                            <p className="text-xs text-gray-400 mt-1">"{playlist.name}" is awaiting review. We will confirm the song is on your playlist shortly.</p>
+                                        </div>
+                                    )}
+                                    {(playlist as any).verification_status === 'verified' && (
+                                        <div className="mb-3 rounded-2xl border border-green-500/30 bg-green-500/10 p-4">
+                                            <p className="text-sm font-bold text-white flex items-center gap-2">
+                                                <CheckCircle className="w-4 h-4 text-green-400" /> "{playlist.name}" verified
+                                            </p>
+                                            <p className="text-xs text-gray-400 mt-1">Please remove the test song from your playlist now. Thank you.</p>
+                                        </div>
+                                    )}
+                                    <PlaylistCard
                                     key={playlist.id}
                                     playlist={playlist}
                                     expanded={expandedPlaylistId === playlist.id}
@@ -1099,6 +1154,7 @@ export default function CuratorDashboard() {
                                     onDelete={() => handleDeletePlaylist(playlist.id)}
                                     onToggleBoost={toggleRankingBoost}
                                 />
+                                </div>
                             ))}
                         </div>
                     </div>

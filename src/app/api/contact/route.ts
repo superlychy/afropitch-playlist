@@ -66,6 +66,7 @@ export async function POST(request: Request) {
                 event_data: {
                     sender: email,
                     subject: subject,
+                    message: message,
                     message_preview: message.substring(0, 100),
                     status: error ? 'failed' : 'sent',
                     error_details: error ? JSON.stringify(error) : null

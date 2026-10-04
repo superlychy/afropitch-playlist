@@ -2,7 +2,7 @@
 
 import {
     Home, ListMusic, History, Wallet, Users, MessageSquare, Settings,
-    Star, Send, Mail, BarChart3, DollarSign, UserPlus, MoreHorizontal, LogOut, X,
+    Star, Send, Mail, BarChart3, DollarSign, UserPlus, MoreHorizontal, LogOut, X, AudioWaveform,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -154,7 +154,8 @@ export function AdminBottomNav({
     const items: (NavItem & { more?: boolean })[] = [
         { tab: "overview", label: "Home", icon: Home },
         { tab: "playlists", playlistTab: "submissions", label: "Playlists", icon: ListMusic },
-        { tab: "support", label: "Support", icon: MessageSquare },
+        { tab: "mixing", label: "Mixing", icon: AudioWaveform },
+        { tab: "inbox", label: "Inbox", icon: Mail },
     ];
     return (
         <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-30 bg-[#0E0E10]/95 backdrop-blur border-t border-white/[0.08] flex px-1.5 pt-2.5 pb-[calc(10px+env(safe-area-inset-bottom))]">

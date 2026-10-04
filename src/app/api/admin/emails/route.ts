@@ -221,6 +221,31 @@ export async function GET(req: Request) {
       .order("created_at", { ascending: false })
       .range(offset, offset + limit - 1);
 
+    // Also include contact form messages (system_logs contact_message events)
+    const { data: contactLogs } = await supabase
+      .from("system_logs")
+      .select("*")
+      .eq("event_type", "contact_message")
+      .order("created_at", { ascending: false })
+      .limit(limit);
+
+    const contactEmails = (contactLogs || []).map((l: any) => ({
+      id: l.id,
+      from_email: l.event_data?.sender || "unknown",
+      to_email: "contact@afropitchplay.best",
+      subject: l.event_data?.subject || "Contact Form",
+      body_text: l.event_data?.message || l.event_data?.message_preview || "",
+      body_html: "",
+      user_id: null,
+      ticket_id: null,
+      status: "received",
+      created_at: l.created_at,
+    }));
+
+    const merged = [...(emails || []), ...contactEmails].sort(
+      (a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    ).slice(0, limit);
+
     if (error && error.message.includes("does not exist")) {
       // Table doesn't exist yet, return system_logs fallback
       const { data: logs } = await supabase
@@ -240,9 +265,9 @@ export async function GET(req: Request) {
 
     return NextResponse.json({
       success: true,
-      emails: emails || [],
-      count: emails?.length || 0,
-      source: "inbound_emails",
+      emails: merged,
+      count: merged.length,
+      source: "inbound_emails+contact_form",
       table_exists: true,
     });
   } catch (err: any) {

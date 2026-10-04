@@ -7,7 +7,7 @@ import { useToast } from "@/components/ui/toast";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Music, Users, Trophy, DollarSign, ShieldAlert, CheckCircle, XCircle, MessageSquare, LogOut, Bell, Plus, Search, Loader2, Send, RefreshCw, Zap, Eye, ChevronLeft } from "lucide-react";
+import { Music, Users, Trophy, DollarSign, ShieldAlert, CheckCircle, XCircle, MessageSquare, LogOut, Bell, Plus, Search, Loader2, Send, RefreshCw, Zap, Eye, ChevronLeft, Link2, ShieldCheck } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { TransactionsList } from "@/components/TransactionsList";
 import { pricingConfig } from "@/../config/pricing";
@@ -84,6 +84,7 @@ interface AdminPlaylist {
     type: string;
     playlist_link?: string;
     created_at: string;
+    verification_status?: string;
 }
 
 interface TopPlaylist {
@@ -134,6 +135,11 @@ export default function AdminDashboard() {
     const [isRefreshing, setIsRefreshing] = useState<string | null>(null);
     const [topCampaigns, setTopCampaigns] = useState<any[]>([]);
     const [topPlaylists, setTopPlaylists] = useState<TopPlaylist[]>([]);
+
+    // Curator playlist verification state
+    const [verificationSongUrl, setVerificationSongUrl] = useState('');
+    const [verificationSongInput, setVerificationSongInput] = useState('');
+    const [savingVerificationSong, setSavingVerificationSong] = useState(false);
 
     // Song Management State
     const [expandedPlaylistId, setExpandedPlaylistId] = useState<string | null>(null);
@@ -360,6 +366,9 @@ export default function AdminDashboard() {
         if (!user) return;
 
         const fetchData = async () => {
+            // 0. Fetch verification song link setting
+            fetchVerificationSongUrl();
+
             // 1. Fetch Users
             const { data: users, error: userError } = await supabase
                 .from('profiles')
@@ -444,7 +453,8 @@ export default function AdminDashboard() {
                     followers: p.followers,
                     type: p.type,
                     playlist_link: p.playlist_link,
-                    created_at: new Date(p.created_at).toLocaleDateString()
+                    created_at: new Date(p.created_at).toLocaleDateString(),
+                    verification_status: p.verification_status || 'unverified'
                 })));
             }
 
@@ -1180,6 +1190,37 @@ export default function AdminDashboard() {
             toast("Error creating user: " + (err?.message || "unknown error"), "error");
         } finally {
             setIsAddingUser(false);
+        }
+    };
+
+    // ---- Curator playlist verification helpers ----
+    const fetchVerificationSongUrl = async () => {
+        const { data } = await supabase.from('app_settings').select('value').eq('key', 'curator_verification_song_url').single();
+        if (data) {
+            setVerificationSongUrl(data.value || '');
+            setVerificationSongInput(data.value || '');
+        }
+    };
+
+    const saveVerificationSongUrl = async () => {
+        setSavingVerificationSong(true);
+        const { error } = await supabase.from('app_settings').upsert({ key: 'curator_verification_song_url', value: verificationSongInput.trim(), updated_at: new Date().toISOString() });
+        setSavingVerificationSong(false);
+        if (error) {
+            toast("Error saving song link: " + error.message, "error");
+        } else {
+            setVerificationSongUrl(verificationSongInput.trim());
+            toast("Verification song link saved.", "success");
+        }
+    };
+
+    const handlePlaylistVerification = async (playlistId: string, action: 'verified' | 'unverified') => {
+        const { error } = await supabase.from('playlists').update({ verification_status: action }).eq('id', playlistId);
+        if (error) {
+            toast("Error updating playlist: " + error.message, "error");
+        } else {
+            setAllPlaylists(prev => prev.map(p => p.id === playlistId ? { ...p, verification_status: action } : p));
+            toast(action === 'verified' ? "Playlist verified. Tell the curator to remove the test song." : "Playlist marked unverified.", "success");
         }
     };
 
@@ -2311,6 +2352,73 @@ export default function AdminDashboard() {
                     {/* APPLICATIONS VIEW */}
                     {activeTab === "applications" && (
                         <div className="space-y-6">
+                            {/* Section 0: Verification test song link (admin-controlled) */}
+                            <Card className="bg-[#141417] border-white/[0.08]">
+                                <CardHeader>
+                                    <CardTitle className="text-white flex items-center gap-2">
+                                        <Link2 className="w-5 h-5 text-green-400" />
+                                        Playlist Verification Song
+                                    </CardTitle>
+                                    <CardDescription>Paste the Spotify link curators must add to each playlist to prove they control it. You can change this anytime.</CardDescription>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="flex flex-col md:flex-row gap-3">
+                                        <Input
+                                            value={verificationSongInput}
+                                            onChange={(e) => setVerificationSongInput(e.target.value)}
+                                            placeholder="https://open.spotify.com/track/..."
+                                            className="flex-1 bg-black/50 border-white/10 text-white"
+                                        />
+                                        <Button onClick={saveVerificationSongUrl} disabled={savingVerificationSong} className="bg-green-600 hover:bg-green-700 shrink-0">
+                                            {savingVerificationSong ? "Saving..." : "Save link"}
+                                        </Button>
+                                    </div>
+                                    {verificationSongUrl && (
+                                        <p className="text-xs text-gray-500 mt-2 break-all">Current: <a href={verificationSongUrl} target="_blank" rel="noopener noreferrer" className="text-green-400 hover:underline">{verificationSongUrl}</a></p>
+                                    )}
+                                </CardContent>
+                            </Card>
+
+                            {/* Section 0b: Playlists awaiting verification */}
+                            <Card className="bg-[#141417] border-white/[0.08]">
+                                <CardHeader>
+                                    <CardTitle className="text-white flex items-center gap-2">
+                                        <ShieldCheck className="w-5 h-5 text-purple-400" />
+                                        Playlists Awaiting Verification
+                                        {allPlaylists.filter(p => p.verification_status === 'pending_review').length > 0 && (
+                                            <span className="text-xs bg-purple-500 text-white px-2 py-0.5 rounded-full">{allPlaylists.filter(p => p.verification_status === 'pending_review').length}</span>
+                                        )}
+                                    </CardTitle>
+                                    <CardDescription>Curators have added the test song and clicked Done. Check each playlist on Spotify, then approve.</CardDescription>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="space-y-4">
+                                        {allPlaylists.filter(p => p.verification_status === 'pending_review').length === 0 && (
+                                            <p className="text-gray-500 text-center py-4 text-sm">No playlists waiting for verification.</p>
+                                        )}
+                                        {allPlaylists.filter(p => p.verification_status === 'pending_review').map(p => (
+                                            <div key={p.id} className="flex flex-col md:flex-row md:items-center justify-between p-4 bg-white/5 rounded-lg border border-purple-500/20 gap-4">
+                                                <div>
+                                                    <p className="font-bold text-white">{p.name}</p>
+                                                    <p className="text-sm text-gray-500">Curator: {p.curator_name}</p>
+                                                    {p.playlist_link && (
+                                                        <a href={p.playlist_link} target="_blank" rel="noopener noreferrer" className="text-xs text-green-400 hover:underline truncate block max-w-xs mt-1">{p.playlist_link}</a>
+                                                    )}
+                                                </div>
+                                                <div className="flex items-center gap-2 shrink-0">
+                                                    <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={() => handlePlaylistVerification(p.id, 'verified')}>
+                                                        <CheckCircle className="w-4 h-4 mr-1" /> Approve
+                                                    </Button>
+                                                    <Button size="sm" variant="destructive" onClick={() => handlePlaylistVerification(p.id, 'unverified')}>
+                                                        <XCircle className="w-4 h-4 mr-1" /> Reject
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </CardContent>
+                            </Card>
+
                             {/* Section 1: Registered curators awaiting profile verification */}
                             <Card className="bg-[#141417] border-white/[0.08]">
                                 <CardHeader>

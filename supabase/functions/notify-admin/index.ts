@@ -107,11 +107,13 @@ Deno.serve(async (req) => {
         // 3. New Submission (Submissions Insert)
         else if (table === 'submissions' && type === 'INSERT') {
             message = `🎵 **New Song Submission**`;
-            details = `Song: ${record.song_title}\nArtist ID: ${record.artist_id}\nPlaylist ID: ${record.playlist_id}\nAmount: ₦${record.amount_paid}`;
-            // Enrich
+            details = `Song: ${record.song_title}\nAmount: ₦${record.amount_paid}`;
+            // Enrich with artist + playlist names (not raw IDs)
             if (supabase) {
                 const { data: artist } = await supabase.from('profiles').select('full_name, email').eq('id', record.artist_id).single();
                 if (artist) details += `\nArtist: ${artist.full_name} (${artist.email})`;
+                const { data: playlist } = await supabase.from('playlists').select('name').eq('id', record.playlist_id).single();
+                if (playlist) details += `\nPlaylist: ${playlist.name}`;
             }
         }
 
