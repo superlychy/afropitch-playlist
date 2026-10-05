@@ -85,7 +85,8 @@ export async function POST(request: Request) {
 
             // Fetch the full email body and store it for the admin inbox.
             // Runs independently: if this fails, the metadata log + Discord
-            // alert above still went through.
+            // alert above still went through. Failures are logged to
+            // system_logs (event_type inbound_body_error) for visibility.
             try {
                 if (emailData.email_id && process.env.RESEND_API_KEY) {
                     // Idempotency: skip if Resend retries and we already stored it.
@@ -101,7 +102,7 @@ export async function POST(request: Request) {
                     if (!alreadyStored) {
                         const { data: full, error: fetchError } = await resend.emails.receiving.get(emailData.email_id);
                         if (fetchError) {
-                            console.error('Failed to fetch inbound email body:', fetchError);
+                            throw new Error('Receiving API error: ' + JSON.stringify(fetchError));
                         } else if (full) {
                             const f: any = full;
                             const toAddr = Array.isArray(f.to) ? (f.to[0] || 'unknown') : (f.to || 'unknown');
@@ -113,13 +114,24 @@ export async function POST(request: Request) {
                                 body_html: (f.html || '').substring(0, 5000),
                                 message_id: dedupeKey,
                             });
-                            if (insertError) console.error('Failed to store inbound email:', insertError);
-                            else console.log('📥 Stored inbound email:', { from: f.from, subject: f.subject });
+                            if (insertError) throw new Error('DB insert error: ' + insertError.message);
+                            console.log('📥 Stored inbound email:', { from: f.from, subject: f.subject });
+                        } else {
+                            throw new Error('Receiving API returned no data');
                         }
                     }
+                } else {
+                    throw new Error(`Skipped: email_id=${!!emailData.email_id} apiKey=${!!process.env.RESEND_API_KEY}`);
                 }
-            } catch (bodyError) {
+            } catch (bodyError: any) {
                 console.error('Inbound body store failed:', bodyError);
+                try {
+                    await supabase.from('system_logs').insert({
+                        event_type: 'inbound_body_error',
+                        event_data: { error: String(bodyError?.message || bodyError), subject: emailData.subject || null },
+                        user_id: null,
+                    });
+                } catch { /* logging must never break the webhook */ }
             }
 
             // Notify via Discord
