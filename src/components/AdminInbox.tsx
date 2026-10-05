@@ -53,6 +53,17 @@ interface ThreadMessage {
   from_admin: boolean;
 }
 
+interface SentEmail {
+  id: string;
+  to_email: string;
+  from_email: string;
+  subject: string;
+  preview: string;
+  status: string;
+  sent_by: string | null;
+  created_at: string;
+}
+
 // Inline conversation thread + reply composer for a support ticket.
 // Replaces the old "Open Chat" button, which dispatched an event nothing listened to.
 function TicketThread({ ticketId }: { ticketId: string }) {
@@ -162,8 +173,9 @@ export function AdminInbox() {
   const { toast } = useToast();
   const [emails, setEmails] = useState<Email[]>([]);
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
+  const [sentEmails, setSentEmails] = useState<SentEmail[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [activeView, setActiveView] = useState<"inbox" | "compose" | "tickets">("inbox");
+  const [activeView, setActiveView] = useState<"inbox" | "compose" | "tickets" | "sent">("inbox");
   const [searchTerm, setSearchTerm] = useState("");
 
   // Compose state
@@ -222,6 +234,29 @@ export function AdminInbox() {
         .limit(50);
 
       if (tix) setTickets(tix as any);
+
+      // Fetch sent emails (admin outbound log)
+      const { data: sentLogs } = await supabase
+        .from("system_logs")
+        .select("*")
+        .in("event_type", ["admin_custom_email_sent", "admin_message_sent"])
+        .order("created_at", { ascending: false })
+        .limit(50);
+
+      if (sentLogs) {
+        setSentEmails(
+          sentLogs.map((l: any) => ({
+            id: l.id,
+            to_email: l.event_data?.to || "unknown",
+            from_email: l.event_data?.from || "",
+            subject: l.event_data?.subject || "No subject",
+            preview: l.event_data?.message || l.event_data?.message_preview || "",
+            status: l.event_data?.status || "unknown",
+            sent_by: l.event_data?.sent_by || null,
+            created_at: l.created_at,
+          }))
+        );
+      }
     } catch (err) {
       console.error("Inbox fetch error:", err);
     } finally {
@@ -326,6 +361,13 @@ export function AdminInbox() {
       t.profiles?.full_name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const filteredSent = sentEmails.filter(
+    (e) =>
+      e.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      e.to_email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      e.preview?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   return (
     <div className="space-y-4 animate-in fade-in duration-300">
       {/* Header + Tabs + Search */}
@@ -350,6 +392,14 @@ export function AdminInbox() {
             className={activeView === "tickets" ? "bg-green-600" : ""}
           >
             Tickets ({tickets.filter((t) => t.status === "open").length})
+          </Button>
+          <Button
+            size="sm"
+            variant={activeView === "sent" ? "default" : "outline"}
+            onClick={() => setActiveView("sent")}
+            className={activeView === "sent" ? "bg-green-600" : ""}
+          >
+            <Send className="w-3 h-3 mr-1" /> Sent ({sentEmails.length})
           </Button>
           <Button
             size="sm"
@@ -507,6 +557,73 @@ export function AdminInbox() {
                   <div className="mt-3 pt-3 border-t border-white/10 space-y-2">
                     <p className="text-sm text-gray-300">{ticket.message}</p>
                     <TicketThread ticketId={ticket.id} />
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {/* Sent View */}
+      {activeView === "sent" && (
+        <div className="space-y-2">
+          {filteredSent.length === 0 && (
+            <Card className="bg-white/5 border-dashed border-white/10 p-8 text-center">
+              <Send className="w-8 h-8 mx-auto mb-2 text-gray-600" />
+              <p className="text-gray-500">No sent emails yet.</p>
+            </Card>
+          )}
+          {filteredSent.map((email) => (
+            <Card
+              key={email.id}
+              className="bg-black/40 border-white/10 cursor-pointer hover:bg-white/5 transition-colors"
+              onClick={() =>
+                setExpandedId(expandedId === email.id ? null : email.id)
+              }
+            >
+              <CardContent className="p-3 sm:p-4">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span
+                        className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${
+                          email.status === "sent"
+                            ? "bg-green-500/20 text-green-400"
+                            : email.status === "failed"
+                            ? "bg-red-500/20 text-red-400"
+                            : "bg-gray-500/20 text-gray-400"
+                        }`}
+                      >
+                        {email.status}
+                      </span>
+                      <span className="text-xs text-gray-500 truncate">
+                        {new Date(email.created_at).toLocaleString()}
+                      </span>
+                    </div>
+                    <p className="text-sm font-bold text-white truncate">
+                      {email.subject}
+                    </p>
+                    <p className="text-xs text-gray-400 truncate">
+                      {email.from_email} → {email.to_email}
+                    </p>
+                  </div>
+                  <div className="text-gray-500">
+                    {expandedId === email.id ? (
+                      <ChevronUp className="w-4 h-4" />
+                    ) : (
+                      <ChevronDown className="w-4 h-4" />
+                    )}
+                  </div>
+                </div>
+                {expandedId === email.id && (
+                  <div className="mt-3 pt-3 border-t border-white/10">
+                    <div className="text-sm text-gray-300 whitespace-pre-wrap mb-3">
+                      {email.preview || "(No content)"}
+                    </div>
+                    {email.sent_by && (
+                      <p className="text-xs text-gray-500">Sent by {email.sent_by}</p>
+                    )}
                   </div>
                 )}
               </CardContent>
