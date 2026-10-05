@@ -258,6 +258,13 @@ export default function MixingPage() {
                     ))}
                 </div>
                 <p className="text-center text-gray-500 text-sm mt-10">
+                    Want proof first?{" "}
+                    <Link href="/mixed" className="text-green-400 hover:underline">
+                        Hear songs we&apos;ve mixed
+                    </Link>
+                    .
+                </p>
+                <p className="text-center text-gray-500 text-sm mt-4">
                     Still curious?{" "}
                     <Link href="/contact" className="text-green-400 hover:underline">
                         Talk to us
