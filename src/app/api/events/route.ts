@@ -10,7 +10,9 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Full-access key for the Receiving API (the send-only RESEND_API_KEY gets a
+// 401 here). Falls back to RESEND_API_KEY if not set.
+const resendReceiving = new Resend(process.env.RESEND_FULL_API_KEY || process.env.RESEND_API_KEY);
 
 /**
  * Verify a Resend (Svix) webhook signature. Fail closed.
@@ -88,7 +90,7 @@ export async function POST(request: Request) {
             // alert above still went through. Failures are logged to
             // system_logs (event_type inbound_body_error) for visibility.
             try {
-                if (emailData.email_id && process.env.RESEND_API_KEY) {
+                if (emailData.email_id && (process.env.RESEND_FULL_API_KEY || process.env.RESEND_API_KEY)) {
                     // Idempotency: skip if Resend retries and we already stored it.
                     let alreadyStored = false;
                     if (dedupeKey) {
@@ -100,7 +102,7 @@ export async function POST(request: Request) {
                         alreadyStored = !!existing && existing.length > 0;
                     }
                     if (!alreadyStored) {
-                        const { data: full, error: fetchError } = await resend.emails.receiving.get(emailData.email_id);
+                        const { data: full, error: fetchError } = await resendReceiving.emails.receiving.get(emailData.email_id);
                         if (fetchError) {
                             throw new Error('Receiving API error: ' + JSON.stringify(fetchError));
                         } else if (full) {
@@ -121,7 +123,7 @@ export async function POST(request: Request) {
                         }
                     }
                 } else {
-                    throw new Error(`Skipped: email_id=${!!emailData.email_id} apiKey=${!!process.env.RESEND_API_KEY}`);
+                    throw new Error(`Skipped: email_id=${!!emailData.email_id} apiKey=${!!(process.env.RESEND_FULL_API_KEY || process.env.RESEND_API_KEY)}`);
                 }
             } catch (bodyError: any) {
                 console.error('Inbound body store failed:', bodyError);
