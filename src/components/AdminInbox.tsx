@@ -203,7 +203,7 @@ export function AdminInbox() {
               from_email: l.event_data?.from || "unknown",
               to_email: l.event_data?.to || "",
               subject: l.event_data?.subject || "No subject",
-              body_text: l.event_data?.message_preview || l.event_data?.body_preview || "",
+              body_text: l.event_data?.message || l.event_data?.message_preview || l.event_data?.body_preview || "",
               body_html: "",
               user_id: null,
               ticket_id: null,
