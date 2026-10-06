@@ -129,6 +129,7 @@ export default function AdminDashboard() {
     const [viewApplication, setViewApplication] = useState<{ kind: 'curator' | 'external', data: any } | null>(null); // Details modal
     const [withdrawals, setWithdrawals] = useState<WithdrawalRequest[]>([]);
     const [tickets, setTickets] = useState<SupportTicket[]>([]);
+    const [unreadInbox, setUnreadInbox] = useState(0);
 
     const [allPlaylists, setAllPlaylists] = useState<AdminPlaylist[]>([]);
     const [acceptedSongCounts, setAcceptedSongCounts] = useState<Record<string, number>>({});
@@ -355,6 +356,28 @@ export default function AdminDashboard() {
                 }).catch(err => console.error("Login notify error", err));
             }
         }
+    }, [user]);
+
+    // Unread inbox badge (menu) — refreshes every minute.
+    useEffect(() => {
+        if (!user || user.role !== 'admin') return;
+        let alive = true;
+        const load = async () => {
+            try {
+                const { data: { session } } = await supabase.auth.getSession();
+                const token = session?.access_token;
+                const res = await fetch("/api/admin/emails/unread-count", {
+                    headers: token ? { Authorization: `Bearer ${token}` } : {},
+                });
+                const data = await res.json();
+                if (alive && data.success) setUnreadInbox(data.unread || 0);
+            } catch {
+                // badge stays at last known value
+            }
+        };
+        load();
+        const t = setInterval(load, 60000);
+        return () => { alive = false; clearInterval(t); };
     }, [user]);
 
     useEffect(() => {
@@ -1391,6 +1414,7 @@ export default function AdminDashboard() {
         withdrawals: pendingWithdrawalsCount,
         openTickets: openTicketsCount,
         applications: pendingCurators.length + curatorApplications.length,
+        unreadInbox: unreadInbox,
     };
     const totalAlerts = pendingWithdrawalsCount + openTicketsCount + pendingCurators.length + curatorApplications.length + pendingSubmissionsCount;
     const totalFollowers = allPlaylists.reduce((acc, p) => acc + Number(p.followers || 0), 0);

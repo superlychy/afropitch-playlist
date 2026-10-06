@@ -13,6 +13,7 @@ export interface NavCounts {
     withdrawals: number;
     openTickets: number;
     applications: number;
+    unreadInbox: number;
 }
 
 interface NavItem {
@@ -46,6 +47,7 @@ function itemCount(item: NavItem, counts: NavCounts): number {
     if (item.tab === "withdrawals") return counts.withdrawals;
     if (item.tab === "support") return counts.openTickets;
     if (item.tab === "applications") return counts.applications;
+    if (item.tab === "inbox") return counts.unreadInbox;
     return 0;
 }
 
