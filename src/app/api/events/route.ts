@@ -151,6 +151,53 @@ export async function POST(request: Request) {
             return NextResponse.json({ received: true });
         }
 
+        // Handle Sent Email Events from Resend — so the admin Sent tab
+        // captures EVERY email sent from the domain, not just ones
+        // composed in the admin panel.
+        if (payload.type === 'email.sent') {
+            const sentData = payload.data || {};
+            const emailId = sentData.email_id || null;
+            const from = sentData.from || "";
+            const to = Array.isArray(sentData.to) ? sentData.to.join(', ') : (sentData.to || "");
+            const subject = sentData.subject || "";
+
+            console.log('📤 Sent Email via Webhook:', { from, to, subject });
+
+            try {
+                // Dedupe: mail composed in the admin panel already has a
+                // full-body log (admin_custom_email_sent / admin_message_sent)
+                // carrying this resend_id — don't log it twice.
+                let alreadyLogged = false;
+                if (emailId) {
+                    const { data: existing } = await supabase
+                        .from('system_logs')
+                        .select('id')
+                        .in('event_type', ['admin_custom_email_sent', 'admin_message_sent'])
+                        .eq('event_data->>resend_id', emailId)
+                        .limit(1);
+                    alreadyLogged = !!existing && existing.length > 0;
+                }
+                if (!alreadyLogged) {
+                    await supabase.from('system_logs').insert({
+                        event_type: 'email_sent',
+                        event_data: {
+                            from,
+                            to,
+                            subject,
+                            resend_id: emailId,
+                            status: 'sent',
+                            via: 'webhook',
+                        },
+                        user_id: null,
+                    });
+                }
+            } catch (dbError) {
+                console.error('Failed to log sent email:', dbError);
+            }
+
+            return NextResponse.json({ received: true });
+        }
+
         return NextResponse.json({ received: true }); // Acknowledge all events
     } catch (error) {
         console.error('Webhook Error:', error);

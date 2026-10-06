@@ -277,17 +277,32 @@ export function AdminInbox() {
 
         if (tix) setTickets(tix as any);
 
-        // Fetch sent emails (admin outbound log), newest first.
+        // Fetch sent emails: admin-composed (full body) + webhook-captured
+        // (every other email sent from the domain). Newest first.
         const { data: sentLogs } = await supabase
           .from("system_logs")
           .select("*")
-          .in("event_type", ["admin_custom_email_sent", "admin_message_sent"])
+          .in("event_type", ["admin_custom_email_sent", "admin_message_sent", "email_sent"])
           .order("created_at", { ascending: false })
-          .limit(50);
+          .limit(100);
 
         if (sentLogs) {
+          // Dedupe: if the email.sent webhook fired before the admin send
+          // route saved its resend_id, both rows exist — keep the admin one
+          // (it has the full body).
+          const adminResendIds = new Set(
+            sentLogs
+              .filter((l: any) => l.event_type !== "email_sent" && l.event_data?.resend_id)
+              .map((l: any) => l.event_data.resend_id)
+          );
+          const deduped = sentLogs.filter(
+            (l: any) =>
+              l.event_type !== "email_sent" ||
+              !l.event_data?.resend_id ||
+              !adminResendIds.has(l.event_data.resend_id)
+          );
           setSentEmails(
-            sentLogs.map((l: any) => ({
+            deduped.slice(0, 50).map((l: any) => ({
               id: l.id,
               to_email: l.event_data?.to || "unknown",
               from_email: l.event_data?.from || "",
