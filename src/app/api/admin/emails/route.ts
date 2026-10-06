@@ -9,21 +9,22 @@ const supabase = createClient(
 );
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-async function requireAdmin(req: Request) {
+async function requireAdmin(req: Request): Promise<string | null> {
   // The frontend sends the session as a Bearer token (not cookies) for this route.
+  // Returns the admin's user id, or null when unauthorized.
   const header = req.headers.get("authorization") || "";
   const token = header.startsWith("Bearer ") ? header.slice(7) : null;
-  if (!token) return false;
+  if (!token) return null;
   const {
     data: { user },
   } = await supabase.auth.getUser(token);
-  if (!user) return false;
+  if (!user) return null;
   const { data: profile } = await supabase
     .from("profiles")
     .select("role")
     .eq("id", user.id)
     .single();
-  return profile?.role === "admin";
+  return profile?.role === "admin" ? user.id : null;
 }
 
 /**
@@ -206,20 +207,26 @@ export async function POST(req: Request) {
 export async function GET(req: Request) {
   try {
     // Admin-only: this returns full inbound email bodies and addresses.
-    if (!(await requireAdmin(req))) {
+    const adminId = await requireAdmin(req);
+    if (!adminId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const { searchParams } = new URL(req.url);
-    const limit = parseInt(searchParams.get("limit") || "50");
+    const limit = parseInt(searchParams.get("limit") || "25");
     const offset = parseInt(searchParams.get("offset") || "0");
+    const q = (searchParams.get("q") || "").trim().toLowerCase();
+    // Fetch a full window from each source so the merged list is a true
+    // global newest-first across both sources (fixes dropped messages).
+    // When searching, pull a wider window so matches are not missed.
+    const window = q ? 500 : offset + limit;
 
     // Try inbound_emails table first
     const { data: emails, error } = await supabase
       .from("inbound_emails")
       .select("*, profiles(full_name, email)")
       .order("created_at", { ascending: false })
-      .range(offset, offset + limit - 1);
+      .range(0, window - 1);
 
     // Also include contact form messages (system_logs contact_message events)
     const { data: contactLogs } = await supabase
@@ -227,10 +234,11 @@ export async function GET(req: Request) {
       .select("*")
       .eq("event_type", "contact_message")
       .order("created_at", { ascending: false })
-      .limit(limit);
+      .range(0, window - 1);
 
     const contactEmails = (contactLogs || []).map((l: any) => ({
       id: l.id,
+      source: "contact",
       from_email: l.event_data?.sender || "unknown",
       to_email: "contact@afropitchplay.best",
       subject: l.event_data?.subject || "Contact Form",
@@ -242,9 +250,33 @@ export async function GET(req: Request) {
       created_at: l.created_at,
     }));
 
-    const merged = [...(emails || []), ...contactEmails].sort(
-      (a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-    ).slice(0, limit);
+    const tagged = (emails || []).map((e: any) => ({ ...e, source: "inbound" }));
+
+    // Which messages has this admin already read?
+    const { data: readLogs } = await supabase
+      .from("system_logs")
+      .select("event_data")
+      .eq("event_type", "inbound_email_read")
+      .eq("user_id", adminId)
+      .order("created_at", { ascending: false })
+      .limit(2000);
+    const readSet = new Set(
+      (readLogs || []).map((l: any) => `${l.event_data?.source}:${l.event_data?.message_id}`)
+    );
+
+    const merged = [...tagged, ...contactEmails]
+      .map((m: any) => ({ ...m, is_read: readSet.has(`${m.source}:${m.id}`) }))
+      .filter((m: any) =>
+        !q ||
+        (m.subject || "").toLowerCase().includes(q) ||
+        (m.from_email || "").toLowerCase().includes(q) ||
+        (m.body_text || "").toLowerCase().includes(q)
+      )
+      .sort(
+        (a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+
+    const page = q ? merged : merged.slice(offset, offset + limit);
 
     if (error && error.message.includes("does not exist")) {
       // Table doesn't exist yet, return system_logs fallback
@@ -265,8 +297,9 @@ export async function GET(req: Request) {
 
     return NextResponse.json({
       success: true,
-      emails: merged,
-      count: merged.length,
+      emails: page,
+      count: page.length,
+      hasMore: q ? false : merged.length > offset + limit,
       source: "inbound_emails+contact_form",
       table_exists: true,
     });

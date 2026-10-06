@@ -91,7 +91,32 @@ serve(async (req) => {
             fields.push({ name: "Subject", value: data.subject || "No Subject", inline: true });
             description = `Email ID: ${data.email_id || 'N/A'}`;
         }
-        // Handle Inbound
+        // Handle Inbound — new Resend event format: { type: 'email.received', data: { from, to, subject, text, html } }
+        else if (type === 'email.received' && data && (data.from || data.subject)) {
+            title = "New Email Received 📬";
+            color = 5763719;
+
+            const fromAddr = typeof data.from === 'string' ? data.from : JSON.stringify(data.from ?? 'unknown');
+            const toAddr = Array.isArray(data.to) ? (data.to[0] || 'unknown') : (data.to || 'unknown');
+
+            // Log to database for the admin inbox and the inbound-email watcher
+            const { error: logError } = await supabase.from('inbound_emails').insert({
+                from_email: fromAddr,
+                to_email: toAddr,
+                subject: data.subject || '',
+                body_text: (data.text || '').substring(0, 5000),
+                body_html: (data.html || '').substring(0, 5000),
+            });
+            if (logError) console.error('Failed to log inbound email:', logError);
+
+            fields.push({ name: "From", value: fromAddr, inline: true });
+            fields.push({ name: "Subject", value: data.subject || "No subject", inline: false });
+
+            let bodySnippet = data.text || data.html || "No Content";
+            if (bodySnippet.length > 200) bodySnippet = bodySnippet.substring(0, 200) + "...";
+            description = bodySnippet;
+        }
+        // Handle Inbound — legacy direct-payload format: { from, to, subject, text, html }
         else if (payload.from && payload.subject) {
             title = "New Email Received 📬";
             color = 5763719;

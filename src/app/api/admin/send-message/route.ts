@@ -45,6 +45,7 @@ export async function POST(request: Request) {
                 to: to,
                 subject: subject,
                 message_preview: message.substring(0, 100),
+                message: message,
                 status: 'pending'
             }
         }).select().single();

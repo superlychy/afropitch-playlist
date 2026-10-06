@@ -54,6 +54,7 @@ export async function POST(request: Request) {
                 from: from,
                 subject: subject,
                 message_preview: message.substring(0, 100),
+                message: message,
                 status: 'pending',
                 sent_by: user.email
             }

@@ -23,6 +23,7 @@ import {
 
 interface Email {
   id: string;
+  source?: "inbound" | "contact";
   from_email: string;
   to_email: string;
   subject: string;
@@ -32,6 +33,7 @@ interface Email {
   ticket_id: string | null;
   status: string;
   created_at: string;
+  is_read?: boolean;
   profiles?: { full_name: string; email: string } | null;
 }
 
@@ -59,10 +61,33 @@ interface SentEmail {
   from_email: string;
   subject: string;
   preview: string;
+  message?: string;
   status: string;
   sent_by: string | null;
   created_at: string;
 }
+
+// Email-style date: "Today, 2:04 PM" / "Yesterday, 2:04 PM" /
+// "Mon, 2:04 PM" (within 7 days) / "Oct 5" / "Oct 5, 2026".
+// Fixed format everywhere so it looks identical on every device.
+function formatEmailDate(iso: string): string {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+  const now = new Date();
+  const time = `${d.getHours() % 12 || 12}:${String(d.getMinutes()).padStart(2, "0")} ${d.getHours() < 12 ? "AM" : "PM"}`;
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startOfMsg = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const dayDiff = Math.round((startOfToday.getTime() - startOfMsg.getTime()) / 86400000);
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  if (dayDiff <= 0) return `Today, ${time}`;
+  if (dayDiff === 1) return `Yesterday, ${time}`;
+  if (dayDiff < 7) return `${days[d.getDay()]}, ${time}`;
+  const datePart = `${months[d.getMonth()]} ${d.getDate()}`;
+  return d.getFullYear() === now.getFullYear() ? datePart : `${datePart}, ${d.getFullYear()}`;
+}
+
+const INBOX_PAGE_SIZE = 25;
 
 // Inline conversation thread + reply composer for a support ticket.
 // Replaces the old "Open Chat" button, which dispatched an event nothing listened to.
@@ -142,7 +167,7 @@ function TicketThread({ ticketId }: { ticketId: string }) {
             >
               <p className="whitespace-pre-wrap">{m.message}</p>
               <p className={`text-[10px] mt-1 ${m.from_admin ? "text-green-400/70" : "text-gray-500"}`}>
-                {m.from_admin ? "You" : "Visitor"} · {new Date(m.created_at).toLocaleString()}
+                {m.from_admin ? "You" : "Visitor"} · {formatEmailDate(m.created_at)}
               </p>
             </div>
           ))}
@@ -187,86 +212,164 @@ export function AdminInbox() {
   // Expanded email
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  const fetchEmails = async () => {
-    setIsLoading(true);
+  // Inbox pagination (true newest-first pages from the API)
+  const [emailOffset, setEmailOffset] = useState(0);
+  const [hasMoreEmails, setHasMoreEmails] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  const fetchEmails = async (offset = 0, append = false) => {
+    if (append) setLoadingMore(true);
+    else setIsLoading(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
 
-      const res = await fetch("/api/admin/emails?limit=50", {
+      const res = await fetch(`/api/admin/emails?limit=${INBOX_PAGE_SIZE}&offset=${offset}`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       const data = await res.json();
       if (data.success) {
-        setEmails(data.emails || []);
-      } else {
-        // Fallback: fetch from system_logs
+        const page = (data.emails || []).map((e: any) => ({
+          ...e,
+          source: e.source || "inbound",
+        }));
+        setEmails((prev) => (append ? [...prev, ...page] : page));
+        setEmailOffset(offset + page.length);
+        setHasMoreEmails(!!data.hasMore);
+      } else if (!append) {
+        // Fallback: fetch from system_logs (inbound + contact only; sent
+        // mail belongs in the Sent tab, never mixed into the inbox).
         const { data: logs } = await supabase
           .from("system_logs")
           .select("*")
-          .in("event_type", ["inbound_email", "admin_message_sent", "admin_custom_email_sent"])
+          .in("event_type", ["inbound_email", "contact_message"])
+          .order("created_at", { ascending: false })
+          .limit(INBOX_PAGE_SIZE);
+
+        if (logs) {
+          const mapped: Email[] = logs.map((l: any) => ({
+            id: l.id,
+            source: (l.event_type === "contact_message" ? "contact" : "inbound") as "contact" | "inbound",
+            from_email: l.event_data?.from || l.event_data?.sender || "unknown",
+            to_email: l.event_data?.to || "",
+            subject: l.event_data?.subject || (l.event_type === "contact_message" ? "Contact Form" : "No subject"),
+            body_text: l.event_data?.message || l.event_data?.message_preview || l.event_data?.body_preview || "",
+            body_html: "",
+            user_id: null,
+            ticket_id: null,
+            status: l.event_data?.status || "received",
+            created_at: l.created_at,
+            is_read: true,
+          }));
+          setEmails(mapped);
+          setEmailOffset(mapped.length);
+          setHasMoreEmails(false);
+        }
+      }
+
+      if (!append) {
+        // Fetch support tickets
+        const { data: tix } = await supabase
+          .from("support_tickets")
+          .select("*, profiles(full_name, email)")
           .order("created_at", { ascending: false })
           .limit(50);
 
-        if (logs) {
-          setEmails(
-            logs.map((l: any) => ({
+        if (tix) setTickets(tix as any);
+
+        // Fetch sent emails (admin outbound log), newest first.
+        const { data: sentLogs } = await supabase
+          .from("system_logs")
+          .select("*")
+          .in("event_type", ["admin_custom_email_sent", "admin_message_sent"])
+          .order("created_at", { ascending: false })
+          .limit(50);
+
+        if (sentLogs) {
+          setSentEmails(
+            sentLogs.map((l: any) => ({
               id: l.id,
-              from_email: l.event_data?.from || "unknown",
-              to_email: l.event_data?.to || "",
+              to_email: l.event_data?.to || "unknown",
+              from_email: l.event_data?.from || "",
               subject: l.event_data?.subject || "No subject",
-              body_text: l.event_data?.message || l.event_data?.message_preview || l.event_data?.body_preview || "",
-              body_html: "",
-              user_id: null,
-              ticket_id: null,
+              preview: l.event_data?.message_preview || "",
+              message: l.event_data?.message || "",
               status: l.event_data?.status || "unknown",
+              sent_by: l.event_data?.sent_by || null,
               created_at: l.created_at,
             }))
           );
         }
       }
-
-      // Fetch support tickets
-      const { data: tix } = await supabase
-        .from("support_tickets")
-        .select("*, profiles(full_name, email)")
-        .order("created_at", { ascending: false })
-        .limit(50);
-
-      if (tix) setTickets(tix as any);
-
-      // Fetch sent emails (admin outbound log)
-      const { data: sentLogs } = await supabase
-        .from("system_logs")
-        .select("*")
-        .in("event_type", ["admin_custom_email_sent", "admin_message_sent"])
-        .order("created_at", { ascending: false })
-        .limit(50);
-
-      if (sentLogs) {
-        setSentEmails(
-          sentLogs.map((l: any) => ({
-            id: l.id,
-            to_email: l.event_data?.to || "unknown",
-            from_email: l.event_data?.from || "",
-            subject: l.event_data?.subject || "No subject",
-            preview: l.event_data?.message || l.event_data?.message_preview || "",
-            status: l.event_data?.status || "unknown",
-            sent_by: l.event_data?.sent_by || null,
-            created_at: l.created_at,
-          }))
-        );
-      }
     } catch (err) {
       console.error("Inbox fetch error:", err);
     } finally {
       setIsLoading(false);
+      setLoadingMore(false);
     }
   };
 
+  // Mark an inbox message as read (persists per admin, cross-device).
+  const markAsRead = async (email: Email) => {
+    if (email.is_read) return;
+    setEmails((prev) => prev.map((e) => (e.id === email.id ? { ...e, is_read: true } : e)));
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      await fetch("/api/admin/emails/read", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ source: email.source || "inbound", message_id: email.id }),
+      });
+    } catch {
+      // read state is best-effort; the message is already open
+    }
+  };
+
+  const toggleExpand = (email: Email) => {
+    const opening = expandedId !== email.id;
+    setExpandedId(opening ? email.id : null);
+    if (opening) markAsRead(email);
+  };
+
+  const loadMoreEmails = () => {
+    if (!loadingMore && hasMoreEmails) fetchEmails(emailOffset, true);
+  };
+
+  // Initial load + server-side search (debounced): searching queries the
+  // full inbox on the server, not just the messages already on screen.
   useEffect(() => {
-    fetchEmails();
-  }, []);
+    const t = setTimeout(async () => {
+      const q = searchTerm.trim();
+      if (!q) {
+        fetchEmails();
+        return;
+      }
+      setIsLoading(true);
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const token = session?.access_token;
+        const res = await fetch(`/api/admin/emails?limit=${INBOX_PAGE_SIZE}&offset=0&q=${encodeURIComponent(q)}`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        const data = await res.json();
+        if (data.success) {
+          setEmails((data.emails || []).map((e: any) => ({ ...e, source: e.source || "inbound" })));
+          setEmailOffset((data.emails || []).length);
+          setHasMoreEmails(false);
+        }
+      } catch (err) {
+        console.error("Inbox search error:", err);
+      } finally {
+        setIsLoading(false);
+      }
+    }, 400);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchTerm]);
 
   const sendReply = async (toEmail: string, subject: string) => {
     if (!composeMessage.trim()) {
@@ -350,6 +453,7 @@ export function AdminInbox() {
 
   const filteredEmails = emails.filter(
     (e) =>
+      !searchTerm ||
       e.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
       e.from_email.toLowerCase().includes(searchTerm.toLowerCase()) ||
       e.body_text?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -409,7 +513,7 @@ export function AdminInbox() {
           >
             <Send className="w-3 h-3 mr-1" /> Compose
           </Button>
-          <Button size="sm" variant="ghost" onClick={fetchEmails}>
+          <Button size="sm" variant="ghost" onClick={() => fetchEmails()}>
             <RefreshCw className="w-3 h-3" />
           </Button>
         </div>
@@ -443,32 +547,37 @@ export function AdminInbox() {
           )}
           {filteredEmails.map((email) => (
             <Card
-              key={email.id}
-              className="bg-black/40 border-white/10 cursor-pointer hover:bg-white/5 transition-colors"
-              onClick={() =>
-                setExpandedId(expandedId === email.id ? null : email.id)
-              }
+              key={`${email.source || "inbound"}-${email.id}`}
+              className={`bg-black/40 border-white/10 cursor-pointer hover:bg-white/5 transition-colors ${
+                !email.is_read ? "border-l-2 border-l-green-500" : ""
+              }`}
+              onClick={() => toggleExpand(email)}
             >
               <CardContent className="p-3 sm:p-4">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 mb-1">
+                      {!email.is_read && (
+                        <span className="w-2 h-2 rounded-full bg-green-500 shrink-0" />
+                      )}
                       <span
                         className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${
-                          email.status === "sent"
-                            ? "bg-green-500/20 text-green-400"
-                            : email.status === "received"
-                            ? "bg-blue-500/20 text-blue-400"
-                            : "bg-gray-500/20 text-gray-400"
+                          email.source === "contact"
+                            ? "bg-purple-500/20 text-purple-400"
+                            : "bg-blue-500/20 text-blue-400"
                         }`}
                       >
-                        {email.status}
+                        {email.source === "contact" ? "contact form" : "received"}
                       </span>
                       <span className="text-xs text-gray-500 truncate">
-                        {new Date(email.created_at).toLocaleString()}
+                        {formatEmailDate(email.created_at)}
                       </span>
                     </div>
-                    <p className="text-sm font-bold text-white truncate">
+                    <p
+                      className={`text-sm truncate ${
+                        !email.is_read ? "font-bold text-white" : "font-normal text-gray-200"
+                      }`}
+                    >
                       {email.subject}
                     </p>
                     <p className="text-xs text-gray-400 truncate">
@@ -485,7 +594,21 @@ export function AdminInbox() {
                 </div>
                 {expandedId === email.id && (
                   <div className="mt-3 pt-3 border-t border-white/10">
-                    <div className="text-sm text-gray-300 whitespace-pre-wrap mb-3">
+                    <div className="mb-3 space-y-1 text-xs">
+                      <p className="text-gray-400">
+                        <span className="text-gray-500">From:</span> {email.from_email}
+                      </p>
+                      <p className="text-gray-400">
+                        <span className="text-gray-500">To:</span> {email.to_email}
+                      </p>
+                      <p className="text-gray-400">
+                        <span className="text-gray-500">Date:</span> {formatEmailDate(email.created_at)}
+                      </p>
+                      <p className="text-gray-400">
+                        <span className="text-gray-500">Subject:</span> {email.subject}
+                      </p>
+                    </div>
+                    <div className="text-sm text-gray-200 whitespace-pre-wrap mb-3">
                       {email.body_text || "(No content)"}
                     </div>
                     <div className="flex gap-2">
@@ -508,6 +631,25 @@ export function AdminInbox() {
               </CardContent>
             </Card>
           ))}
+          {hasMoreEmails && !searchTerm && (
+            <div className="text-center pt-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={loadMoreEmails}
+                disabled={loadingMore}
+                className="border-white/10"
+              >
+                {loadingMore ? (
+                  <>
+                    <RefreshCw className="w-3 h-3 mr-1 animate-spin" /> Loading…
+                  </>
+                ) : (
+                  "Load more"
+                )}
+              </Button>
+            </div>
+          )}
         </div>
       )}
 
@@ -541,7 +683,7 @@ export function AdminInbox() {
                         {ticket.status}
                       </span>
                       <span className="text-xs text-gray-500">
-                        {new Date(ticket.created_at).toLocaleString()}
+                        {formatEmailDate(ticket.created_at)}
                       </span>
                     </div>
                     <p className="text-sm font-bold text-white">
@@ -598,7 +740,7 @@ export function AdminInbox() {
                         {email.status}
                       </span>
                       <span className="text-xs text-gray-500 truncate">
-                        {new Date(email.created_at).toLocaleString()}
+                        {formatEmailDate(email.created_at)}
                       </span>
                     </div>
                     <p className="text-sm font-bold text-white truncate">
@@ -618,9 +760,28 @@ export function AdminInbox() {
                 </div>
                 {expandedId === email.id && (
                   <div className="mt-3 pt-3 border-t border-white/10">
-                    <div className="text-sm text-gray-300 whitespace-pre-wrap mb-3">
-                      {email.preview || "(No content)"}
+                    <div className="mb-3 space-y-1 text-xs">
+                      <p className="text-gray-400">
+                        <span className="text-gray-500">From:</span> {email.from_email || "AfroPitch"}
+                      </p>
+                      <p className="text-gray-400">
+                        <span className="text-gray-500">To:</span> {email.to_email}
+                      </p>
+                      <p className="text-gray-400">
+                        <span className="text-gray-500">Date:</span> {formatEmailDate(email.created_at)}
+                      </p>
+                      <p className="text-gray-400">
+                        <span className="text-gray-500">Subject:</span> {email.subject}
+                      </p>
                     </div>
+                    <div className="text-sm text-gray-200 whitespace-pre-wrap mb-3">
+                      {email.message || email.preview || "(No content)"}
+                    </div>
+                    {email.message ? null : (
+                      <p className="text-xs text-gray-500 mb-2">
+                        Full text was not saved for this older message — only a preview is available.
+                      </p>
+                    )}
                     {email.sent_by && (
                       <p className="text-xs text-gray-500">Sent by {email.sent_by}</p>
                     )}
