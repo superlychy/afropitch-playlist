@@ -138,14 +138,28 @@ export async function POST(request: Request) {
 
             // Notify via Discord
             if (DISCORD_WEBHOOK) {
-                await fetch(DISCORD_WEBHOOK, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        content: `📧 **Incoming Email Received**\n**From:** ${from}\n**To:** ${to}\n**Subject:** ${subject}\n\n*Check Admin Dashboard for log.*`,
-                        username: 'AfroPitch Mail Bot'
-                    })
-                });
+                try {
+                    const discordRes = await fetch(DISCORD_WEBHOOK, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            content: `📧 **Incoming Email Received**\n**From:** ${from}\n**To:** ${to}\n**Subject:** ${subject}\n\n*Check Admin Dashboard for log.*`,
+                            username: 'AfroPitch Mail Bot'
+                        })
+                    });
+                    if (!discordRes.ok) {
+                        throw new Error(`Discord HTTP ${discordRes.status}: ${await discordRes.text()}`);
+                    }
+                } catch (discordError: any) {
+                    console.error('Discord notify failed:', discordError);
+                    try {
+                        await supabase.from('system_logs').insert({
+                            event_type: 'discord_notify_error',
+                            event_data: { error: String(discordError?.message || discordError), subject: subject || null },
+                            user_id: null,
+                        });
+                    } catch { /* logging must never break the webhook */ }
+                }
             }
 
             return NextResponse.json({ received: true });
