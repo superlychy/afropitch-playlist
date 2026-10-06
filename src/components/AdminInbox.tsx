@@ -794,7 +794,7 @@ export function AdminInbox() {
                     </div>
                     {email.message ? null : (
                       <p className="text-xs text-gray-500 mb-2">
-                        Full text was not saved for this older message — only a preview is available.
+                        Full text is not available for this message — it was sent outside the admin panel.
                       </p>
                     )}
                     {email.sent_by && (

@@ -89,6 +89,10 @@ export async function POST(request: Request) {
             // Runs independently: if this fails, the metadata log + Discord
             // alert above still went through. Failures are logged to
             // system_logs (event_type inbound_body_error) for visibility.
+            // The snippet is reused for the Discord notification so the
+            // content (e.g. verification codes) is readable without opening
+            // the admin panel.
+            let bodySnippet = "";
             try {
                 if (emailData.email_id && (process.env.RESEND_FULL_API_KEY || process.env.RESEND_API_KEY)) {
                     // Idempotency: skip if Resend retries and we already stored it.
@@ -108,11 +112,13 @@ export async function POST(request: Request) {
                         } else if (full) {
                             const f: any = full;
                             const toAddr = Array.isArray(f.to) ? (f.to[0] || 'unknown') : (f.to || 'unknown');
+                            const bodyText = f.text || '';
+                            bodySnippet = bodyText.substring(0, 1000);
                             const { error: insertError } = await supabase.from('inbound_emails').insert({
                                 from_email: typeof f.from === 'string' ? f.from : 'unknown',
                                 to_email: toAddr,
                                 subject: f.subject || '',
-                                body_text: (f.text || '').substring(0, 5000),
+                                body_text: bodyText.substring(0, 5000),
                                 body_html: (f.html || '').substring(0, 5000),
                                 message_id: dedupeKey,
                             });
@@ -120,6 +126,17 @@ export async function POST(request: Request) {
                             console.log('📥 Stored inbound email:', { from: f.from, subject: f.subject });
                         } else {
                             throw new Error('Receiving API returned no data');
+                        }
+                    } else if (dedupeKey) {
+                        // Resend retried a stored email: pull the snippet from
+                        // the existing row so Discord still shows content.
+                        const { data: existing } = await supabase
+                            .from('inbound_emails')
+                            .select('body_text')
+                            .eq('message_id', dedupeKey)
+                            .limit(1);
+                        if (existing && existing.length > 0) {
+                            bodySnippet = (existing[0].body_text || '').substring(0, 1000);
                         }
                     }
                 } else {
@@ -136,14 +153,18 @@ export async function POST(request: Request) {
                 } catch { /* logging must never break the webhook */ }
             }
 
-            // Notify via Discord
+            // Notify via Discord (with content snippet so verification
+            // codes etc. are readable without opening the admin panel)
             if (DISCORD_WEBHOOK) {
                 try {
+                    const content =
+                        `📧 **Incoming Email Received**\n**From:** ${from}\n**To:** ${to}\n**Subject:** ${subject}` +
+                        (bodySnippet ? `\n\n${bodySnippet}` : `\n\n*Check Admin Dashboard for log.*`);
                     const discordRes = await fetch(DISCORD_WEBHOOK, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
-                            content: `📧 **Incoming Email Received**\n**From:** ${from}\n**To:** ${to}\n**Subject:** ${subject}\n\n*Check Admin Dashboard for log.*`,
+                            content,
                             username: 'AfroPitch Mail Bot'
                         })
                     });
