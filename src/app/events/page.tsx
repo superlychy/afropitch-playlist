@@ -50,7 +50,7 @@ const CATEGORY_LABELS: Record<string, string> = {
     showcase: "Showcase",
 };
 
-const PER_PAGE = 9;
+const PER_PAGE = 15;
 
 function formatDateRange(startsAt: string, endsAt: string) {
     const start = new Date(startsAt);
