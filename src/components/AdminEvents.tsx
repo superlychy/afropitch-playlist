@@ -90,6 +90,7 @@ const emptyForm = (): EventForm => ({
 export function AdminEvents() {
     const { toast } = useToast();
     const [events, setEvents] = useState<EventItem[]>([]);
+    const [interestCounts, setInterestCounts] = useState<Record<string, { interested: number; not: number }>>({});
     const [loading, setLoading] = useState(true);
     const [showNew, setShowNew] = useState(false);
     const [expanded, setExpanded] = useState<string | null>(null);
@@ -107,6 +108,14 @@ export function AdminEvents() {
             .select("*")
             .order("starts_at", { ascending: false });
         setEvents((data ?? []) as EventItem[]);
+        const { data: votes } = await supabase.from("event_interest").select("event_id, value");
+        const agg: Record<string, { interested: number; not: number }> = {};
+        for (const v of votes ?? []) {
+            const a = (agg[v.event_id] ??= { interested: 0, not: 0 });
+            if (v.value === "interested") a.interested++;
+            else a.not++;
+        }
+        setInterestCounts(agg);
         setLoading(false);
     };
 
@@ -484,6 +493,13 @@ export function AdminEvents() {
                                 <div className="min-w-0">
                                     <p className="text-white font-semibold">{e.title}</p>
                                     <p className="text-xs text-gray-500 font-mono">/events/{e.slug}</p>
+                                    {interestCounts[e.id] && (interestCounts[e.id].interested > 0 || interestCounts[e.id].not > 0) && (
+                                        <p className="text-xs text-gray-500 mt-1">
+                                            <span className="text-green-400">{interestCounts[e.id].interested} interested</span>
+                                            {" · "}
+                                            <span className="text-red-400">{interestCounts[e.id].not} not interested</span>
+                                        </p>
+                                    )}
                                 </div>
                                 <div className="flex gap-2">
                                     <a href={`https://afropitchplay.best/events/${e.slug}`} target="_blank" rel="noreferrer">

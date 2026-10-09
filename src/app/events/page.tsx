@@ -45,7 +45,12 @@ const CATEGORY_LABELS: Record<string, string> = {
     awards: "Awards",
     industry: "Industry",
     competition: "Competition",
+    party: "Party",
+    tour: "Tour",
+    showcase: "Showcase",
 };
+
+const PER_PAGE = 9;
 
 function formatDateRange(startsAt: string, endsAt: string) {
     const start = new Date(startsAt);
@@ -107,24 +112,54 @@ function EventCard({ event, live }: { event: EventRow; live?: boolean }) {
     );
 }
 
-export default async function EventsPage() {
+export default async function EventsPage({
+    searchParams,
+}: {
+    searchParams: Promise<{ page?: string }>;
+}) {
+    const { page: pageParam } = await searchParams;
+    const page = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
     const supabase = await createClient();
-    const { data } = await supabase
+    const nowIso = new Date().toISOString();
+    const baseSelect =
+        "id, title, slug, starts_at, ends_at, venue, city, country, image_url, description, category";
+
+    // Happening now (shown on page 1 only).
+    const { data: liveData } =
+        page === 1
+            ? await supabase
+                  .from("events")
+                  .select(baseSelect)
+                  .eq("status", "published")
+                  .lte("starts_at", nowIso)
+                  .gte("ends_at", nowIso)
+                  .order("starts_at", { ascending: true })
+            : { data: [] };
+
+    // Upcoming, nearest first, paginated.
+    const from = (page - 1) * PER_PAGE;
+    const to = from + PER_PAGE - 1;
+    const { data: upcomingData, count: upcomingCount } = await supabase
         .from("events")
-        .select("id, title, slug, starts_at, ends_at, venue, city, country, image_url, description, category")
+        .select(baseSelect, { count: "exact" })
         .eq("status", "published")
-        .order("starts_at", { ascending: true });
+        .gt("starts_at", nowIso)
+        .order("starts_at", { ascending: true })
+        .range(from, to);
 
-    const rows = (data ?? []) as EventRow[];
-    const now = Date.now();
+    // Past events, most recent first (latest 12).
+    const { data: pastData } = await supabase
+        .from("events")
+        .select(baseSelect)
+        .eq("status", "published")
+        .lt("ends_at", nowIso)
+        .order("ends_at", { ascending: false })
+        .limit(12);
 
-    const live = rows
-        .filter((e) => new Date(e.starts_at).getTime() <= now && new Date(e.ends_at).getTime() >= now)
-        .sort((a, b) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime());
-    const upcoming = rows.filter((e) => new Date(e.starts_at).getTime() > now);
-    const past = rows
-        .filter((e) => new Date(e.ends_at).getTime() < now)
-        .sort((a, b) => new Date(b.ends_at).getTime() - new Date(a.ends_at).getTime());
+    const live = (liveData ?? []) as EventRow[];
+    const upcoming = (upcomingData ?? []) as EventRow[];
+    const past = (pastData ?? []) as EventRow[];
+    const totalPages = Math.max(1, Math.ceil((upcomingCount ?? 0) / PER_PAGE));
 
     return (
         <main className="w-full mx-auto max-w-4xl px-4 py-16 md:py-24">
@@ -154,11 +189,44 @@ export default async function EventsPage() {
             <section className="mb-12">
                 <h2 className="text-xl font-bold text-white mb-4">Upcoming</h2>
                 {upcoming.length > 0 ? (
-                    <div className="space-y-3">
-                        {upcoming.map((e) => (
-                            <EventCard key={e.id} event={e} />
-                        ))}
-                    </div>
+                    <>
+                        <div className="space-y-3">
+                            {upcoming.map((e) => (
+                                <EventCard key={e.id} event={e} />
+                            ))}
+                        </div>
+                        {totalPages > 1 && (
+                            <div className="flex items-center justify-center gap-2 mt-8">
+                                {page > 1 ? (
+                                    <Link
+                                        href={page === 2 ? "/events" : `/events?page=${page - 1}`}
+                                        className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-gray-300 hover:border-yellow-500/40 transition-colors"
+                                    >
+                                        ← Previous
+                                    </Link>
+                                ) : (
+                                    <span className="rounded-xl border border-white/5 px-4 py-2 text-sm text-gray-700">
+                                        ← Previous
+                                    </span>
+                                )}
+                                <span className="text-sm text-gray-500 px-2">
+                                    Page {page} of {totalPages}
+                                </span>
+                                {page < totalPages ? (
+                                    <Link
+                                        href={`/events?page=${page + 1}`}
+                                        className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-gray-300 hover:border-yellow-500/40 transition-colors"
+                                    >
+                                        Next →
+                                    </Link>
+                                ) : (
+                                    <span className="rounded-xl border border-white/5 px-4 py-2 text-sm text-gray-700">
+                                        Next →
+                                    </span>
+                                )}
+                            </div>
+                        )}
+                    </>
                 ) : (
                     <Card className="border-dashed border-white/10 bg-white/5">
                         <CardContent className="pt-8 pb-8 text-center">

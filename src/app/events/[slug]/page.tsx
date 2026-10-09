@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase-server";
 import { Card, CardContent } from "@/components/ui/card";
 import { CalendarDays, MapPin, ArrowLeft, Building2 } from "lucide-react";
 import { TicketButton } from "./TicketButton";
+import { InterestButtons } from "./InterestButtons";
 
 interface EventDetail {
     id: string;
@@ -222,6 +223,8 @@ export default async function EventDetailPage({
                         </span>
                     </div>
                 ) : null}
+
+                {!isPast && <InterestButtons eventId={event.id} />}
             </div>
         </main>
     );
