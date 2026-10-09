@@ -224,7 +224,18 @@ export default async function EventDetailPage({
                     </div>
                 ) : null}
 
-                {!isPast && <InterestButtons eventId={event.id} />}
+                {!isPast && (
+                    <InterestButtons
+                        eventId={event.id}
+                        event={{
+                            title: event.title,
+                            starts_at: event.starts_at,
+                            ends_at: event.ends_at,
+                            venue: event.venue,
+                            city: event.city,
+                        }}
+                    />
+                )}
             </div>
         </main>
     );
