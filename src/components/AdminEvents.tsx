@@ -19,13 +19,14 @@ interface EventItem {
     image_url: string | null;
     description: string | null;
     ticket_url: string | null;
+    is_free: boolean;
     organizer: string | null;
     category: string;
     status: string;
     created_at: string;
 }
 
-const CATEGORIES = ["concert", "festival", "awards", "industry", "competition"] as const;
+const CATEGORIES = ["concert", "festival", "awards", "industry", "competition", "party", "tour", "showcase"] as const;
 
 const CATEGORY_LABELS: Record<string, string> = {
     concert: "Concert",
@@ -33,6 +34,9 @@ const CATEGORY_LABELS: Record<string, string> = {
     awards: "Awards",
     industry: "Industry",
     competition: "Competition",
+    party: "Party",
+    tour: "Tour",
+    showcase: "Showcase",
 };
 
 const slugify = (s: string) =>
@@ -62,6 +66,7 @@ interface EventForm {
     image_url: string;
     description: string;
     ticket_url: string;
+    is_free: boolean;
     organizer: string;
     category: string;
 }
@@ -77,6 +82,7 @@ const emptyForm = (): EventForm => ({
     image_url: "",
     description: "",
     ticket_url: "",
+    is_free: false,
     organizer: "",
     category: "concert",
 });
@@ -130,6 +136,7 @@ export function AdminEvents() {
                 image_url: e.image_url ?? "",
                 description: e.description ?? "",
                 ticket_url: e.ticket_url ?? "",
+                is_free: e.is_free ?? false,
                 organizer: e.organizer ?? "",
                 category: e.category,
             };
@@ -180,6 +187,7 @@ export function AdminEvents() {
             image_url: newForm.image_url.trim() || null,
             description: newForm.description.trim() || null,
             ticket_url: newForm.ticket_url.trim() || null,
+            is_free: newForm.is_free,
             organizer: newForm.organizer.trim() || null,
             category: newForm.category,
             status: "draft",
@@ -217,6 +225,7 @@ export function AdminEvents() {
                 image_url: f.image_url.trim() || null,
                 description: f.description.trim() || null,
                 ticket_url: f.ticket_url.trim() || null,
+                is_free: f.is_free,
                 organizer: f.organizer.trim() || null,
                 category: f.category,
                 updated_at: new Date().toISOString(),
@@ -378,6 +387,10 @@ export function AdminEvents() {
             <div>
                 <label className={labelCls}>Ticket URL <span className="text-gray-500">(optional, links the "Get tickets" button)</span></label>
                 <input value={f.ticket_url} onChange={(e) => set({ ticket_url: e.target.value })} placeholder="https://…" className={`${inputCls} font-mono`} />
+                <label className="mt-2 flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                    <input type="checkbox" checked={f.is_free} onChange={(e) => set({ is_free: e.target.checked })} className="w-4 h-4 accent-green-600" />
+                    Free entry <span className="text-gray-500">(shows a "Free entry" badge instead of a ticket button)</span>
+                </label>
             </div>
         </div>
     );

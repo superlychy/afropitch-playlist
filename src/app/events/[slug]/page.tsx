@@ -18,6 +18,7 @@ interface EventDetail {
     image_url: string | null;
     description: string | null;
     ticket_url: string | null;
+    is_free: boolean;
     organizer: string | null;
     category: string;
 }
@@ -34,7 +35,7 @@ async function getEvent(slug: string): Promise<EventDetail | null> {
     const supabase = await createClient();
     const { data } = await supabase
         .from("events")
-        .select("id, title, slug, starts_at, ends_at, venue, city, country, image_url, description, ticket_url, organizer, category")
+        .select("id, title, slug, starts_at, ends_at, venue, city, country, image_url, description, ticket_url, is_free, organizer, category")
         .eq("slug", slug)
         .eq("status", "published")
         .maybeSingle();
@@ -134,7 +135,9 @@ export default async function EventDetailPage({
         ...(event.organizer ? { organizer: { "@type": "Organization", name: event.organizer } } : {}),
         ...(event.ticket_url
             ? { offers: { "@type": "Offer", url: event.ticket_url, availability: "https://schema.org/InStock" } }
-            : {}),
+            : event.is_free
+              ? { offers: { "@type": "Offer", price: "0", priceCurrency: "NGN", availability: "https://schema.org/InStock" } }
+              : {}),
     };
 
     return (
@@ -205,14 +208,20 @@ export default async function EventDetailPage({
                     </Card>
                 )}
 
-                {event.ticket_url && !isPast && (
+                {event.ticket_url && !isPast ? (
                     <div className="text-center pt-2">
                         <TicketButton eventId={event.id} ticketUrl={event.ticket_url} />
                         <p className="text-xs text-gray-600 mt-3">
                             Tickets are sold by the event organizer. You will leave AfroPitch.
                         </p>
                     </div>
-                )}
+                ) : event.is_free && !isPast ? (
+                    <div className="text-center pt-2">
+                        <span className="inline-block rounded-full border border-green-500/30 bg-green-950/30 px-6 py-3 text-base font-semibold text-green-300">
+                            Free entry
+                        </span>
+                    </div>
+                ) : null}
             </div>
         </main>
     );
