@@ -18,6 +18,7 @@ import { CustomEmailForm } from "@/components/CustomEmailForm";
 import { AdminInbox } from "@/components/AdminInbox";
 import { AdminMixing } from "@/components/AdminMixing";
 import { AdminFeatured } from "@/components/AdminFeatured";
+import { AdminEvents } from "@/components/AdminEvents";
 import { usePagination, PaginationControls, FilterButtons } from "@/components/admin/Pagination";
 import { StatCard } from "@/components/dashboards/admin/StatCard";
 import { AlertBanner } from "@/components/dashboards/admin/AlertBanner";
@@ -94,7 +95,7 @@ interface TopPlaylist {
     total_clicks: number;
 }
 
-const VALID_TABS = ["overview", "analytics", "users", "withdrawals", "transactions", "support", "playlists", "submissions", "mixing", "featured", "applications", "broadcast", "inbox"] as const;
+const VALID_TABS = ["overview", "analytics", "users", "withdrawals", "transactions", "support", "playlists", "submissions", "mixing", "featured", "events", "applications", "broadcast", "inbox"] as const;
 type AdminTab = typeof VALID_TABS[number];
 
 export default function AdminDashboard() {
@@ -1444,6 +1445,7 @@ export default function AdminDashboard() {
         submissions: "Submissions",
         mixing: "Mixing orders",
         featured: "Featured",
+        events: "Events",
         applications: "Applications",
         broadcast: "Broadcast",
         inbox: "Inbox",
@@ -2718,6 +2720,13 @@ export default function AdminDashboard() {
                     {activeTab === "featured" && (
                         <div className="animate-in fade-in duration-300">
                             <AdminFeatured />
+                        </div>
+                    )}
+
+                    {/* EVENTS VIEW */}
+                    {activeTab === "events" && (
+                        <div className="animate-in fade-in duration-300">
+                            <AdminEvents />
                         </div>
                     )}
 

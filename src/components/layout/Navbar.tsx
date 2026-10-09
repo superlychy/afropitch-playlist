@@ -16,6 +16,7 @@ const menuGroups: MenuGroup[] = [
         links: [
             { name: "Playlists", href: "/playlists", description: "Curated Afrobeat playlists" },
             { name: "Featured", href: "/featured", description: "Artist of the week" },
+            { name: "Events", href: "/events", description: "Concerts and festivals" },
             { name: "Mixed Songs", href: "/mixed", description: "Mixed by AfroPitch" },
         ],
     },

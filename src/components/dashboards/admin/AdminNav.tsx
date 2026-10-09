@@ -3,6 +3,7 @@
 import {
     Home, ListMusic, History, Wallet, Users, MessageSquare, Settings,
     Star, Send, Mail, BarChart3, DollarSign, UserPlus, MoreHorizontal, LogOut, X, AudioWaveform,
+    CalendarDays,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -32,6 +33,7 @@ const MANAGE_ITEMS: NavItem[] = [
     { tab: "users", label: "Users", icon: Users },
     { tab: "support", label: "Support", icon: MessageSquare, count: 0 },
     { tab: "featured", label: "Featured", icon: Star },
+    { tab: "events", label: "Events", icon: CalendarDays },
     { tab: "broadcast", label: "Broadcast", icon: Send },
     { tab: "inbox", label: "Inbox", icon: Mail },
 ];
@@ -206,6 +208,7 @@ const MORE_ITEMS: NavItem[] = [
     { tab: "support", label: "Support tickets", icon: MessageSquare },
     { tab: "mixing", label: "Mixing orders", icon: Settings },
     { tab: "featured", label: "Featured", icon: Star },
+    { tab: "events", label: "Events", icon: CalendarDays },
     { tab: "broadcast", label: "Broadcast", icon: Send },
     { tab: "inbox", label: "Inbox", icon: Mail },
     { tab: "analytics", label: "Analytics", icon: BarChart3 },
