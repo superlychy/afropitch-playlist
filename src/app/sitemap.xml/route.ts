@@ -11,6 +11,7 @@ export async function GET() {
     { url: "/pricing", priority: "0.9", changefreq: "weekly" },
     { url: "/mixing", priority: "0.9", changefreq: "weekly" },
     { url: "/featured", priority: "0.8", changefreq: "weekly" },
+    { url: "/events", priority: "0.8", changefreq: "weekly" },
     { url: "/mixed", priority: "0.8", changefreq: "weekly" },
     { url: "/how-it-works", priority: "0.8", changefreq: "monthly" },
     { url: "/trust", priority: "0.8", changefreq: "monthly" },
@@ -50,6 +51,25 @@ export async function GET() {
     for (const row of data ?? []) {
       const slug = (row as { slug: string }).slug;
       if (slug) routes.push({ url: `/featured/${slug}`, priority: "0.7", changefreq: "monthly" });
+    }
+  } catch {
+    // sitemap still serves the static routes if the DB lookup fails
+  }
+
+  // Published event pages (SEO: one URL per event)
+  try {
+    const sbEv = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+    const { data: evs } = await sbEv
+      .from("events")
+      .select("slug")
+      .eq("status", "published")
+      .not("slug", "is", null);
+    for (const row of evs ?? []) {
+      const slug = (row as { slug: string }).slug;
+      if (slug) routes.push({ url: `/events/${slug}`, priority: "0.7", changefreq: "weekly" });
     }
   } catch {
     // sitemap still serves the static routes if the DB lookup fails
