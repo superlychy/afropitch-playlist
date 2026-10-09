@@ -15,7 +15,6 @@ export const metadata: Metadata = {
         "african award shows",
         "lagos concerts",
         "amapiano events",
-        "AfroPitch events",
     ],
     openGraph: {
         title: "African Music Events | AfroPitch",
