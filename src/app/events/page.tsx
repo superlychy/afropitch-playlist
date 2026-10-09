@@ -130,9 +130,6 @@ export default async function EventsPage() {
     return (
         <main className="w-full mx-auto max-w-4xl px-4 py-16 md:py-24">
             <div className="text-center space-y-4 mb-12">
-                <div className="inline-block rounded-full border border-yellow-500/30 bg-yellow-950/30 px-4 py-1.5 text-sm text-yellow-300">
-                    🎟️ AfroPitch Events
-                </div>
                 <h1 className="text-4xl font-bold tracking-tight text-white sm:text-5xl">
                     AfroPitch <span className="text-yellow-400">Events</span>
                 </h1>
