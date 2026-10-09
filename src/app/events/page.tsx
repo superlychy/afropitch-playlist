@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { CalendarDays, MapPin, Ticket } from "lucide-react";
 
 export const metadata: Metadata = {
-    title: "AfroPitch Events | AfroPitch",
+    title: "African Music Events | AfroPitch",
     description:
         "Discover concerts, festivals, award shows and industry events across Nigeria and Africa. Never miss the shows that matter, from Felabration to the next big night in Lagos.",
     keywords: [
@@ -18,7 +18,7 @@ export const metadata: Metadata = {
         "AfroPitch events",
     ],
     openGraph: {
-        title: "AfroPitch Events | AfroPitch",
+        title: "African Music Events | AfroPitch",
         description:
             "Concerts, festivals, award shows and industry events across Nigeria and Africa. Find your next night out.",
         url: "https://afropitchplay.best/events",
@@ -131,7 +131,7 @@ export default async function EventsPage() {
         <main className="w-full mx-auto max-w-4xl px-4 py-16 md:py-24">
             <div className="text-center space-y-4 mb-12">
                 <h1 className="text-4xl font-bold tracking-tight text-white sm:text-5xl">
-                    AfroPitch <span className="text-yellow-400">Events</span>
+                    African music <span className="text-yellow-400">events</span>
                 </h1>
                 <p className="text-xl text-gray-400 max-w-2xl mx-auto">
                     Concerts, festivals, award shows and industry nights across

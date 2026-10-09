@@ -63,15 +63,15 @@ export async function generateMetadata({
 
     const description =
         event.description?.slice(0, 160) ??
-        `${event.title} in ${event.city}, ${event.country}. Dates, venue and tickets on AfroPitch Events.`;
+        `${event.title} in ${event.city}, ${event.country}. Dates, venue and tickets on AfroPitch.`;
     const categoryLabel = CATEGORY_LABELS[event.category] ?? event.category;
 
     return {
-        title: `${event.title} | AfroPitch Events`,
+        title: `${event.title} | AfroPitch`,
         description,
         keywords: [event.title, `${categoryLabel} ${event.city}`, `events in ${event.city}`, event.venue ?? "", "AfroPitch", "african music events"].filter(Boolean),
         openGraph: {
-            title: `${event.title} | AfroPitch Events`,
+            title: `${event.title} | AfroPitch`,
             description,
             url: `${siteUrl}/events/${event.slug}`,
             type: "article",
@@ -79,7 +79,7 @@ export async function generateMetadata({
         },
         twitter: {
             card: "summary_large_image",
-            title: `${event.title} | AfroPitch Events`,
+            title: `${event.title} | AfroPitch`,
             description,
             ...(event.image_url ? { images: [event.image_url] } : {}),
         },
