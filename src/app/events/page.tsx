@@ -112,6 +112,37 @@ function EventCard({ event, live }: { event: EventRow; live?: boolean }) {
     );
 }
 
+export async function generateMetadata({
+    searchParams,
+}: {
+    searchParams: Promise<{ page?: string; category?: string }>;
+}): Promise<Metadata> {
+    const { page: pageParam, category: categoryParam } = await searchParams;
+    const page = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
+    const category = Object.keys(CATEGORY_LABELS).includes(categoryParam ?? "")
+        ? (categoryParam as string)
+        : null;
+    const qs = new URLSearchParams({
+        ...(page > 1 ? { page: String(page) } : {}),
+        ...(category ? { category } : {}),
+    }).toString();
+    const catName = category ? ` ${CATEGORY_LABELS[category]}` : "";
+    return {
+        title: `African Music Events${catName} | AfroPitch`,
+        description:
+            "Discover concerts, festivals, award shows and industry events across Nigeria and Africa. Never miss the shows that matter, from Felabration to the next big night in Lagos.",
+        alternates: {
+            canonical: `https://afropitchplay.best/events${qs ? `?${qs}` : ""}`,
+        },
+        openGraph: {
+            title: `African Music Events${catName} | AfroPitch`,
+            description:
+                "Concerts, festivals, award shows and industry nights across Nigeria and Africa.",
+            url: `https://afropitchplay.best/events${qs ? `?${qs}` : ""}`,
+        },
+    };
+}
+
 export default async function EventsPage({
     searchParams,
 }: {
