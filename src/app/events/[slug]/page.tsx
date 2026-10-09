@@ -97,6 +97,12 @@ export default async function EventDetailPage({
     const event = await getEvent(slug);
     if (!event) notFound();
 
+    // Logged-in users get reminder emails without typing their address.
+    const {
+        data: { user },
+    } = await (await createClient()).auth.getUser();
+    const userEmail = user?.email ?? null;
+
     // Traction metric: log the view. Fire-and-forget so a logging failure
     // can never break the page render.
     createClient()
@@ -234,6 +240,7 @@ export default async function EventDetailPage({
                             venue: event.venue,
                             city: event.city,
                         }}
+                        userEmail={userEmail}
                     />
                 )}
             </div>

@@ -44,7 +44,15 @@ function downloadIcs(info: EventReminderInfo) {
     URL.revokeObjectURL(url);
 }
 
-export function InterestButtons({ eventId, event }: { eventId: string; event: EventReminderInfo }) {
+export function InterestButtons({
+    eventId,
+    event,
+    userEmail,
+}: {
+    eventId: string;
+    event: EventReminderInfo;
+    userEmail: string | null;
+}) {
     const [mine, setMine] = useState<Vote>(null);
     const [busy, setBusy] = useState(false);
     const [showReminder, setShowReminder] = useState(false);
@@ -94,15 +102,15 @@ export function InterestButtons({ eventId, event }: { eventId: string; event: Ev
         }
     };
 
-    const saveEmailReminder = async () => {
-        if (remindBusy || !email.trim()) return;
+    const saveEmailReminder = async (address: string) => {
+        if (remindBusy || !address.trim()) return;
         setRemindBusy(true);
         setRemindMsg(null);
         try {
             const res = await fetch("/api/events/remind", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ event_id: eventId, email: email.trim() }),
+                body: JSON.stringify({ event_id: eventId, email: address.trim() }),
             });
             const d = await res.json().catch(() => ({}));
             if (d.ok) {
@@ -165,6 +173,7 @@ export function InterestButtons({ eventId, event }: { eventId: string; event: Ev
                         </div>
                         <p className="text-sm text-gray-400 mb-5">
                             You're interested in {event.title}. Want us to remind you before it starts?
+                            {userEmail && <span className="block mt-1 text-gray-500">We'll email {userEmail}.</span>}
                         </p>
                         {!remindDone ? (
                             <div className="space-y-3">
@@ -175,23 +184,34 @@ export function InterestButtons({ eventId, event }: { eventId: string; event: Ev
                                     <CalendarPlus className="w-4 h-4" />
                                     Add to my calendar
                                 </button>
-                                <div className="flex gap-2">
-                                    <input
-                                        type="email"
-                                        value={email}
-                                        onChange={(e) => setEmail(e.target.value)}
-                                        placeholder="Email address"
-                                        className="flex-1 min-w-0 rounded-xl border border-white/15 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-yellow-500/50"
-                                    />
+                                {userEmail ? (
                                     <button
-                                        onClick={saveEmailReminder}
-                                        disabled={remindBusy || !email.trim()}
-                                        className="inline-flex items-center gap-2 rounded-xl bg-yellow-500 hover:bg-yellow-400 disabled:opacity-60 px-4 py-3 text-sm font-bold text-black transition-colors"
+                                        onClick={() => saveEmailReminder(userEmail)}
+                                        disabled={remindBusy}
+                                        className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-yellow-500 hover:bg-yellow-400 disabled:opacity-60 px-4 py-3 text-sm font-bold text-black transition-colors"
                                     >
                                         <Mail className="w-4 h-4" />
-                                        {remindBusy ? "Saving…" : "Remind me"}
+                                        {remindBusy ? "Saving…" : `Email me a reminder`}
                                     </button>
-                                </div>
+                                ) : (
+                                    <div className="flex gap-2">
+                                        <input
+                                            type="email"
+                                            value={email}
+                                            onChange={(e) => setEmail(e.target.value)}
+                                            placeholder="Email address"
+                                            className="flex-1 min-w-0 rounded-xl border border-white/15 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-yellow-500/50"
+                                        />
+                                        <button
+                                            onClick={() => saveEmailReminder(email)}
+                                            disabled={remindBusy || !email.trim()}
+                                            className="inline-flex items-center gap-2 rounded-xl bg-yellow-500 hover:bg-yellow-400 disabled:opacity-60 px-4 py-3 text-sm font-bold text-black transition-colors"
+                                        >
+                                            <Mail className="w-4 h-4" />
+                                            {remindBusy ? "Saving…" : "Remind me"}
+                                        </button>
+                                    </div>
+                                )}
                                 {remindMsg && <p className="text-xs text-gray-500">{remindMsg}</p>}
                             </div>
                         ) : (
