@@ -115,51 +115,73 @@ function EventCard({ event, live }: { event: EventRow; live?: boolean }) {
 export default async function EventsPage({
     searchParams,
 }: {
-    searchParams: Promise<{ page?: string }>;
+    searchParams: Promise<{ page?: string; category?: string }>;
 }) {
-    const { page: pageParam } = await searchParams;
+    const { page: pageParam, category: categoryParam } = await searchParams;
     const page = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
+    const category = Object.keys(CATEGORY_LABELS).includes(categoryParam ?? "")
+        ? (categoryParam as string)
+        : null;
     const supabase = await createClient();
     const nowIso = new Date().toISOString();
     const baseSelect =
         "id, title, slug, starts_at, ends_at, venue, city, country, image_url, description, category";
 
+    const applyCategory = <T,>(q: T): T => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const query = q as any;
+        return (category ? query.eq("category", category) : query) as T;
+    };
+
     // Happening now (shown on page 1 only).
     const { data: liveData } =
         page === 1
-            ? await supabase
-                  .from("events")
-                  .select(baseSelect)
-                  .eq("status", "published")
-                  .lte("starts_at", nowIso)
-                  .gte("ends_at", nowIso)
-                  .order("starts_at", { ascending: true })
+            ? await applyCategory(
+                  supabase
+                      .from("events")
+                      .select(baseSelect)
+                      .eq("status", "published")
+                      .lte("starts_at", nowIso)
+                      .gte("ends_at", nowIso)
+                      .order("starts_at", { ascending: true })
+              )
             : { data: [] };
 
     // Upcoming, nearest first, paginated.
     const from = (page - 1) * PER_PAGE;
     const to = from + PER_PAGE - 1;
-    const { data: upcomingData, count: upcomingCount } = await supabase
-        .from("events")
-        .select(baseSelect, { count: "exact" })
-        .eq("status", "published")
-        .gt("starts_at", nowIso)
-        .order("starts_at", { ascending: true })
-        .range(from, to);
+    const { data: upcomingData, count: upcomingCount } = await applyCategory(
+        supabase
+            .from("events")
+            .select(baseSelect, { count: "exact" })
+            .eq("status", "published")
+            .gt("starts_at", nowIso)
+            .order("starts_at", { ascending: true })
+            .range(from, to)
+    );
 
     // Past events, most recent first (latest 12).
-    const { data: pastData } = await supabase
-        .from("events")
-        .select(baseSelect)
-        .eq("status", "published")
-        .lt("ends_at", nowIso)
-        .order("ends_at", { ascending: false })
-        .limit(12);
+    const { data: pastData } = await applyCategory(
+        supabase
+            .from("events")
+            .select(baseSelect)
+            .eq("status", "published")
+            .lt("ends_at", nowIso)
+            .order("ends_at", { ascending: false })
+            .limit(12)
+    );
 
     const live = (liveData ?? []) as EventRow[];
     const upcoming = (upcomingData ?? []) as EventRow[];
     const past = (pastData ?? []) as EventRow[];
     const totalPages = Math.max(1, Math.ceil((upcomingCount ?? 0) / PER_PAGE));
+    const catParam = (p: number) => {
+        const qs = new URLSearchParams({
+            ...(p > 1 ? { page: String(p) } : {}),
+            ...(category ? { category } : {}),
+        }).toString();
+        return qs ? `/events?${qs}` : "/events";
+    };
 
     return (
         <main className="w-full mx-auto max-w-4xl px-4 py-16 md:py-24">
@@ -171,6 +193,32 @@ export default async function EventsPage({
                     Concerts, festivals, award shows and industry nights across
                     Nigeria and Africa. Find your next night out.
                 </p>
+            </div>
+
+            <div className="flex flex-wrap justify-center gap-2 mb-12">
+                <Link
+                    href="/events"
+                    className={`rounded-full px-4 py-1.5 text-sm font-semibold transition-colors ${
+                        !category
+                            ? "bg-yellow-500 text-black"
+                            : "border border-white/15 bg-white/5 text-gray-300 hover:border-yellow-500/40"
+                    }`}
+                >
+                    All
+                </Link>
+                {Object.entries(CATEGORY_LABELS).map(([key, label]) => (
+                    <Link
+                        key={key}
+                        href={`/events?category=${key}`}
+                        className={`rounded-full px-4 py-1.5 text-sm font-semibold transition-colors ${
+                            category === key
+                                ? "bg-yellow-500 text-black"
+                                : "border border-white/15 bg-white/5 text-gray-300 hover:border-yellow-500/40"
+                        }`}
+                    >
+                        {label}
+                    </Link>
+                ))}
             </div>
 
             {live.length > 0 && (
@@ -199,7 +247,7 @@ export default async function EventsPage({
                             <div className="flex items-center justify-center gap-2 mt-8">
                                 {page > 1 ? (
                                     <Link
-                                        href={page === 2 ? "/events" : `/events?page=${page - 1}`}
+                                        href={catParam(page - 1)}
                                         className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-gray-300 hover:border-yellow-500/40 transition-colors"
                                     >
                                         ← Previous
@@ -214,7 +262,7 @@ export default async function EventsPage({
                                 </span>
                                 {page < totalPages ? (
                                     <Link
-                                        href={`/events?page=${page + 1}`}
+                                        href={catParam(page + 1)}
                                         className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-gray-300 hover:border-yellow-500/40 transition-colors"
                                     >
                                         Next →
