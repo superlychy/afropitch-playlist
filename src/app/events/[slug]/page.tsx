@@ -68,7 +68,9 @@ export async function generateMetadata({
     const categoryLabel = CATEGORY_LABELS[event.category] ?? event.category;
 
     return {
-        title: `${event.title} | AfroPitch`,
+        // Root layout appends "| AfroPitch Playlist" via its title template;
+        // keep this short and name-led so Google doesn't rewrite it.
+        title: event.title,
         description,
         keywords: [event.title, `${categoryLabel} ${event.city}`, `events in ${event.city}`, event.venue ?? "", "AfroPitch", "african music events"].filter(Boolean),
         openGraph: {
