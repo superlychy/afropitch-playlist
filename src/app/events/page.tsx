@@ -4,27 +4,6 @@ import { createClient } from "@/lib/supabase-server";
 import { Card, CardContent } from "@/components/ui/card";
 import { CalendarDays, MapPin, Ticket } from "lucide-react";
 
-export const metadata: Metadata = {
-    title: "African Music Events | AfroPitch",
-    description:
-        "Discover concerts, festivals, award shows and industry events across Nigeria and Africa. Never miss the shows that matter, from Felabration to the next big night in Lagos.",
-    keywords: [
-        "african music events",
-        "afrobeats concerts",
-        "nigeria music festivals",
-        "african award shows",
-        "lagos concerts",
-        "amapiano events",
-    ],
-    openGraph: {
-        title: "African Music Events | AfroPitch",
-        description:
-            "Concerts, festivals, award shows and industry events across Nigeria and Africa. Find your next night out.",
-        url: "https://afropitchplay.best/events",
-        type: "website",
-    },
-};
-
 interface EventRow {
     id: string;
     title: string;
@@ -131,6 +110,14 @@ export async function generateMetadata({
         title: `African Music Events${catName} | AfroPitch`,
         description:
             "Discover concerts, festivals, award shows and industry events across Nigeria and Africa. Never miss the shows that matter, from Felabration to the next big night in Lagos.",
+        keywords: [
+            "african music events",
+            "afrobeats concerts",
+            "nigeria music festivals",
+            "african award shows",
+            "lagos concerts",
+            "amapiano events",
+        ],
         alternates: {
             canonical: `https://afropitchplay.best/events${qs ? `?${qs}` : ""}`,
         },
@@ -139,6 +126,7 @@ export async function generateMetadata({
             description:
                 "Concerts, festivals, award shows and industry nights across Nigeria and Africa.",
             url: `https://afropitchplay.best/events${qs ? `?${qs}` : ""}`,
+            type: "website",
         },
     };
 }
