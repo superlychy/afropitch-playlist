@@ -74,7 +74,10 @@ export async function generateMetadata({
     const image = feature.photo_url ?? feature.cover_art_url;
 
     return {
-        title: `${name}: ${tier} | AfroPitch`,
+        // Note: the root layout appends "| AfroPitch Playlist" via its title
+        // template, so we keep this short and name-led to avoid Google
+        // rewriting it.
+        title: `${name}: ${tier}`,
         description,
         keywords: [name, "afrobeats artist", "african musician", "featured artist", "AfroPitch", feature.song_title ?? ""].filter(Boolean),
         openGraph: {
@@ -145,9 +148,28 @@ export default async function FeaturedArtistPage({
             : {}),
     };
 
+    // FAQ markup from the questionnaire Q&A ("In <name>'s words" section).
+    // This is what makes Google eligible to show the artist's own answers
+    // in search results and ties the page to the artist's name.
+    const faqLd =
+        feature.qa && feature.qa.length > 0
+            ? {
+                  "@context": "https://schema.org",
+                  "@type": "FAQPage",
+                  mainEntity: feature.qa.map((item) => ({
+                      "@type": "Question",
+                      name: item.q,
+                      acceptedAnswer: { "@type": "Answer", text: item.a },
+                  })),
+              }
+            : null;
+
     return (
         <main className="w-full mx-auto max-w-3xl px-4 py-16 md:py-24">
             <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+            {faqLd && (
+                <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqLd) }} />
+            )}
             <Link href="/featured" className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-yellow-400 mb-8">
                 <ArrowLeft className="w-4 h-4" /> All featured artists
             </Link>
