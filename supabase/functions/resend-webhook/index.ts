@@ -103,8 +103,8 @@ serve(async (req) => {
                 from_email: fromAddr,
                 to_email: toAddr,
                 subject: data.subject || '',
-                body_text: (data.text || '').substring(0, 5000),
-                body_html: (data.html || '').substring(0, 5000),
+                body_text: (data.text || ''),
+                body_html: (data.html || ''),
             });
             if (logError) console.error('Failed to log inbound email:', logError);
 
@@ -125,8 +125,8 @@ serve(async (req) => {
                 from_email: typeof payload.from === 'string' ? payload.from : JSON.stringify(payload.from),
                 to_email: Array.isArray(payload.to) ? (payload.to[0] || 'unknown') : (payload.to || 'unknown'),
                 subject: payload.subject || '',
-                body_text: (payload.text || '').substring(0, 5000),
-                body_html: (payload.html || '').substring(0, 5000),
+                body_text: (payload.text || ''),
+                body_html: (payload.html || ''),
             });
             if (logError) console.error('Failed to log inbound email:', logError);
 

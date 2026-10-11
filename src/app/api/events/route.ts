@@ -118,8 +118,8 @@ export async function POST(request: Request) {
                                 from_email: typeof f.from === 'string' ? f.from : 'unknown',
                                 to_email: toAddr,
                                 subject: f.subject || '',
-                                body_text: bodyText.substring(0, 5000),
-                                body_html: (f.html || '').substring(0, 5000),
+                                body_text: bodyText,
+                                body_html: f.html || '',
                                 message_id: dedupeKey,
                             });
                             if (insertError) throw new Error('DB insert error: ' + insertError.message);
@@ -199,15 +199,17 @@ export async function POST(request: Request) {
             console.log('📤 Sent Email via Webhook:', { from, to, subject });
 
             try {
-                // Dedupe: mail composed in the admin panel already has a
-                // full-body log (admin_custom_email_sent / admin_message_sent)
-                // carrying this resend_id — don't log it twice.
+                // Dedupe: mail composed in the admin panel or sent by the
+                // notify-user function already has a full-body log
+                // (admin_custom_email_sent / admin_message_sent /
+                // automated_email_sent) carrying this resend_id — don't log
+                // it twice.
                 let alreadyLogged = false;
                 if (emailId) {
                     const { data: existing } = await supabase
                         .from('system_logs')
                         .select('id')
-                        .in('event_type', ['admin_custom_email_sent', 'admin_message_sent'])
+                        .in('event_type', ['admin_custom_email_sent', 'admin_message_sent', 'automated_email_sent'])
                         .eq('event_data->>resend_id', emailId)
                         .limit(1);
                     alreadyLogged = !!existing && existing.length > 0;

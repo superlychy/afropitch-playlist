@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useToast } from "@/components/ui/toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -62,6 +62,8 @@ interface SentEmail {
   subject: string;
   preview: string;
   message?: string;
+  body_html?: string;
+  label?: string | null;
   status: string;
   sent_by: string | null;
   created_at: string;
@@ -194,11 +196,16 @@ function TicketThread({ ticketId }: { ticketId: string }) {
   );
 }
 
+const SENT_FETCH_SIZE = 50; // raw rows per page; dedupe shrinks it
+
 export function AdminInbox() {
   const { toast } = useToast();
   const [emails, setEmails] = useState<Email[]>([]);
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
-  const [sentEmails, setSentEmails] = useState<SentEmail[]>([]);
+  const [sentRaw, setSentRaw] = useState<any[]>([]);
+  const [sentOffset, setSentOffset] = useState(0);
+  const [hasMoreSent, setHasMoreSent] = useState(false);
+  const [loadingMoreSent, setLoadingMoreSent] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [activeView, setActiveView] = useState<"inbox" | "compose" | "tickets" | "sent">("inbox");
   const [searchTerm, setSearchTerm] = useState("");
@@ -277,44 +284,7 @@ export function AdminInbox() {
 
         if (tix) setTickets(tix as any);
 
-        // Fetch sent emails: admin-composed (full body) + webhook-captured
-        // (every other email sent from the domain). Newest first.
-        const { data: sentLogs } = await supabase
-          .from("system_logs")
-          .select("*")
-          .in("event_type", ["admin_custom_email_sent", "admin_message_sent", "email_sent"])
-          .order("created_at", { ascending: false })
-          .limit(100);
-
-        if (sentLogs) {
-          // Dedupe: if the email.sent webhook fired before the admin send
-          // route saved its resend_id, both rows exist — keep the admin one
-          // (it has the full body).
-          const adminResendIds = new Set(
-            sentLogs
-              .filter((l: any) => l.event_type !== "email_sent" && l.event_data?.resend_id)
-              .map((l: any) => l.event_data.resend_id)
-          );
-          const deduped = sentLogs.filter(
-            (l: any) =>
-              l.event_type !== "email_sent" ||
-              !l.event_data?.resend_id ||
-              !adminResendIds.has(l.event_data.resend_id)
-          );
-          setSentEmails(
-            deduped.slice(0, 50).map((l: any) => ({
-              id: l.id,
-              to_email: l.event_data?.to || "unknown",
-              from_email: l.event_data?.from || "",
-              subject: l.event_data?.subject || "No subject",
-              preview: l.event_data?.message_preview || "",
-              message: l.event_data?.message || "",
-              status: l.event_data?.status || "unknown",
-              sent_by: l.event_data?.sent_by || null,
-              created_at: l.created_at,
-            }))
-          );
-        }
+        await fetchSent(false);
       }
     } catch (err) {
       console.error("Inbox fetch error:", err);
@@ -323,6 +293,75 @@ export function AdminInbox() {
       setLoadingMore(false);
     }
   };
+
+  // Sent tab: true pagination over system_logs. Fetches raw rows newest-first
+  // with .range(); dedupe + mapping happen in the sentEmails memo below so
+  // pairs split across page boundaries still resolve correctly.
+  const fetchSent = async (append = false) => {
+    if (append) setLoadingMoreSent(true);
+    try {
+      const from = append ? sentOffset : 0;
+      const { data: sentLogs } = await supabase
+        .from("system_logs")
+        .select("*")
+        .in("event_type", [
+          "admin_custom_email_sent",
+          "admin_message_sent",
+          "automated_email_sent",
+          "email_sent",
+        ])
+        .order("created_at", { ascending: false })
+        .range(from, from + SENT_FETCH_SIZE - 1);
+      if (sentLogs) {
+        setSentRaw((prev) => (append ? [...prev, ...sentLogs] : sentLogs));
+        setSentOffset(from + sentLogs.length);
+        setHasMoreSent(sentLogs.length === SENT_FETCH_SIZE);
+      } else if (!append) {
+        setSentRaw([]);
+        setSentOffset(0);
+        setHasMoreSent(false);
+      }
+    } catch (err) {
+      console.error("Sent fetch error:", err);
+    } finally {
+      if (append) setLoadingMoreSent(false);
+    }
+  };
+
+  // Dedupe: if the email.sent webhook fired before the admin/automated send
+  // logged its resend_id, both rows exist — keep the full-body one.
+  // automated_email_sent rows (from the notify-user function) carry the full
+  // subject + body, so they are preferred over webhook rows.
+  const sentEmails: SentEmail[] = useMemo(() => {
+    const fullBodyResendIds = new Set(
+      sentRaw
+        .filter((l: any) => l.event_type !== "email_sent" && l.event_data?.resend_id)
+        .map((l: any) => l.event_data.resend_id)
+    );
+    const deduped = sentRaw.filter(
+      (l: any) =>
+        l.event_type !== "email_sent" ||
+        !l.event_data?.resend_id ||
+        !fullBodyResendIds.has(l.event_data.resend_id)
+    );
+    return deduped.map((l: any) => {
+      const bodyText = l.event_data?.body_text || l.event_data?.message || "";
+      return {
+        id: l.id,
+        to_email: l.event_data?.to || "unknown",
+        from_email: l.event_data?.from || "",
+        subject: l.event_data?.subject || "No subject",
+        preview:
+          l.event_data?.message_preview || bodyText.slice(0, 140) || "",
+        message: bodyText,
+        body_html: l.event_data?.body_html || "",
+        label: l.event_data?.label || null,
+        status: l.event_data?.status || "unknown",
+        sent_by: l.event_data?.sent_by || null,
+        created_at: l.created_at,
+      };
+    });
+  }, [sentRaw]);
 
   // Mark an inbox message as read (persists per admin, cross-device).
   const markAsRead = async (email: Email) => {
@@ -788,15 +827,23 @@ export function AdminInbox() {
                       <p className="text-gray-400">
                         <span className="text-gray-500">Subject:</span> {email.subject}
                       </p>
+                      {email.label && (
+                        <p className="text-gray-400">
+                          <span className="text-gray-500">Type:</span>{" "}
+                          <span className="text-[10px] px-2 py-0.5 rounded-full font-bold uppercase bg-purple-500/20 text-purple-400">
+                            {email.label.replace(/_/g, " ")}
+                          </span>
+                        </p>
+                      )}
                     </div>
                     <div className="text-sm text-gray-200 whitespace-pre-wrap mb-3">
                       {email.message || email.preview || "(No content)"}
                     </div>
-                    {email.message ? null : (
+                    {!email.message && !email.body_html ? (
                       <p className="text-xs text-gray-500 mb-2">
                         Full text is not available for this message — it was sent outside the admin panel.
                       </p>
-                    )}
+                    ) : null}
                     {email.sent_by && (
                       <p className="text-xs text-gray-500">Sent by {email.sent_by}</p>
                     )}
@@ -805,6 +852,25 @@ export function AdminInbox() {
               </CardContent>
             </Card>
           ))}
+          {hasMoreSent && (
+            <div className="text-center pt-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => fetchSent(true)}
+                disabled={loadingMoreSent}
+                className="border-white/10"
+              >
+                {loadingMoreSent ? (
+                  <>
+                    <RefreshCw className="w-3 h-3 mr-1 animate-spin" /> Loading…
+                  </>
+                ) : (
+                  "Load more"
+                )}
+              </Button>
+            </div>
+          )}
         </div>
       )}
 

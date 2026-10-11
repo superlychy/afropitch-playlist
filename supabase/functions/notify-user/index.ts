@@ -138,7 +138,7 @@ async function handleTransaction(record: any) {
         dashboardLink: `${SITE_URL}/dashboard/artist` // Generic link, role detection tough here without more queries
     });
 
-    await sendEmail(user.email, subject, html);
+    await sendEmail(user.email, subject, html, undefined, 'transaction_receipt');
 }
 
 async function handleSubmissionInsert(record: any) {
@@ -176,7 +176,7 @@ async function handleSubmissionInsert(record: any) {
             </div>
     `);
 
-    await sendEmail(curator.email, subject, html);
+    await sendEmail(curator.email, subject, html, undefined, 'new_submission_curator_alert');
 }
 
 async function handleSubmissionUpdate(record: any) {
@@ -208,7 +208,7 @@ async function handleSubmissionUpdate(record: any) {
             dashboardLink: `${SITE_URL}/dashboard/artist`,
             trackingLink: trackingLink
         });
-        await sendEmail(user.email, subject, html);
+        await sendEmail(user.email, subject, html, undefined, 'submission_approved');
     }
     else if (record.status === 'declined') {
         const subject = `Update on your submission to ${playlistName}`;
@@ -225,7 +225,7 @@ async function handleSubmissionUpdate(record: any) {
             currency: CURRENCY,
             dashboardLink: `${SITE_URL}/dashboard/artist`
         });
-        await sendEmail(user.email, subject, html);
+        await sendEmail(user.email, subject, html, undefined, 'submission_declined');
     }
 }
 
@@ -247,7 +247,7 @@ async function handleRankingBoost(record: any) {
             </div>
     `);
 
-    await sendEmail(user.email, subject, html);
+    await sendEmail(user.email, subject, html, undefined, 'ranking_boost');
 }
 
 async function handleWithdrawalUpdate(record: any) {
@@ -269,7 +269,7 @@ async function handleWithdrawalUpdate(record: any) {
     // Since I have transaction receipt, that covers the financial movement. 
     // This is just a status alert.
 
-    await sendEmail(user.email, subject, html);
+    await sendEmail(user.email, subject, html, undefined, 'withdrawal_update');
 }
 
 async function handleSupportInsert(record: any) {
@@ -292,7 +292,7 @@ async function handleSupportInsert(record: any) {
             subject: record.subject,
             dashboardLink: record.user_id ? `${SITE_URL}/dashboard/artist` : SITE_URL,
         });
-        await sendEmail(toEmail, `Support ticket received: ${record.subject}`, html);
+        await sendEmail(toEmail, `Support ticket received: ${record.subject}`, html, undefined, 'support_ticket_received');
     }
     // Notify the admin so chat tickets don't sit unseen.
     const adminHtml = getSupportTicketAdminTemplate({
@@ -301,7 +301,7 @@ async function handleSupportInsert(record: any) {
         snippet: String(record.message || '').replace(/^From:.*\n\n/, '').slice(0, 400),
         dashboardLink: `${SITE_URL}/dashboard/admin`,
     });
-    await sendEmail('admin@afropitchplay.best', `New support ticket: ${record.subject}`, adminHtml);
+    await sendEmail('admin@afropitchplay.best', `New support ticket: ${record.subject}`, adminHtml, undefined, 'support_ticket_admin_alert');
 }
 
 async function handleSupportUpdate(record: any) {
@@ -316,7 +316,7 @@ async function handleSupportUpdate(record: any) {
         dashboardLink: `${SITE_URL}/dashboard` // generic
     });
 
-    await sendEmail(user.email, subject, html);
+    await sendEmail(user.email, subject, html, undefined, 'support_ticket_update');
 }
 
 async function handleCuratorApplicationUpdate(record: any) {
@@ -331,14 +331,14 @@ async function handleCuratorApplicationUpdate(record: any) {
             playlistLink: record.playlist_link || '',
             signupLink: `${SITE_URL}/signup/curator`,
         });
-        await sendEmail(email, subject, html);
+        await sendEmail(email, subject, html, undefined, 'curator_application_approved');
     } else if (record.status === 'rejected') {
         const subject = `Update on your AfroPitch curator application`;
         const html = getCuratorRejectedTemplate({
             name,
             dashboardLink: SITE_URL,
         });
-        await sendEmail(email, subject, html);
+        await sendEmail(email, subject, html, undefined, 'curator_application_rejected');
     }
 }
 async function handleProfileVerificationUpdate(record: any, old_record: any) {
@@ -354,14 +354,14 @@ async function handleProfileVerificationUpdate(record: any, old_record: any) {
             name,
             dashboardLink: `${SITE_URL}/dashboard/curator`,
         });
-        await sendEmail(email, subject, html);
+        await sendEmail(email, subject, html, undefined, 'curator_verified');
     } else if (record.verification_status === 'rejected') {
         const subject = `Update on your AfroPitch curator verification`;
         const html = getCuratorRejectedTemplate({
             name,
             dashboardLink: `${SITE_URL}/dashboard/curator`,
         });
-        await sendEmail(email, subject, html);
+        await sendEmail(email, subject, html, undefined, 'curator_verification_rejected');
     }
 }
 async function handleMixingMessage(record: any) {
@@ -382,7 +382,7 @@ async function handleMixingMessage(record: any) {
             snippet: String(record.body || '').slice(0, 300),
             dashboardLink: `${SITE_URL}/dashboard/artist`,
         });
-        await sendEmail(artist.email, subject, html);
+        await sendEmail(artist.email, subject, html, undefined, 'mixing_message');
     }
 }
 
@@ -407,7 +407,7 @@ async function handleMixingRefund(record: any, old: any) {
             reason: record.refund_request_reason || 'No reason given.',
             dashboardLink: `${SITE_URL}/dashboard/admin`,
         });
-        await sendEmail('admin@afropitchplay.best', subject, html);
+        await sendEmail('admin@afropitchplay.best', subject, html, undefined, 'mixing_refund_requested');
     } else if (denied) {
         if (!artist || !artist.email) return;
         const subject = `Update on your refund request: ${record.song_title}`;
@@ -416,7 +416,7 @@ async function handleMixingRefund(record: any, old: any) {
             songTitle: record.song_title,
             dashboardLink: `${SITE_URL}/dashboard/artist`,
         });
-        await sendEmail(artist.email, subject, html);
+        await sendEmail(artist.email, subject, html, undefined, 'mixing_refund_denied');
     }
 }
 
@@ -560,7 +560,7 @@ async function handleBroadcast(record: any) {
                 ${unsubFooter}
         `);
 
-            await sendEmail(email, subject, html, listUnsubHeaders);
+            await sendEmail(email, subject, html, listUnsubHeaders, 'broadcast');
             sentCount++;
             // Rate limit
             await new Promise(r => setTimeout(r, 200));
@@ -569,8 +569,10 @@ async function handleBroadcast(record: any) {
     console.log(`✅ Broadcast complete. Email sent: ${sentCount} (skipped ${skippedUnsub} unsubscribed), in-app: ${inAppCount} (Target: ${targetRole}).`);
 }
 
-async function sendEmail(to: string, subject: string, html: string, headers?: Record<string, string>) {
+async function sendEmail(to: string, subject: string, html: string, headers?: Record<string, string>, label?: string) {
     console.log(`📧 Sending email to ${to}: ${subject}`);
+    let resendId: string | null = null;
+    let sendError: string | null = null;
     try {
         const { data, error } = await resend.emails.send({
             from: 'AfroPitch <notifications@afropitchplay.best>', // Using the new domain
@@ -582,10 +584,33 @@ async function sendEmail(to: string, subject: string, html: string, headers?: Re
 
         if (error) {
             console.error('Resend API Error:', error);
+            sendError = JSON.stringify(error);
         } else {
             console.log('Email sent successfully:', data);
+            resendId = (data as any)?.id ?? null;
         }
     } catch (e) {
         console.error("Exception sending email:", e);
+        sendError = e instanceof Error ? e.message : String(e);
+    }
+
+    // Full-body log for the admin Sent tab. Best-effort: never breaks sending.
+    try {
+        await supabase.from('system_logs').insert({
+            event_type: 'automated_email_sent',
+            event_data: {
+                to,
+                from: 'AfroPitch <notifications@afropitchplay.best>',
+                subject,
+                body_html: html,
+                body_text: html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(),
+                label: label || 'automated',
+                resend_id: resendId,
+                status: sendError ? 'failed' : 'sent',
+            },
+            user_id: null,
+        });
+    } catch (e) {
+        console.error('Failed to log automated email (non-fatal):', e);
     }
 }

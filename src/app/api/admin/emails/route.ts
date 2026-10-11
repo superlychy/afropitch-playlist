@@ -215,26 +215,39 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const limit = parseInt(searchParams.get("limit") || "25");
     const offset = parseInt(searchParams.get("offset") || "0");
-    const q = (searchParams.get("q") || "").trim().toLowerCase();
+    // Sanitize for PostgREST or() syntax: strip , ( ) % and backslash.
+    // ilike is case-insensitive, so no lowercasing needed.
+    const q = (searchParams.get("q") || "").trim().replace(/[%(),\\]/g, "");
     // Fetch a full window from each source so the merged list is a true
     // global newest-first across both sources (fixes dropped messages).
-    // When searching, pull a wider window so matches are not missed.
-    const window = q ? 500 : offset + limit;
+    // When searching, the match happens in the database across the full
+    // history (not just a JS-filtered window), capped at 200 per source.
+    const window = q ? 200 : offset + limit;
 
-    // Try inbound_emails table first
-    const { data: emails, error } = await supabase
+    // Try inbound_emails table first (search pushed into the database)
+    let inboundQuery = supabase
       .from("inbound_emails")
       .select("*, profiles(full_name, email)")
-      .order("created_at", { ascending: false })
-      .range(0, window - 1);
+      .order("created_at", { ascending: false });
+    if (q) {
+      inboundQuery = inboundQuery.or(
+        `subject.ilike.%${q}%,from_email.ilike.%${q}%,body_text.ilike.%${q}%`
+      );
+    }
+    const { data: emails, error } = await inboundQuery.range(0, window - 1);
 
     // Also include contact form messages (system_logs contact_message events)
-    const { data: contactLogs } = await supabase
+    let contactQuery = supabase
       .from("system_logs")
       .select("*")
       .eq("event_type", "contact_message")
-      .order("created_at", { ascending: false })
-      .range(0, window - 1);
+      .order("created_at", { ascending: false });
+    if (q) {
+      contactQuery = contactQuery.or(
+        `event_data->>subject.ilike.%${q}%,event_data->>sender.ilike.%${q}%,event_data->>message.ilike.%${q}%`
+      );
+    }
+    const { data: contactLogs } = await contactQuery.range(0, window - 1);
 
     const contactEmails = (contactLogs || []).map((l: any) => ({
       id: l.id,
@@ -264,14 +277,11 @@ export async function GET(req: Request) {
       (readLogs || []).map((l: any) => `${l.event_data?.source}:${l.event_data?.message_id}`)
     );
 
+    // When q is set, matching already happened in the database (ilike on
+    // subject/from_email/body_text for both sources); here we only merge and
+    // sort newest-first.
     const merged = [...tagged, ...contactEmails]
       .map((m: any) => ({ ...m, is_read: readSet.has(`${m.source}:${m.id}`) }))
-      .filter((m: any) =>
-        !q ||
-        (m.subject || "").toLowerCase().includes(q) ||
-        (m.from_email || "").toLowerCase().includes(q) ||
-        (m.body_text || "").toLowerCase().includes(q)
-      )
       .sort(
         (a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       );
