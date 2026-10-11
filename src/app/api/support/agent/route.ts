@@ -87,8 +87,23 @@ function extractReply(data: unknown): { reply: string; escalate: boolean; summar
     try {
         const parsed = JSON.parse(text) as { reply?: unknown; escalate?: unknown; summary?: unknown };
         if (parsed && typeof parsed.reply === "string") {
-            const summary = typeof parsed.summary === "string" ? parsed.summary.trim().slice(0, 1500) : "";
-            return { reply: parsed.reply.trim(), escalate: parsed.escalate === true, summary };
+            // The model sometimes double-encodes: the reply field itself is a
+            // JSON string like {"reply": "...", "escalate": false}. Unwrap it.
+            let replyText = parsed.reply;
+            let escalate = parsed.escalate === true;
+            let summary = typeof parsed.summary === "string" ? parsed.summary : "";
+            const inner = replyText.trim();
+            if (inner.startsWith("{") && inner.includes("\"reply\"")) {
+                try {
+                    const nested = JSON.parse(inner) as { reply?: unknown; escalate?: unknown; summary?: unknown };
+                    if (nested && typeof nested.reply === "string") {
+                        replyText = nested.reply;
+                        escalate = nested.escalate === true;
+                        if (typeof nested.summary === "string") summary = nested.summary;
+                    }
+                } catch { /* not actually nested — use the outer values */ }
+            }
+            return { reply: replyText.trim(), escalate, summary: summary.trim().slice(0, 1500) };
         }
     } catch {
         // Model ignored the JSON contract: fall through and use the raw text.
