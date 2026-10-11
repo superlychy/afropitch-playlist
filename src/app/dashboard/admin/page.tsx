@@ -99,6 +99,37 @@ interface TopPlaylist {
 const VALID_TABS = ["overview", "analytics", "users", "withdrawals", "transactions", "support", "playlists", "submissions", "mixing", "featured", "events", "applications", "broadcast", "inbox"] as const;
 type AdminTab = typeof VALID_TABS[number];
 
+// Guest tickets carry their identity in the message ("From: NAME <email>");
+// agent escalations carry a transcript. Both are unpacked so the ticket card
+// reads like every other card: who it is from, and what they actually said.
+function ticketFromHeader(t: any): { name: string; email: string } {
+    const m = String(t?.message || "").match(/^\s*From:\s*([^\n<]+?)\s*(?:<([^>]+)>)?\s*\n/);
+    return {
+        name: (m?.[1] || "").trim(),
+        email: (m?.[2] || "").trim() || String(t?.contact_email || "").trim(),
+    };
+}
+
+function ticketDisplayName(t: any): string {
+    const { name, email } = ticketFromHeader(t);
+    return name || email || t?.profiles?.full_name || "Unknown";
+}
+
+function ticketPreview(t: any): string {
+    let msg = String(t?.message || "").replace(/^\s*From:[^\n]*\n+/, "");
+    if (t?.subject === "Support agent escalation") {
+        msg = msg
+            .replace(/^Chat with AfroPitch Support agent:\s*\n+/, "")
+            .replace(/\n*The agent determined this needs a human\.\s*$/, "");
+        const visitorLine = msg
+            .split("\n")
+            .map(s => s.trim())
+            .find(s => /^visitor:/i.test(s));
+        if (visitorLine) return visitorLine.replace(/^visitor:\s*/i, "");
+    }
+    return msg.replace(/\s+/g, " ").trim();
+}
+
 export default function AdminDashboard() {
     const { user, isLoading, logout } = useAuth();
     const { toast } = useToast();
@@ -475,10 +506,10 @@ export default function AdminDashboard() {
             if (supportTicks) {
                 setTickets(supportTicks.map((t: any) => ({
                     id: t.id,
-                    user_name: t.profiles?.full_name || 'Unknown',
+                    user_name: ticketDisplayName(t),
                     subject: t.subject,
                     status: t.status,
-                    last_message: t.message,
+                    last_message: ticketPreview(t),
                     date: new Date(t.created_at).toLocaleDateString()
                 })));
             }
@@ -2403,10 +2434,10 @@ export default function AdminDashboard() {
                                                 <div className="bg-blue-500/20 p-2 rounded-full text-blue-500 shrink-0">
                                                     <MessageSquare className="w-6 h-6" />
                                                 </div>
-                                                <div>
-                                                    <p className="font-bold text-white truncate">{t.subject}</p>
-                                                    <p className="text-sm text-gray-400">From: {t.user_name} &middot; {t.date}</p>
-                                                    <p className="text-xs text-gray-500 mt-1 line-clamp-1">{t.last_message}</p>
+                                                <div className="min-w-0 flex-1">
+                                                    <p className="font-bold text-white truncate leading-snug">{t.subject}</p>
+                                                    <p className="text-sm text-gray-400 leading-snug mt-0.5 truncate">From: {t.user_name} &middot; {t.date}</p>
+                                                    <p className="text-xs text-gray-500 leading-snug mt-1 line-clamp-1 break-words">{t.last_message}</p>
                                                 </div>
                                             </div>
                                             <div className="flex items-center gap-3 w-full sm:w-auto justify-start sm:justify-end">
