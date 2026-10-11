@@ -56,15 +56,24 @@ export async function GET(req: NextRequest) {
             adminIds = new Set((profs || []).map((p: any) => p.id));
         }
 
+        // Team-only rows (agent transcripts) never reach the visitor. Rows
+        // marked [[team-note]] are system notes from the team side: show the
+        // text without the marker, rendered as a team message.
+        const visible = (messages || []).filter(
+            (m: any) => !(typeof m.message === "string" && m.message.startsWith("Agent transcript (team only)"))
+        );
         return NextResponse.json({
             ok: true,
             ticket: { id: ticket.id, subject: ticket.subject, status: ticket.status },
-            messages: (messages || []).map((m: any) => ({
-                id: m.id,
-                message: m.message,
-                created_at: m.created_at,
-                from_admin: !!m.sender_id && adminIds.has(m.sender_id),
-            })),
+            messages: visible.map((m: any) => {
+                const isTeamNote = typeof m.message === "string" && m.message.startsWith("[[team-note]]");
+                return {
+                    id: m.id,
+                    message: isTeamNote ? m.message.replace("[[team-note]]", "") : m.message,
+                    created_at: m.created_at,
+                    from_admin: isTeamNote || (!!m.sender_id && adminIds.has(m.sender_id)),
+                };
+            }),
         });
     } catch {
         return NextResponse.json({ ok: false, error: "Could not load thread." }, { status: 500 });

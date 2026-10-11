@@ -14,7 +14,7 @@ import { createClient as createAdminClient } from "@supabase/supabase-js";
 export async function POST(req: NextRequest) {
     try {
         const body = await req.json();
-        const { subject, message, name, email, ticket_id, access_token } = body || {};
+        const { subject, message, name, email, ticket_id, access_token, agent_escalation } = body || {};
 
         const admin = createAdminClient(
             process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -102,11 +102,30 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ ok: false, error: "Could not create the ticket." }, { status: 500 });
         }
 
-        const { error: messageError } = await admin.from("support_messages").insert({
-            ticket_id: ticket.id,
-            sender_id: userId,
-            message: fullMessage,
-        });
+        // Agent escalations: the chat transcript is context for the team only.
+        // It is stored as a marked system row the admin sees, but the visitor's
+        // thread (visitor-thread route) filters marked rows out and shows a
+        // short team handoff note instead of the whole transcript blob.
+        const threadRows = agent_escalation
+            ? [
+                {
+                    ticket_id: ticket.id,
+                    sender_id: null,
+                    message: `Agent transcript (team only)\n${fullMessage}`,
+                },
+                {
+                    ticket_id: ticket.id,
+                    sender_id: null,
+                    message: `[[team-note]]This conversation has been passed to the AfroPitch team. They will reply here and by email.`,
+                },
+            ]
+            : [{
+                ticket_id: ticket.id,
+                sender_id: userId,
+                message: fullMessage,
+            }];
+
+        const { error: messageError } = await admin.from("support_messages").insert(threadRows);
 
         if (messageError) {
             // Ticket exists but the thread starter failed — log loudly, don't pretend all is well.

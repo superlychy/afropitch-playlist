@@ -187,6 +187,7 @@ export function AIHelp() {
                     message: `Chat with AfroPitch Support agent:\n\n${buildTranscript(msgs)}\n\nThe agent determined this needs a human.`,
                     name: name.trim(),
                     email: email.trim(),
+                    agent_escalation: true,
                 }),
             });
             const json = await res.json().catch(() => null);
