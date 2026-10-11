@@ -7,7 +7,7 @@ import { useToast } from "@/components/ui/toast";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Music, Users, Trophy, DollarSign, ShieldAlert, CheckCircle, XCircle, MessageSquare, LogOut, Bell, Plus, Search, Loader2, Send, RefreshCw, Zap, Eye, ChevronLeft, Link2, ShieldCheck, ArrowDown } from "lucide-react";
+import { Music, Users, Trophy, DollarSign, ShieldAlert, CheckCircle, XCircle, MessageSquare, LogOut, Bell, Plus, Search, Loader2, Send, RefreshCw, Zap, Eye, ChevronLeft, Link2, ShieldCheck, ArrowDown, Star } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { TransactionsList } from "@/components/TransactionsList";
 import { pricingConfig } from "@/../config/pricing";
@@ -216,6 +216,7 @@ export default function AdminDashboard() {
     const chatBoxRef = useRef<HTMLDivElement>(null);
     const chatEndRef = useRef<HTMLDivElement>(null);
     const chatBottomRef = useRef(true);
+    const [chatRating, setChatRating] = useState<{ rating: number; comment: string | null } | null>(null);
 
     const scrollChatToBottom = (smooth = true) => {
         chatBottomRef.current = true;
@@ -1190,6 +1191,14 @@ export default function AdminDashboard() {
         setChatNewCount(0);
         chatBottomRef.current = true;
         requestAnimationFrame(() => chatEndRef.current?.scrollIntoView());
+
+        // Visitor's post-close rating, if they gave one.
+        supabase
+            .from('support_ratings')
+            .select('rating, comment')
+            .eq('ticket_id', ticket.id)
+            .maybeSingle()
+            .then(({ data }) => setChatRating(data ? { rating: data.rating, comment: data.comment } : null));
 
         // Cleanup previous realtime channel
         if (chatChannelRef.current) supabase.removeChannel(chatChannelRef.current);
@@ -2955,6 +2964,12 @@ export default function AdminDashboard() {
                             <div>
                                 <h3 className="font-bold text-white text-lg">{activeTicket?.subject}</h3>
                                 <p className="text-sm text-gray-400">Chat with {activeTicket?.user_name}</p>
+                                {chatRating && (
+                                    <p className="text-xs text-yellow-400 mt-1 flex items-center gap-1">
+                                        <Star className="w-3.5 h-3.5 fill-yellow-400" />
+                                        Rated {chatRating.rating}/5{chatRating.comment ? ` — “${chatRating.comment}”` : ""}
+                                    </p>
+                                )}
                             </div>
                             <div className="flex gap-2">
                                 {activeTicket?.status === 'open' && (

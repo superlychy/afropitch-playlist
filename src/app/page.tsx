@@ -2,6 +2,7 @@ import Link from "next/link";
 import { pricingConfig } from "@/../config/pricing";
 import { CheckCircle2, ArrowRight } from "lucide-react";
 import { RecentApprovals } from "@/components/RecentApprovals";
+import { HomeFaq } from "@/components/HomeFaq";
 
 export default function Home() {
   const faqs = [
@@ -263,19 +264,11 @@ export default function Home() {
         </div>
       </section>
 
-      {/* FAQ Section */}
+      {/* FAQ Section: all questions collapsed by default (accordion). Every
+          word stays in the page HTML and the FAQPage JSON-LD above stays
+          valid, so SEO is untouched. */}
       <section className="w-full py-24 px-4 bg-white/[0.02]">
-        <div className="max-w-3xl mx-auto space-y-12">
-          <h2 className="text-3xl font-bold text-center animate-fade-in-up">Frequently Asked Questions</h2>
-          <div className="space-y-4 stagger-children">
-            {faqs.map((faq, index) => (
-              <div key={index} className="p-6 rounded-xl bg-white/5 border border-white/5 hover:border-white/10 transition-all hover:-translate-y-1 duration-200 animate-fade-in-up hover-card">
-                <h3 className="font-semibold text-lg mb-2 text-white">{faq.q}</h3>
-                <p className="text-gray-400">{faq.a}</p>
-              </div>
-            ))}
-          </div>
-        </div>
+        <HomeFaq faqs={faqs} />
       </section>
 
       {/* CTA Section */}

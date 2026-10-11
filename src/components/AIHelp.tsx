@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { usePathname } from "next/navigation";
-import { MessageSquare, X, Send, Bot, User, HelpCircle, ChevronRight, TicketPlus, Loader2, ArrowLeft, Headset, ArrowDown } from "lucide-react";
+import { MessageSquare, X, Send, Bot, User, HelpCircle, ChevronRight, TicketPlus, Loader2, ArrowLeft, Headset, ArrowDown, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -75,7 +75,13 @@ export function AIHelp() {
     // The support session survives page refreshes: it ends only when the
     // admin closes the ticket, at which point a closed notice is shown.
     const [ticketClosed, setTicketClosed] = useState(false);
+    const [closedTicket, setClosedTicket] = useState<ActiveTicket | null>(null);
     const pollRef = useRef<number | null>(null);
+    // Post-close rating: "how did we perform", one per ticket.
+    const [rating, setRating] = useState(0);
+    const [ratingComment, setRatingComment] = useState("");
+    const [ratingSent, setRatingSent] = useState(false);
+    const [ratingSending, setRatingSending] = useState(false);
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const threadEndRef = useRef<HTMLDivElement>(null);
@@ -131,15 +137,52 @@ export function AIHelp() {
         } catch { /* ignore */ }
     };
 
-    const handleTicketClosed = useCallback(() => {
+    const handleTicketClosed = useCallback((ticket: ActiveTicket) => {
         if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
         clearSession();
         setActiveTicket(null);
         setThread([]);
         setThreadNewCount(0);
         setUnread(0);
+        setClosedTicket(ticket);
+        // Ask for a rating once per ticket; never re-ask after it was given.
+        try {
+            setRatingSent(!!localStorage.getItem(`afropitch_support_rated_${ticket.ticket_id}`));
+        } catch { setRatingSent(false); }
+        setRating(0);
+        setRatingComment("");
         setTicketClosed(true);
         setMode("ticket");
+    }, []);
+
+    const submitRating = async (skipped: boolean) => {
+        if (!closedTicket || ratingSending) return;
+        if (!skipped && rating < 1) return;
+        setRatingSending(true);
+        try { localStorage.setItem(`afropitch_support_rated_${closedTicket.ticket_id}`, "1"); } catch { /* ignore */ }
+        if (!skipped) {
+            try {
+                await fetch("/api/support/rating", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        ticket_id: closedTicket.ticket_id,
+                        access_token: closedTicket.access_token,
+                        rating,
+                        comment: ratingComment.trim(),
+                    }),
+                });
+            } catch { /* a failed rating must not block the closed notice */ }
+        }
+        setRatingSent(true);
+        setRatingSending(false);
+    };
+
+    // Homepage "Ask AfroPitch Support" button opens the widget in agent mode.
+    useEffect(() => {
+        const open = () => { setIsOpen(true); setMode("agent"); };
+        window.addEventListener("afropitch:open-support", open);
+        return () => window.removeEventListener("afropitch:open-support", open);
     }, []);
 
     // ---------- Guest identity + intake ----------
@@ -329,7 +372,7 @@ export function AIHelp() {
             if (!json?.ok) return null;
             // The admin closed the ticket: end the session for the visitor.
             if (json.ticket?.status === "closed") {
-                handleTicketClosed();
+                handleTicketClosed(ticket);
                 return "closed";
             }
             const msgs: ThreadMsg[] = (json.messages || []).map((m: any) => ({
@@ -413,6 +456,10 @@ export function AIHelp() {
 
     const openTicketMode = (ticket: ActiveTicket) => {
         setTicketClosed(false);
+        setClosedTicket(null);
+        setRatingSent(false);
+        setRating(0);
+        setRatingComment("");
         setActiveTicket(ticket);
         try { localStorage.setItem(LS_KEY, JSON.stringify(ticket)); } catch { /* ignore */ }
         setMode("ticket");
@@ -711,29 +758,65 @@ export function AIHelp() {
                         )
                     ) : ticketClosed ? (
                         <>
-                            {/* Session ended by the team: the conversation is over until the visitor starts a new one. */}
-                            <div className="flex-1 overflow-y-auto p-4 custom-scrollbar bg-white/[0.02] flex flex-col items-center justify-center text-center gap-3">
-                                <div className="w-12 h-12 rounded-full bg-green-500/15 flex items-center justify-center">
-                                    <Headset className="w-6 h-6 text-green-400" />
+                            {/* Session ended by the team. First: "how did we perform" (once per ticket). Then the closed notice. */}
+                            {!ratingSent ? (
+                                <div className="flex-1 overflow-y-auto p-4 custom-scrollbar bg-white/[0.02] flex flex-col items-center justify-center text-center gap-3">
+                                    <p className="text-sm font-bold text-white">How did we perform?</p>
+                                    <p className="text-xs text-gray-400 max-w-[240px] leading-relaxed">
+                                        Tap a star to rate your support experience.
+                                    </p>
+                                    <div className="flex gap-1.5">
+                                        {[1, 2, 3, 4, 5].map(s => (
+                                            <button key={s} onClick={() => setRating(s)} aria-label={`${s} star${s > 1 ? "s" : ""}`} className="p-1">
+                                                <Star className={`w-8 h-8 transition-colors ${s <= rating ? "text-yellow-400 fill-yellow-400" : "text-gray-600"}`} />
+                                            </button>
+                                        ))}
+                                    </div>
+                                    <Input
+                                        value={ratingComment}
+                                        onChange={(e) => setRatingComment(e.target.value)}
+                                        placeholder="Anything we should know? (optional)"
+                                        className="bg-black/50 border-white/10 h-9 text-xs rounded-lg max-w-[260px]"
+                                    />
+                                    <div className="flex gap-2">
+                                        <Button
+                                            size="sm"
+                                            onClick={() => submitRating(false)}
+                                            disabled={rating < 1 || ratingSending}
+                                            className="bg-green-600 hover:bg-green-700 text-white rounded-full text-xs px-5"
+                                        >
+                                            {ratingSending ? "Sending…" : "Submit rating"}
+                                        </Button>
+                                        <button onClick={() => submitRating(true)} className="text-xs text-gray-500 hover:text-gray-300 px-2">
+                                            Skip
+                                        </button>
+                                    </div>
                                 </div>
-                                <p className="text-sm font-bold text-white">This conversation was closed by the support team.</p>
-                                <p className="text-xs text-gray-400 max-w-[240px] leading-relaxed">
-                                    If you need anything else, start a new chat and our support assistant will pick it up.
-                                </p>
-                                <Button
-                                    size="sm"
-                                    onClick={() => {
-                                        setTicketClosed(false);
-                                        setMessages([]);
-                                        setThread([]);
-                                        setMode("agent");
-                                        seedGreeting();
-                                    }}
-                                    className="bg-green-600 hover:bg-green-700 text-white rounded-full text-xs px-5"
-                                >
-                                    Start a new chat
-                                </Button>
-                            </div>
+                            ) : (
+                                <div className="flex-1 overflow-y-auto p-4 custom-scrollbar bg-white/[0.02] flex flex-col items-center justify-center text-center gap-3">
+                                    <div className="w-12 h-12 rounded-full bg-green-500/15 flex items-center justify-center">
+                                        <Headset className="w-6 h-6 text-green-400" />
+                                    </div>
+                                    <p className="text-sm font-bold text-white">This conversation was closed by the support team.</p>
+                                    <p className="text-xs text-gray-400 max-w-[240px] leading-relaxed">
+                                        If you need anything else, start a new chat and our support assistant will pick it up.
+                                    </p>
+                                    <Button
+                                        size="sm"
+                                        onClick={() => {
+                                            setTicketClosed(false);
+                                            setClosedTicket(null);
+                                            setMessages([]);
+                                            setThread([]);
+                                            setMode("agent");
+                                            seedGreeting();
+                                        }}
+                                        className="bg-green-600 hover:bg-green-700 text-white rounded-full text-xs px-5"
+                                    >
+                                        Start a new chat
+                                    </Button>
+                                </div>
+                            )}
                         </>
                     ) : (
                         <>
