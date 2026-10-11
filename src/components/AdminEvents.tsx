@@ -23,6 +23,8 @@ interface EventItem {
     organizer: string | null;
     category: string;
     status: string;
+    source: string | null;
+    source_url: string | null;
     created_at: string;
 }
 
@@ -37,6 +39,24 @@ const CATEGORY_LABELS: Record<string, string> = {
     party: "Party",
     tour: "Tour",
     showcase: "Showcase",
+};
+
+// Admin-only source inspection: where this event was found, one click to verify.
+const sourceLine = (e: EventItem) => {
+    if (e.source_url) {
+        let host = e.source_url;
+        try { host = new URL(e.source_url).hostname.replace(/^www\./, ""); } catch { /* keep raw */ }
+        return (
+            <p className="text-xs mt-1">
+                <a href={e.source_url} target="_blank" rel="noreferrer" className="text-sky-400 hover:text-sky-300 underline underline-offset-2">
+                    View source: {host} ↗
+                </a>
+                {e.source ? <span className="text-gray-600"> · found via {e.source}</span> : null}
+            </p>
+        );
+    }
+    if (e.source) return <p className="text-xs text-gray-600 mt-1">Source: {e.source} (no link recorded)</p>;
+    return <p className="text-xs text-amber-500 mt-1">No source recorded</p>;
 };
 
 const slugify = (s: string) =>
@@ -66,6 +86,7 @@ interface EventForm {
     image_url: string;
     description: string;
     ticket_url: string;
+    source_url: string;
     is_free: boolean;
     organizer: string;
     category: string;
@@ -82,6 +103,7 @@ const emptyForm = (): EventForm => ({
     image_url: "",
     description: "",
     ticket_url: "",
+    source_url: "",
     is_free: false,
     organizer: "",
     category: "concert",
@@ -145,6 +167,7 @@ export function AdminEvents() {
                 image_url: e.image_url ?? "",
                 description: e.description ?? "",
                 ticket_url: e.ticket_url ?? "",
+                source_url: e.source_url ?? "",
                 is_free: e.is_free ?? false,
                 organizer: e.organizer ?? "",
                 category: e.category,
@@ -196,6 +219,7 @@ export function AdminEvents() {
             image_url: newForm.image_url.trim() || null,
             description: newForm.description.trim() || null,
             ticket_url: newForm.ticket_url.trim() || null,
+            source_url: newForm.source_url.trim() || null,
             is_free: newForm.is_free,
             organizer: newForm.organizer.trim() || null,
             category: newForm.category,
@@ -234,6 +258,7 @@ export function AdminEvents() {
                 image_url: f.image_url.trim() || null,
                 description: f.description.trim() || null,
                 ticket_url: f.ticket_url.trim() || null,
+                source_url: f.source_url.trim() || null,
                 is_free: f.is_free,
                 organizer: f.organizer.trim() || null,
                 category: f.category,
@@ -394,6 +419,10 @@ export function AdminEvents() {
                 <textarea value={f.description} onChange={(e) => set({ description: e.target.value })} rows={4} placeholder="What is this event about? Lineup, vibe, what to expect." className={`${inputCls} leading-relaxed`} />
             </div>
             <div>
+                <label className={labelCls}>Source URL <span className="text-gray-500">(admin only: the page where this event was found, so you can open it and verify the listing)</span></label>
+                <input value={f.source_url} onChange={(e) => set({ source_url: e.target.value })} placeholder="https://…" className={`${inputCls} font-mono`} />
+            </div>
+            <div>
                 <label className={labelCls}>Ticket URL <span className="text-gray-500">(optional, links the "Get tickets" button)</span></label>
                 <input value={f.ticket_url} onChange={(e) => set({ ticket_url: e.target.value })} placeholder="https://…" className={`${inputCls} font-mono`} />
                 <label className="mt-2 flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
@@ -454,6 +483,7 @@ export function AdminEvents() {
                                             <p className="text-sm text-gray-500">
                                                 {e.starts_at ? new Date(e.starts_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : ""} · {e.city}
                                             </p>
+                                            {sourceLine(e)}
                                         </div>
                                         <div className="flex gap-2 flex-wrap">
                                             <Button size="sm" variant="outline" onClick={() => setExpanded(isOpen ? null : e.id)} className="border-white/15 rounded-xl">
@@ -493,6 +523,7 @@ export function AdminEvents() {
                                 <div className="min-w-0">
                                     <p className="text-white font-semibold">{e.title}</p>
                                     <p className="text-xs text-gray-500 font-mono">/events/{e.slug}</p>
+                                    {sourceLine(e)}
                                     {interestCounts[e.id] && (interestCounts[e.id].interested > 0 || interestCounts[e.id].not > 0) && (
                                         <p className="text-xs text-gray-500 mt-1">
                                             <span className="text-green-400">{interestCounts[e.id].interested} interested</span>
