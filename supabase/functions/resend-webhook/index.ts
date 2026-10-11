@@ -61,25 +61,15 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // 2. Fetch the Secret from Database Vault via RPC
-    const { data: webhookUrl, error: secretError } = await supabase.rpc('get_discord_webhook');
-
-    if (secretError || !webhookUrl) {
-        console.error("Failed to retrieve secret from DB Vault:", secretError);
-        return new Response("Configuration Error: Missing Secret in Vault", { status: 500 });
-    }
-
-    const DISCORD_WEBHOOK_URL = webhookUrl as string;
+    let title = "Using Resend Webhook";
+    let color = 3447003; // Default Blue
+    let description = "";
+    const fields: { name: string; value: string; inline: boolean }[] = [];
 
     try {
         const payload = JSON.parse(rawBody);
         const type = payload.type;
         const data = payload.data || {};
-
-        let title = "Using Resend Webhook";
-        let color = 3447003; // Default Blue
-        let description = "";
-        const fields = [];
 
         // Handle Resend Events
         if (type === 'email.delivered' || type === 'email.sent' || type === 'email.opened' || type === 'email.clicked' || type === 'email.bounced' || type === 'email.complained') {
@@ -90,16 +80,25 @@ serve(async (req) => {
             fields.push({ name: "To", value: Array.isArray(data.to) ? data.to.join(", ") : (data.to || 'Unknown'), inline: true });
             fields.push({ name: "Subject", value: data.subject || "No Subject", inline: true });
             description = `Email ID: ${data.email_id || 'N/A'}`;
+
+            // Persist delivery events so a Discord outage never loses them.
+            const { error: logError } = await supabase.from('system_logs').insert({
+                event_type: 'resend_event',
+                event_data: { type, to: data.to ?? null, subject: data.subject ?? null, email_id: data.email_id ?? null },
+                user_id: null,
+            });
+            if (logError) console.error('Failed to log resend event:', logError);
         }
         // Handle Inbound — new Resend event format: { type: 'email.received', data: { from, to, subject, text, html } }
         else if (type === 'email.received' && data && (data.from || data.subject)) {
-            title = "New Email Received 📬";
+            title = "New Email Received";
             color = 5763719;
 
             const fromAddr = typeof data.from === 'string' ? data.from : JSON.stringify(data.from ?? 'unknown');
             const toAddr = Array.isArray(data.to) ? (data.to[0] || 'unknown') : (data.to || 'unknown');
 
-            // Log to database for the admin inbox and the inbound-email watcher
+            // Log to database for the admin inbox and the inbound-email watcher.
+            // This is the primary record; it must not depend on Discord.
             const { error: logError } = await supabase.from('inbound_emails').insert({
                 from_email: fromAddr,
                 to_email: toAddr,
@@ -118,7 +117,7 @@ serve(async (req) => {
         }
         // Handle Inbound — legacy direct-payload format: { from, to, subject, text, html }
         else if (payload.from && payload.subject) {
-            title = "New Email Received 📬";
+            title = "New Email Received";
             color = 5763719;
 
             // Log to database for Muse's inbound-email watcher
@@ -141,41 +140,46 @@ serve(async (req) => {
             title = "Unknown Resend Event";
             description = `Start of payload: ${JSON.stringify(payload).substring(0, 500)}`;
         }
-
-        // Construct Discord Payload
-        const discordBody = {
-            embeds: [
-                {
-                    title: title,
-                    description: description,
-                    color: color,
-                    fields: fields,
-                    timestamp: new Date().toISOString(),
-                    footer: { text: "AfroPitch Notifier • Powered by Resend" }
-                }
-            ]
-        };
-
-        // Send to Discord
-        const discordRes = await fetch(DISCORD_WEBHOOK_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(discordBody)
-        });
-
-        if (!discordRes.ok) {
-            const errText = await discordRes.text();
-            console.error("Discord Error:", errText);
-            return new Response(`Discord Error: ${errText}`, { status: 500 });
-        }
-
-        return new Response(JSON.stringify({ success: true }), {
-            status: 200,
-            headers: { "Content-Type": "application/json" }
-        });
-
-    } catch (e: any) {
+    } catch (e: unknown) {
         console.error("Webhook Error:", e);
-        return new Response(JSON.stringify({ error: e.message }), { status: 500 });
+        return new Response(JSON.stringify({ error: e instanceof Error ? e.message : String(e) }), { status: 500 });
     }
+
+    // Discord notification is best-effort: it must NEVER fail the webhook.
+    // A dead Discord webhook previously returned 500 for every event, which
+    // got this endpoint auto-disabled by Resend. Database writes above are
+    // the primary record; Discord is only a courtesy ping.
+    try {
+        const { data: webhookUrl } = await supabase.rpc('get_discord_webhook');
+        if (webhookUrl) {
+            const discordRes = await fetch(webhookUrl as string, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    embeds: [
+                        {
+                            title: title,
+                            description: description,
+                            color: color,
+                            fields: fields,
+                            timestamp: new Date().toISOString(),
+                            footer: { text: "AfroPitch Notifier • Powered by Resend" }
+                        }
+                    ]
+                })
+            });
+            if (!discordRes.ok) {
+                console.error("Discord notify failed (non-fatal):", await discordRes.text());
+            }
+        } else {
+            console.warn("Discord notify skipped (non-fatal): no webhook URL in vault");
+        }
+    } catch (e) {
+        console.error("Discord notify failed (non-fatal):", e);
+    }
+
+    return new Response(JSON.stringify({ success: true }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" }
+    });
 });
