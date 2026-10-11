@@ -31,6 +31,7 @@ const menuGroups: MenuGroup[] = [
         name: "Company",
         links: [
             { name: "How It Works", href: "/how-it-works", description: "Pitching, explained" },
+            { name: "FAQ", href: "/faq", description: "Questions, answered" },
             { name: "Trust", href: "/trust", description: "Why artists trust us" },
             { name: "Contact", href: "/contact", description: "Get in touch" },
         ],
