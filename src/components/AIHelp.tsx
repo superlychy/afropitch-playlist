@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import { usePathname } from "next/navigation";
 import { MessageSquare, X, Send, Bot, User, HelpCircle, ChevronRight, TicketPlus, Loader2, ArrowLeft, Headset } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,6 +35,9 @@ const AGENT_FALLBACK =
 
 export function AIHelp() {
     const { user, isLoading } = useAuth();
+    // The visitor support widget has no place inside the admin console, and
+    // on mobile its floating button overlaps the admin's own chat controls.
+    const onAdminDashboard = (usePathname() || "").startsWith("/dashboard/admin");
     const [isOpen, setIsOpen] = useState(false);
     const [mode, setMode] = useState<"agent" | "ticket">("agent");
 
@@ -417,7 +421,7 @@ export function AIHelp() {
     };
 
     return (
-        <div className="fixed right-6 bottom-24 sm:bottom-6 z-50 flex flex-col items-end font-sans">
+        <div className={`fixed right-6 bottom-24 sm:bottom-6 z-50 flex-col items-end font-sans ${onAdminDashboard ? "hidden lg:flex" : "flex"}`}>
             {isOpen && (
                 <Card className="mb-4 w-[350px] max-w-[calc(100vw-2rem)] h-[500px] max-h-[calc(100dvh-12rem)] bg-zinc-950/95 border border-green-500/30 backdrop-blur-xl flex flex-col shadow-2xl rounded-2xl overflow-hidden animate-in slide-in-from-bottom-5 zoom-in-95">
                     {/* Header */}
