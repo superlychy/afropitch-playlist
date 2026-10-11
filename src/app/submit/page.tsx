@@ -32,7 +32,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { supabase } from "@/lib/supabase";
+import { supabasePublic } from "@/lib/supabase";
 import { SongSearch } from "@/components/SongSearch";
 
 interface Playlist {
@@ -107,32 +107,73 @@ function SubmitForm() {
   }, [user]);
 
   // Fetch Data
+  // Public listings load through supabasePublic (no login session), the same
+  // fix applied to /playlists on 2026-09-28: a stale or expired session in
+  // the browser can never break this page's public data again. Each query
+  // gets its own timeout and one automatic retry, and failures log the real
+  // error detail as a plain string (Error objects serialise to "{}" in the
+  // client error log, which hid the cause of the Oct 6 / Oct 10 failures).
   useEffect(() => {
+    const errDetail = (e: any): string => {
+      if (!e) return "unknown error";
+      if (typeof e === "string") return e;
+      const parts = [e.message, e.code, e.details, e.hint].filter(Boolean);
+      return parts.length ? parts.join(" | ") : String(e);
+    };
+
+    const withTimeout = (p: PromiseLike<any>, label: string): Promise<any> =>
+      Promise.race([
+        Promise.resolve(p),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error(`${label} timed out after 15s`)), 15000)
+        ),
+      ]);
+
+    const loadPlaylists = async () => {
+      let lastErr: any = null;
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const { data, error } = await withTimeout(
+          supabasePublic
+            .from("playlists")
+            .select("*, curator:profiles!curator_id(role, full_name, verification_status)")
+            .eq("is_active", true)
+            .order("followers", { ascending: false }),
+          "Playlists fetch"
+        );
+        if (!error && data) return data;
+        lastErr = error || new Error("Playlists query returned no data");
+        if (attempt === 0) await new Promise((r) => setTimeout(r, 800));
+      }
+      throw lastErr;
+    };
+
+    const loadCurators = async () => {
+      let lastErr: any = null;
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const { data, error } = await withTimeout(
+          supabasePublic
+            .from("profiles")
+            .select("*, playlists(count)")
+            .or("role.eq.curator,role.eq.admin"),
+          "Curators fetch"
+        );
+        if (!error && data) return data;
+        lastErr = error || new Error("Curators query returned no data");
+        if (attempt === 0) await new Promise((r) => setTimeout(r, 800));
+      }
+      throw lastErr;
+    };
+
     const fetchData = async () => {
       setIsLoading(true);
       try {
-        const fetchPlaylistsPromise = supabase
-          .from("playlists")
-          .select("*, curator:profiles!curator_id(role, full_name, verification_status)")
-          .eq("is_active", true)
-          .order("followers", { ascending: false });
-
-        const fetchCuratorsPromise = supabase
-          .from("profiles")
-          .select("*, playlists(count)")
-          .or("role.eq.curator,role.eq.admin");
-
-        const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error("Request timed out")), 15000)
-        );
-
         const [plResult, curResult] = await Promise.allSettled([
-          Promise.race([fetchPlaylistsPromise, timeoutPromise]),
-          Promise.race([fetchCuratorsPromise, timeoutPromise]),
+          loadPlaylists(),
+          loadCurators(),
         ]);
 
-        if (plResult.status === "fulfilled" && (plResult.value as any).data) {
-          const plData = (plResult.value as any).data;
+        if (plResult.status === "fulfilled") {
+          const plData = plResult.value;
           const mapped = plData
             .filter(
               (p: any) =>
@@ -160,13 +201,15 @@ function SubmitForm() {
             });
           setAllPlaylists(mapped);
         } else {
-          console.error("Playlists fetch failed", plResult);
+          console.error(
+            `Playlists fetch failed: ${errDetail((plResult as any).reason)}`
+          );
           setError(true);
           toast("Failed to load playlists. Please refresh.", "error");
         }
 
-        if (curResult.status === "fulfilled" && (curResult.value as any).data) {
-          const cData = (curResult.value as any).data;
+        if (curResult.status === "fulfilled") {
+          const cData = curResult.value;
           const verifiedCurators = cData.filter(
             (c: any) =>
               c.role === "admin" || c.verification_status === "verified"
@@ -178,11 +221,13 @@ function SubmitForm() {
             }))
           );
         } else {
-          console.error("Curators fetch failed", curResult);
+          console.error(
+            `Curators fetch failed: ${errDetail((curResult as any).reason)}`
+          );
           setCurators([]);
         }
       } catch (err) {
-        console.error("Unexpected error:", err);
+        console.error(`Submit page load failed: ${errDetail(err)}`);
         toast("Failed to load page data", "error");
       } finally {
         setIsLoading(false);
