@@ -404,8 +404,6 @@ export default function ArtistDashboard() {
       ? "bg-[#22C55E]/15 text-[#22C55E]"
       : status === "declined" || status === "rejected"
       ? "bg-[#EF4444]/15 text-[#EF4444]"
-      : status === "archived"
-      ? "bg-white/10 text-zinc-400"
       : "bg-[#EAB308]/15 text-[#EAB308]";
 
   const subDate = (iso: string) =>
@@ -631,7 +629,7 @@ export default function ArtistDashboard() {
                           {sub.status}
                         </span>
                       </div>
-                      {(sub.status === "declined" || sub.status === "rejected" || sub.status === "archived") && sub.feedback && (
+                      {(sub.status === "declined" || sub.status === "rejected") && sub.feedback && (
                         <div className="mt-2 text-xs text-zinc-400 bg-[#EF4444]/5 border border-[#EF4444]/15 rounded-[10px] px-2.5 py-2">
                           <b className="text-red-300">Curator:</b> {sub.feedback}
                         </div>
@@ -650,7 +648,7 @@ export default function ArtistDashboard() {
                           <div className="flex-1 min-w-0">
                             <h4 className="text-sm font-bold truncate">{sub.song_title}</h4>
                             <p className="text-xs text-zinc-500 truncate">{sub.playlist?.name || "Unknown"} · {subDate(sub.created_at)}</p>
-                            {(sub.status === "declined" || sub.status === "rejected" || sub.status === "archived") && sub.feedback && (
+                            {(sub.status === "declined" || sub.status === "rejected") && sub.feedback && (
                               <p className="text-xs text-zinc-400 mt-1 truncate" title={sub.feedback}>
                                 <span className="text-red-300 font-bold">Curator:</span> {sub.feedback}
                               </p>

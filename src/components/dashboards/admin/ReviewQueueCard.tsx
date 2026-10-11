@@ -37,6 +37,8 @@ export function ReviewQueueCard({
     onPreview,
     onAccept,
     onDecline,
+    onQuickDecline,
+    onHide,
     onFeatured,
     layout = "card",
 }: {
@@ -46,6 +48,8 @@ export function ReviewQueueCard({
     onPreview: () => void;
     onAccept: () => void;
     onDecline: () => void;
+    onQuickDecline?: () => void;
+    onHide?: () => void;
     onFeatured: () => void;
     /** "card" = stacked mobile style, "row" = horizontal desktop style */
     layout?: "card" | "row";
@@ -141,6 +145,9 @@ export function ReviewQueueCard({
         </div>
     );
 
+    // Quick decline: free submissions only (server-enforced too), no reason, no email.
+    const canQuickDecline = !!onQuickDecline && Number(song?.amount_paid || 0) === 0;
+
     const actions = (
         <>
             <div className={layout === "row" ? "flex gap-2 shrink-0" : "grid grid-cols-2 gap-2"}>
@@ -157,6 +164,28 @@ export function ReviewQueueCard({
                     Decline
                 </button>
             </div>
+            {(canQuickDecline || onHide) && (
+                <div className={layout === "row" ? "flex gap-2 shrink-0" : "grid grid-cols-2 gap-2"}>
+                    {canQuickDecline && (
+                        <button
+                            onClick={onQuickDecline}
+                            title="Decline without asking a reason and without sending an email (free submissions only)"
+                            className="bg-transparent border border-white/[0.12] text-[#A1A1AA] font-bold text-xs rounded-xl px-4 py-2.5 hover:text-white hover:border-white/30"
+                        >
+                            Quick decline
+                        </button>
+                    )}
+                    {onHide && (
+                        <button
+                            onClick={onHide}
+                            title="Hide from the review queue. No decision, no email, no refund. Reversible."
+                            className="bg-transparent border border-white/[0.12] text-[#A1A1AA] font-bold text-xs rounded-xl px-4 py-2.5 hover:text-white hover:border-white/30"
+                        >
+                            Hide
+                        </button>
+                    )}
+                </div>
+            )}
             {layout === "card" && (
                 <button
                     onClick={onFeatured}

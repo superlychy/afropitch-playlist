@@ -211,6 +211,8 @@ async function handleSubmissionUpdate(record: any) {
         await sendEmail(user.email, subject, html, undefined, 'submission_approved');
     }
     else if (record.status === 'declined') {
+        // Quick decline (admin, free submissions only): no reason, no email.
+        if (record.decline_silent === true) return;
         const subject = `Update on your submission to ${playlistName}`;
         const html = getSongDeclinedTemplate({
             name: user.full_name || 'Artist',

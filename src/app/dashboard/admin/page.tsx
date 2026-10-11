@@ -366,7 +366,11 @@ export default function AdminDashboard() {
     const usersPag = usePagination(filteredUsers.length);
 
     const filteredSubmissions = allSubmissions.filter(s => {
-        const matchesStatus = subStatus === "all" || s.status === subStatus;
+        const matchesStatus = subStatus === "all"
+            ? true
+            : subStatus === "hidden"
+                ? !!s.is_archived
+                : s.status === subStatus && !s.is_archived;
         const q = subSearch.trim().toLowerCase();
         const matchesSearch = !q
             || (s.song_title || "").toLowerCase().includes(q)
@@ -389,7 +393,7 @@ export default function AdminDashboard() {
     });
     const ticketsPag = usePagination(filteredTickets.length);
 
-    const pendingSongs = playlistSongs.filter(s => s.status === "pending");
+    const pendingSongs = playlistSongs.filter(s => s.status === "pending" && !s.is_archived);
     const pendingSongsPag = usePagination(pendingSongs.length);
 
     const filteredPlaylists = allPlaylists
@@ -482,8 +486,8 @@ export default function AdminDashboard() {
                 .order('created_at', { ascending: false });
             if (extApps) setCuratorApplications(extApps);
 
-            // New: Count Pending Submissions
-            const { count: subCount } = await supabase.from('submissions').select('*', { count: 'exact', head: true }).eq('status', 'pending');
+            // New: Count Pending Submissions (hidden ones are out of the queue)
+            const { count: subCount } = await supabase.from('submissions').select('*', { count: 'exact', head: true }).eq('status', 'pending').eq('is_archived', false);
             setPendingSubmissionsCount(subCount || 0);
 
 
@@ -1068,12 +1072,13 @@ export default function AdminDashboard() {
         setIsLoadingSongs(false);
     };
 
-    // New Function to fetch specific Pending Songs globally
+    // New Function to fetch specific Pending Songs globally (hidden ones excluded)
     const fetchGlobalPendingSongs = async () => {
         const { data } = await supabase
             .from('submissions')
             .select('*, artist:profiles(full_name), playlist:playlists(name, type)')
             .eq('status', 'pending')
+            .eq('is_archived', false)
             .order('created_at', { ascending: false });
 
         if (data) setPlaylistSongs(data);
@@ -1104,7 +1109,7 @@ export default function AdminDashboard() {
         if (activeTab === 'submissions') fetchAllSubmissions();
     }, [activeTab]);
 
-    const runSubmissionAction = async (submissionId: string, action: 'accepted' | 'declined' | 'archived', feedback: string, trackingSlug: string | null, declineReasonCode?: DeclineReasonCode) => {
+    const runSubmissionAction = async (submissionId: string, action: 'accepted' | 'declined' | 'archived' | 'unarchived', feedback: string, trackingSlug: string | null, declineReasonCode?: DeclineReasonCode, silent?: boolean) => {
         const sub = playlistSongs.find(s => s.id === submissionId);
 
         try {
@@ -1114,7 +1119,8 @@ export default function AdminDashboard() {
                 p_feedback: feedback,
                 p_curator_id: user?.id,
                 p_tracking_slug: trackingSlug,
-                p_decline_reason: declineReasonCode ?? null
+                p_decline_reason: declineReasonCode ?? null,
+                p_silent: silent ?? false
             });
 
             if (error) throw error;
@@ -1123,15 +1129,32 @@ export default function AdminDashboard() {
             const successMsg = action === 'accepted'
                 ? "Song accepted! Artist notified and link tracking generated."
                 : action === 'archived'
-                    ? "Submission archived. Refund processed to artist wallet."
-                    : "Song rejected. Refund processed to artist wallet.";
+                    ? "Submission hidden from the queue. No decision made, nothing sent."
+                    : action === 'unarchived'
+                        ? "Submission is back in the queue."
+                        : silent
+                            ? "Song declined silently. No reason asked, no email sent."
+                            : "Song rejected. Refund processed to artist wallet.";
             toast(successMsg, "success");
 
-            // Update local state
-            setPlaylistSongs(prev => prev.map(s => s.id === submissionId ? { ...s, status: action } : s));
+            // Update local state (both the review queue and the submissions list)
+            const applyLocal = (s: any) => {
+                if (s.id !== submissionId) return s;
+                if (action === 'archived') return { ...s, is_archived: true };
+                if (action === 'unarchived') return { ...s, is_archived: false };
+                return { ...s, status: action, decline_silent: silent ?? false };
+            };
+            setPlaylistSongs(prev => prev.map(applyLocal));
+            setAllSubmissions(prev => prev.map(applyLocal));
             // Keep the pending badge in sync without a reload
-            if (sub?.status === 'pending') {
+            if (sub?.status === 'pending' && (action === 'declined' || action === 'accepted')) {
                 setPendingSubmissionsCount(prev => Math.max(0, prev - 1));
+            }
+            if (action === 'archived') {
+                setPendingSubmissionsCount(prev => Math.max(0, prev - 1));
+            }
+            if (action === 'unarchived') {
+                setPendingSubmissionsCount(prev => prev + 1);
             }
         } catch (err: any) {
             console.error("Submission Action Error:", err);
@@ -1139,14 +1162,37 @@ export default function AdminDashboard() {
         }
     };
 
-    const handleSubmissionAction = async (submissionId: string, action: 'accepted' | 'declined' | 'archived') => {
-        const sub = playlistSongs.find(s => s.id === submissionId);
+    const handleSubmissionAction = async (submissionId: string, action: 'accepted' | 'declined' | 'archived' | 'quick-decline' | 'unhide') => {
+        const sub = playlistSongs.find(s => s.id === submissionId) || allSubmissions.find(s => s.id === submissionId);
         if (!sub) return;
 
         if (action === 'declined') {
             // The reason is picked in the DeclineReasonModal; the picked code
             // decides which decline email template the artist receives.
             setDeclineTargetId(submissionId);
+            return;
+        }
+
+        if (action === 'quick-decline') {
+            // Silent decline: free submissions only (server-enforced), no
+            // reason asked, no email sent.
+            const confirmed = confirm(
+                `Quick-decline "${sub.song_title || 'Untitled'}"?\n\nNo reason will be asked and the artist gets NO email. Only for free submissions.`
+            );
+            if (!confirmed) return;
+            await runSubmissionAction(submissionId, 'declined', '', null, undefined, true);
+            return;
+        }
+
+        if (action === 'archived') {
+            // Hide: reversible queue flag, never a decision. No money moves,
+            // no email, status stays pending.
+            await runSubmissionAction(submissionId, 'archived', 'Hidden by admin', null);
+            return;
+        }
+
+        if (action === 'unhide') {
+            await runSubmissionAction(submissionId, 'unarchived', '', null);
             return;
         }
 
@@ -1811,6 +1857,8 @@ export default function AdminDashboard() {
                                                     onPreview={() => setPreviewSong(song)}
                                                     onAccept={() => handleSubmissionAction(song.id, 'accepted')}
                                                     onDecline={() => handleSubmissionAction(song.id, 'declined')}
+                                                    onQuickDecline={() => handleSubmissionAction(song.id, 'quick-decline')}
+                                                    onHide={() => handleSubmissionAction(song.id, 'archived')}
                                                     onFeatured={() => { setFeaturedEmailSub(song); setFeaturedEmailCategory("artist-of-the-week"); }}
                                                 />
                                             );
@@ -1830,6 +1878,8 @@ export default function AdminDashboard() {
                                                     onPreview={() => setPreviewSong(song)}
                                                     onAccept={() => handleSubmissionAction(song.id, 'accepted')}
                                                     onDecline={() => handleSubmissionAction(song.id, 'declined')}
+                                                    onQuickDecline={() => handleSubmissionAction(song.id, 'quick-decline')}
+                                                    onHide={() => handleSubmissionAction(song.id, 'archived')}
                                                     onFeatured={() => { setFeaturedEmailSub(song); setFeaturedEmailCategory("artist-of-the-week"); }}
                                                 />
                                             );
@@ -2313,6 +2363,8 @@ export default function AdminDashboard() {
                                                         onPreview={() => setPreviewSong(song)}
                                                         onAccept={() => handleSubmissionAction(song.id, 'accepted')}
                                                         onDecline={() => handleSubmissionAction(song.id, 'declined')}
+                                                        onQuickDecline={() => handleSubmissionAction(song.id, 'quick-decline')}
+                                                        onHide={() => handleSubmissionAction(song.id, 'archived')}
                                                         onFeatured={() => { setFeaturedEmailSub(song); setFeaturedEmailCategory("artist-of-the-week"); }}
                                                     />
                                                 );
@@ -2857,7 +2909,7 @@ export default function AdminDashboard() {
                                                 { value: "pending", label: "Pending" },
                                                 { value: "accepted", label: "Accepted" },
                                                 { value: "declined", label: "Declined" },
-                                                { value: "archived", label: "Archived" },
+                                                { value: "hidden", label: "Hidden" },
                                             ]}
                                             value={subStatus}
                                             onChange={setSubStatus}
@@ -2876,11 +2928,20 @@ export default function AdminDashboard() {
                                                             <span className={`text-[10px] px-2 py-0.5 rounded-full uppercase font-bold tracking-wider ${
                                                                 sub.status === 'accepted' ? 'bg-green-500/20 text-green-400' :
                                                                 sub.status === 'declined' ? 'bg-red-500/20 text-red-400' :
-                                                                sub.status === 'archived' ? 'bg-gray-500/20 text-gray-400' :
                                                                 'bg-yellow-500/20 text-yellow-400'
                                                             }`}>
                                                                 {sub.status}
                                                             </span>
+                                                            {sub.is_archived && (
+                                                                <span className="text-[10px] px-2 py-0.5 rounded-full uppercase font-bold tracking-wider bg-gray-500/20 text-gray-400">
+                                                                    hidden
+                                                                </span>
+                                                            )}
+                                                            {sub.decline_silent && (
+                                                                <span className="text-[10px] px-2 py-0.5 rounded-full uppercase font-bold tracking-wider bg-zinc-500/20 text-zinc-400" title="Declined without reason or email">
+                                                                    silent
+                                                                </span>
+                                                            )}
                                                             {sub.ranking_boosted_at && <span className="text-[10px] bg-green-500 text-black px-1.5 py-0.5 rounded font-bold animate-pulse">Rising</span>}
                                                             {sub.status === 'accepted' && (
                                                                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400 font-bold" title="Tracking link clicks">
@@ -2897,7 +2958,19 @@ export default function AdminDashboard() {
                                                         <span>{new Date(sub.created_at).toLocaleDateString()}</span>
                                                     </div>
                                                     <div className="flex items-center justify-start sm:justify-end gap-2 shrink-0">
-                                                        {sub.status !== 'declined' && sub.status !== 'archived' && (
+                                                        {sub.is_archived ? (
+                                                        <Button
+                                                            size="sm"
+                                                            variant="outline"
+                                                            className="h-8 gap-2 border-white/10 hover:border-green-500/50 hover:text-green-400"
+                                                            onClick={() => handleSubmissionAction(sub.id, 'unhide')}
+                                                            title="Put this submission back in the review queue"
+                                                        >
+                                                            Unhide
+                                                        </Button>
+                                                        ) : (
+                                                        <>
+                                                        {sub.status !== 'declined' && (
                                                         <Button
                                                             size="sm"
                                                             variant="outline"
@@ -2907,6 +2980,8 @@ export default function AdminDashboard() {
                                                         >
                                                             <Send className="w-3.5 h-3.5" /> Featured
                                                         </Button>
+                                                        )}
+                                                        </>
                                                         )}
                                                         {sub.status === 'accepted' && (
                                                             <Button

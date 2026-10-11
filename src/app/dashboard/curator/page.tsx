@@ -192,7 +192,7 @@ export default function CuratorDashboard() {
 
                     // Calculate Stats
                     const revenue = subs.filter(s => s.status === 'accepted' || s.status === 'declined').reduce((acc, curr) => acc + curr.amount_paid, 0);
-                    const pending = subs.filter(s => s.status === 'pending').length;
+                    const pending = subs.filter(s => s.status === 'pending' && !s.is_archived).length;
                     const total = subs.length;
 
                     setStats({
@@ -754,8 +754,9 @@ export default function CuratorDashboard() {
     const handleReviewAction = async (submissionId: string, action: 'accepted' | 'declined' | 'archived', feedback: string, declineReasonCode?: DeclineReasonCode) => {
         if (!user) return;
 
-        // All actions (including archived) go through the secure RPC below so the
-        // money logic runs: archived refunds the artist, like a decline.
+        // All actions go through the secure RPC below so the money logic runs.
+        // 'archived' now only hides the row from the queue: no decision, no
+        // money movement, no email. The admin can unhide it.
 
         // Create tracking slug if accepted
         let trackingSlug = null;
@@ -815,7 +816,7 @@ export default function CuratorDashboard() {
 
     // Derived data for the new layout
     const month = currentMonthName();
-    const pendingReviews = reviews.filter((r: any) => r.status === 'pending');
+    const pendingReviews = reviews.filter((r: any) => r.status === 'pending' && !r.is_archived);
     const decidedReviews = reviews.filter((r: any) => r.status !== 'pending');
     const visiblePending = tierFilter === 'all' ? pendingReviews : pendingReviews.filter((r: any) => r.tier === tierFilter);
     const expressPending = pendingReviews.filter((r: any) => r.tier === 'express').length;
@@ -1027,7 +1028,7 @@ export default function CuratorDashboard() {
                                         currency={pricingConfig.currency}
                                         onAccept={() => handleReviewAction(review.id, 'accepted', 'Great track! Added to playlist.')}
                                         onDecline={() => openDeclineModal(review.id)}
-                                        onArchive={() => handleReviewAction(review.id, 'archived' as any, 'Archived.')}
+                                        onHide={() => handleReviewAction(review.id, 'archived' as any, 'Hidden by curator.')}
                                         onToggleBoost={() => toggleRankingBoost(review.id)}
                                         onPlay={() => setPreviewReview(review)}
                                     />
@@ -1045,7 +1046,7 @@ export default function CuratorDashboard() {
                                             currency={pricingConfig.currency}
                                             onAccept={() => handleReviewAction(review.id, 'accepted', 'Great track! Added to playlist.')}
                                             onDecline={() => openDeclineModal(review.id)}
-                                            onArchive={() => handleReviewAction(review.id, 'archived' as any, 'Archived.')}
+                                            onHide={() => handleReviewAction(review.id, 'archived' as any, 'Hidden by curator.')}
                                             onToggleBoost={() => toggleRankingBoost(review.id)}
                                             onPlay={() => setPreviewReview(review)}
                                         />

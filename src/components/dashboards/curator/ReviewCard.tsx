@@ -9,12 +9,12 @@ interface Props {
     currency: string;
     onAccept: () => void;
     onDecline: () => void;
-    onArchive: () => void;
+    onHide: () => void;
     onToggleBoost: () => void;
     onPlay: () => void;
 }
 
-export function ReviewCard({ review, currency, onAccept, onDecline, onArchive, onToggleBoost, onPlay }: Props) {
+export function ReviewCard({ review, currency, onAccept, onDecline, onHide, onToggleBoost, onPlay }: Props) {
     const isPending = review.status === "pending";
     const isAccepted = review.status === "accepted";
     const tierLabel = review.tier ? String(review.tier).charAt(0).toUpperCase() + String(review.tier).slice(1) : "";
@@ -126,17 +126,18 @@ export function ReviewCard({ review, currency, onAccept, onDecline, onArchive, o
                             <X className="w-[18px] h-[18px] md:w-4 md:h-4" strokeWidth={3} /> Decline
                         </button>
                         <button
-                            onClick={onArchive}
+                            onClick={onHide}
+                            title="Hide from your queue. No decision, no email, no refund. The admin can unhide it."
                             className="hidden md:flex rounded-xl bg-[#1B1B1F] border border-white/10 text-zinc-400 font-bold text-sm py-3 items-center justify-center gap-2 hover:text-white hover:border-white/25"
                         >
-                            Archive
+                            Hide
                         </button>
                     </div>
                     <button
-                        onClick={onArchive}
+                        onClick={onHide}
                         className="md:hidden w-full mt-2 text-[12px] text-zinc-500 hover:text-zinc-300 py-1.5"
                     >
-                        Archive instead
+                        Hide instead
                     </button>
                 </div>
             ) : (
