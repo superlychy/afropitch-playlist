@@ -39,7 +39,7 @@ export const metadata: Metadata = {
 const faqs = [
     {
         q: "How does the escrow payment work?",
-        a: "You pay upfront, but your money is held in escrow, not sent to the engineer. When the mix is done you get a watermarked 60-second preview. Only when you accept the mix is the payment released. If you're not satisfied, the full amount is refunded to your AfroPitch wallet, which you can withdraw to your bank account.",
+        a: "You pay upfront, but your money is held in escrow, not sent to the engineer. When the mix is done you get a watermarked 60-second preview. Only when you accept the mix is the payment released. If you're not satisfied, refunds are paid by bank transfer.",
     },
     {
         q: "What files should I upload?",
@@ -101,7 +101,7 @@ const steps = [
     {
         icon: BadgeCheck,
         title: "Accept & release",
-        text: "Love it? Accept and the full file is yours. Not happy? Instant refund to your wallet.",
+        text: "Love it? Accept and the full file is yours. Not happy? Refunds are paid by bank transfer.",
     },
 ];
 
