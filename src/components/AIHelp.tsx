@@ -28,6 +28,7 @@ type GuestIdentity = { role?: GuestRole; name?: string; email?: string; anonymou
 
 const LS_KEY = "afropitch_support_ticket_v1";
 const VISITOR_LS_KEY = "afropitch_support_visitor_v1";
+const CHAT_LS_KEY = "afropitch_support_chat_v1";
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const GREETING = "Hi, this is AfroPitch Support. How can I help you today?";
 const AGENT_FALLBACK =
@@ -71,6 +72,10 @@ export function AIHelp() {
     const [ticketInput, setTicketInput] = useState("");
     const [ticketSendingMsg, setTicketSendingMsg] = useState(false);
     const [unread, setUnread] = useState(0);
+    // The support session survives page refreshes: it ends only when the
+    // admin closes the ticket, at which point a closed notice is shown.
+    const [ticketClosed, setTicketClosed] = useState(false);
+    const pollRef = useRef<number | null>(null);
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const threadEndRef = useRef<HTMLDivElement>(null);
@@ -111,6 +116,31 @@ export function AIHelp() {
 
     const pushAssistant = (text: string, extra?: Partial<Msg>) =>
         setMessages(prev => [...prev, { role: "assistant", text, ...extra }]);
+
+    // Persist the agent conversation on this device (survives refresh).
+    useEffect(() => {
+        try {
+            if (messages.length > 0) localStorage.setItem(CHAT_LS_KEY, JSON.stringify(messages.slice(-20)));
+        } catch { /* ignore */ }
+    }, [messages]);
+
+    const clearSession = () => {
+        try {
+            localStorage.removeItem(LS_KEY);
+            localStorage.removeItem(CHAT_LS_KEY);
+        } catch { /* ignore */ }
+    };
+
+    const handleTicketClosed = useCallback(() => {
+        if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+        clearSession();
+        setActiveTicket(null);
+        setThread([]);
+        setThreadNewCount(0);
+        setUnread(0);
+        setTicketClosed(true);
+        setMode("ticket");
+    }, []);
 
     // ---------- Guest identity + intake ----------
     const identified = !!user || !!guest?.email;
@@ -290,13 +320,18 @@ export function AIHelp() {
     };
 
     // ---------- Live ticket thread ----------
-    const fetchThread = useCallback(async (ticket: ActiveTicket, initial = false) => {
+    const fetchThread = useCallback(async (ticket: ActiveTicket, initial = false): Promise<string | null> => {
         const params = new URLSearchParams({ ticket_id: ticket.ticket_id });
         if (ticket.access_token) params.set("token", ticket.access_token);
         try {
             const res = await fetch(`/api/support/visitor-thread?${params.toString()}`);
             const json = await res.json().catch(() => null);
-            if (!json?.ok) return;
+            if (!json?.ok) return null;
+            // The admin closed the ticket: end the session for the visitor.
+            if (json.ticket?.status === "closed") {
+                handleTicketClosed();
+                return "closed";
+            }
             const msgs: ThreadMsg[] = (json.messages || []).map((m: any) => ({
                 id: m.id, text: m.message, from_admin: m.from_admin, created_at: m.created_at,
             }));
@@ -329,10 +364,14 @@ export function AIHelp() {
                     setUnread(0);
                 }
             }
+            return json.ticket?.status ?? "open";
         } catch { /* poll failures are silent — next poll retries */ }
-    }, []);
+        return null;
+    }, [handleTicketClosed]);
 
-    // Restore persisted ticket on mount
+    // Restore the persisted session on mount: the ticket thread reopens
+    // straight into the conversation, and the agent chat picks up where the
+    // visitor left it. Nothing here opens the panel on its own.
     useEffect(() => {
         try {
             const raw = localStorage.getItem(LS_KEY);
@@ -341,7 +380,23 @@ export function AIHelp() {
                 if (t?.ticket_id) {
                     setActiveTicket(t);
                     setThreadLoading(true);
-                    fetchThread(t, true).finally(() => setThreadLoading(false));
+                    fetchThread(t, true)
+                        .then(status => { if (status && status !== "closed") setMode("ticket"); })
+                        .finally(() => setThreadLoading(false));
+                }
+            }
+        } catch { /* corrupted storage — start fresh */ }
+        try {
+            const c = localStorage.getItem(CHAT_LS_KEY);
+            if (c) {
+                const arr = JSON.parse(c);
+                if (Array.isArray(arr) && arr.length) {
+                    setMessages(
+                        arr
+                            .filter((m: any) => m && (m.role === "user" || m.role === "assistant") && typeof m.text === "string")
+                            .slice(-20)
+                            .map((m: any) => ({ role: m.role, text: m.text }))
+                    );
                 }
             }
         } catch { /* corrupted storage — start fresh */ }
@@ -350,11 +405,14 @@ export function AIHelp() {
     // Poll for admin replies while a ticket is active
     useEffect(() => {
         if (!activeTicket) return;
-        const id = setInterval(() => fetchThread(activeTicket), 10000);
-        return () => clearInterval(id);
+        pollRef.current = window.setInterval(() => fetchThread(activeTicket), 10000);
+        return () => {
+            if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+        };
     }, [activeTicket?.ticket_id, fetchThread]);
 
     const openTicketMode = (ticket: ActiveTicket) => {
+        setTicketClosed(false);
         setActiveTicket(ticket);
         try { localStorage.setItem(LS_KEY, JSON.stringify(ticket)); } catch { /* ignore */ }
         setMode("ticket");
@@ -651,6 +709,32 @@ export function AIHelp() {
                                 </div>
                             </>
                         )
+                    ) : ticketClosed ? (
+                        <>
+                            {/* Session ended by the team: the conversation is over until the visitor starts a new one. */}
+                            <div className="flex-1 overflow-y-auto p-4 custom-scrollbar bg-white/[0.02] flex flex-col items-center justify-center text-center gap-3">
+                                <div className="w-12 h-12 rounded-full bg-green-500/15 flex items-center justify-center">
+                                    <Headset className="w-6 h-6 text-green-400" />
+                                </div>
+                                <p className="text-sm font-bold text-white">This conversation was closed by the support team.</p>
+                                <p className="text-xs text-gray-400 max-w-[240px] leading-relaxed">
+                                    If you need anything else, start a new chat and our support assistant will pick it up.
+                                </p>
+                                <Button
+                                    size="sm"
+                                    onClick={() => {
+                                        setTicketClosed(false);
+                                        setMessages([]);
+                                        setThread([]);
+                                        setMode("agent");
+                                        seedGreeting();
+                                    }}
+                                    className="bg-green-600 hover:bg-green-700 text-white rounded-full text-xs px-5"
+                                >
+                                    Start a new chat
+                                </Button>
+                            </div>
+                        </>
                     ) : (
                         <>
                             {/* Live ticket thread */}
