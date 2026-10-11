@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/lib/supabase";
 import { TransactionsList } from "@/components/TransactionsList";
+import { DeclineReasonModal, type DeclineReasonCode } from "@/components/dashboards/DeclineReasonModal";
 import { ReviewCard } from "@/components/dashboards/curator/ReviewCard";
 import { PlaylistCard } from "@/components/dashboards/curator/PlaylistCard";
 import { PreviewModal } from "@/components/dashboards/curator/PreviewModal";
@@ -57,24 +58,14 @@ export default function CuratorDashboard() {
     // Withdraw Modal State
     const [showWithdraw, setShowWithdraw] = useState(false);
 
-    // Decline Logic
+    // Decline Logic (reason selection lives in DeclineReasonModal)
     const [showDeclineModal, setShowDeclineModal] = useState(false);
     const [selectedSubmissionId, setSelectedSubmissionId] = useState<string | null>(null);
-    const [declineReason, setDeclineReason] = useState("");
-    const [customDeclineReason, setCustomDeclineReason] = useState("");
 
     // Accept Logic
     const [showAcceptModal, setShowAcceptModal] = useState(false);
     const [acceptFeedback, setAcceptFeedback] = useState("Great track! Happy to include it in the playlist. Please share the link to boost your ranking!");
 
-    const declineOptions = [
-        "Does not fit playlist vibe",
-        "Production quality improperly mixed",
-        "Song structure needs work",
-        "Vocals are off-key or unclear",
-        "Wrong genre for this playlist",
-        "Other (See notes)"
-    ];
     const [withdrawAmount, setWithdrawAmount] = useState("");
     const [bankName, setBankName] = useState("");
     const [accountNumber, setAccountNumber] = useState("");
@@ -760,7 +751,7 @@ export default function CuratorDashboard() {
         }
     }, [newPlaylistLink]);
 
-    const handleReviewAction = async (submissionId: string, action: 'accepted' | 'declined' | 'archived', feedback: string) => {
+    const handleReviewAction = async (submissionId: string, action: 'accepted' | 'declined' | 'archived', feedback: string, declineReasonCode?: DeclineReasonCode) => {
         if (!user) return;
 
         // All actions (including archived) go through the secure RPC below so the
@@ -782,7 +773,8 @@ export default function CuratorDashboard() {
             p_action: action,
             p_feedback: feedback,
             p_curator_id: user.id,
-            p_tracking_slug: trackingSlug
+            p_tracking_slug: trackingSlug,
+            p_decline_reason: declineReasonCode ?? null
         });
 
         if (error) {
@@ -798,8 +790,6 @@ export default function CuratorDashboard() {
 
     const openDeclineModal = (id: string) => {
         setSelectedSubmissionId(id);
-        setDeclineReason(declineOptions[0]);
-        setCustomDeclineReason("");
         setShowDeclineModal(true);
     };
 
@@ -816,10 +806,9 @@ export default function CuratorDashboard() {
         setSelectedSubmissionId(null);
     };
 
-    const confirmDecline = async () => {
+    const confirmDecline = async (reasonCode: DeclineReasonCode, feedback: string) => {
         if (!selectedSubmissionId) return;
-        const finalFeedback = declineReason === "Other (See notes)" ? customDeclineReason : declineReason;
-        await handleReviewAction(selectedSubmissionId, 'declined', finalFeedback || "Declined");
+        await handleReviewAction(selectedSubmissionId, 'declined', feedback || "Declined", reasonCode);
         setShowDeclineModal(false);
         setSelectedSubmissionId(null);
     };
@@ -1532,45 +1521,10 @@ export default function CuratorDashboard() {
 
             {/* ============ DECLINE MODAL ============ */}
             {showDeclineModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-                    <div className="bg-[#141417] border border-white/10 p-6 rounded-[20px] w-full max-w-md space-y-4 max-h-[90vh] overflow-y-auto">
-                        <h3 className="font-bold text-lg text-[#F87171] flex items-center gap-2">
-                            <XCircle className="w-5 h-5" /> Decline Submission
-                        </h3>
-                        <p className="text-sm text-zinc-400">Please provide a reason for the artist. This helps them improve.</p>
-
-                        <div className="space-y-3">
-                            <Label>Reason</Label>
-                            <div className="grid grid-cols-1 gap-2">
-                                {declineOptions.map((option) => (
-                                    <div key={option}
-                                        className={`p-3 rounded-xl border cursor-pointer transition-colors text-sm ${declineReason === option ? 'bg-[rgba(239,68,68,0.15)] border-[#F87171] text-white' : 'bg-white/5 border-white/10 text-zinc-400 hover:bg-white/10'}`}
-                                        onClick={() => setDeclineReason(option)}
-                                    >
-                                        {option}
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-
-                        {(declineReason === "Other (See notes)" || true) && (
-                            <div className="space-y-2">
-                                <Label>Additional Notes (Optional)</Label>
-                                <Textarea
-                                    value={customDeclineReason}
-                                    onChange={e => setCustomDeclineReason(e.target.value)}
-                                    placeholder="Add specific feedback here..."
-                                    className="min-h-[80px] bg-black/40 border-white/10"
-                                />
-                            </div>
-                        )}
-
-                        <div className="flex justify-end gap-2 pt-4">
-                            <Button variant="ghost" onClick={() => setShowDeclineModal(false)}>Cancel</Button>
-                            <Button variant="destructive" onClick={confirmDecline}>Confirm Decline</Button>
-                        </div>
-                    </div>
-                </div>
+                <DeclineReasonModal
+                    onClose={() => { setShowDeclineModal(false); setSelectedSubmissionId(null); }}
+                    onConfirm={confirmDecline}
+                />
             )}
 
             {/* ============ ACCEPT MODAL ============ */}

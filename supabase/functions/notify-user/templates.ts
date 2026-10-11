@@ -92,28 +92,74 @@ export const getSongApprovedTemplate = (data: {
     ${btn(data.dashboardLink, 'View Dashboard')}
 `);
 
+// Decline emails are per-reason (Max, 2026-10-11). The reason code is picked
+// in the admin/curator decline modal and stored on submissions.decline_reason.
+// Only the mix_quality template carries the mixing offer. The refund block
+// appears ONLY for paid submissions (amountPaid > 0); free submissions get
+// the free line instead and never mention a refund. A null or unknown reason
+// (rows reviewed before decline_reason existed) falls back to the custom
+// template using the stored feedback text. No em dashes anywhere.
+export type DeclineReasonCode =
+    | 'not_fit'
+    | 'wrong_genre'
+    | 'mix_quality'
+    | 'structure'
+    | 'vocals'
+    | 'not_right_now'
+    | 'custom';
+
+const DECLINE_REASON_PARAGRAPHS: Record<Exclude<DeclineReasonCode, 'custom'>, string> = {
+    not_fit: "This is about fit, not quality. Every playlist has a specific sound and mood that its listeners expect, and the curator did not feel this song sits comfortably inside that sound. A song that does not fit one playlist can be perfect for another, so we encourage you to look through the other playlists on AfroPitch and pitch the ones whose sound matches this record.",
+    wrong_genre: "This playlist focuses on a different genre from the one this song falls under, so the curator could not place it. Genres matter a lot in playlisting because listeners come to each playlist expecting a particular style. Have a look at the playlists tagged for your genre on AfroPitch; pitching the right genre gives your song a much fairer chance.",
+    mix_quality: "The curator's feedback is that the mix and production are holding this song back. When the mix is not clear and balanced, a good song struggles to compete with the other records on the playlist, no matter how strong the writing is. This is fixable, and it is one of the most common reasons songs get declined.",
+    structure: "The curator's feedback is about the structure of the song: how it starts, where the hook lands, and how the sections flow. On a playlist, listeners decide quickly, so a slow build or a late hook can cost a song its place even when the idea is strong. If you rework the arrangement, we would be glad to hear the song again in the future.",
+    vocals: "The curator's feedback is about the vocal: parts of the performance are off key, or the vocal is not clear enough in the recording to carry the song. Vocals are the first thing listeners connect with, so it is worth another take or a cleaner recording session before pitching the song again. The song itself may well be strong; this is about the performance and recording.",
+    not_right_now: "There is nothing wrong with this song, and this decision is not about its quality or its mix. The playlist simply cannot take it at this moment. Playlists rotate songs in and out, space opens and closes, and timing matters as much as the record itself. Please do not be discouraged: pitch it to other playlists that fit, and feel free to bring future songs to this curator again.",
+};
+
+const MIXING_OFFER_BOX = `
+    <div style="margin: 25px 0; padding: 20px; background-color: #f0fdf4; border: 1px solid #16a34a; border-radius: 8px; text-align: center;">
+        <p style="color: #111; font-weight: bold; margin: 0 0 8px 0;">Give your song the mix it deserves.</p>
+        <p style="color: #555; font-size: 14px; margin: 0 0 15px 0;">Most songs get rejected because they are not well mixed or arranged. Try mixing with AfroPitch: a professional engineer works on your track, and your payment stays protected until you approve the final mix.</p>
+        <a href="https://afropitchplay.best/mixing" style="display: inline-block; background-color: #16a34a; color: #ffffff; font-weight: bold; padding: 12px 24px; border-radius: 8px; text-decoration: none;">Mix my song with AfroPitch</a>
+    </div>
+`;
+
 export const getSongDeclinedTemplate = (data: {
     name: string;
     songTitle: string;
     playlistName: string;
     feedback: string;
-    refundAmount: string;
+    reason: string | null;
+    amountPaid: number;
+    currency: string;
     dashboardLink: string;
-}) => brandedEmail(`
+}) => {
+    const knownReason = data.reason && data.reason !== 'custom' && Object.prototype.hasOwnProperty.call(DECLINE_REASON_PARAGRAPHS, data.reason)
+        ? (data.reason as Exclude<DeclineReasonCode, 'custom'>)
+        : null;
+
+    const reasonHtml = knownReason
+        ? `<p>${DECLINE_REASON_PARAGRAPHS[knownReason]}</p>`
+        : `<p>The curator's feedback:</p>
+    <div style="background-color: #f9f9f9; border: 1px solid #ddd; padding: 15px; border-radius: 8px; margin: 20px 0; font-style: italic; color: #333;">"${data.feedback}"</div>`;
+
+    const mixingBox = data.reason === 'mix_quality' ? MIXING_OFFER_BOX : '';
+
+    const refundHtml = data.amountPaid > 0
+        ? `<p>Your submission fee of ${data.currency}${data.amountPaid.toLocaleString()} has been refunded to your AfroPitch wallet. You can use it to submit this song to another playlist, or save it for your next release.</p>`
+        : `<p>This was a free submission, so no fee was charged.</p>`;
+
+    return brandedEmail(`
     <p>Hi ${data.name},</p>
-    <p>Regarding your submission of <strong>${data.songTitle}</strong> to <strong>${data.playlistName}</strong>.</p>
-    <p>Unfortunately, the curator has decided not to add your track at this time. Here is their feedback:</p>
-
-    <div style="background-color: #f9f9f9; border: 1px solid #ddd; padding: 15px; border-radius: 8px; margin: 20px 0; font-style: italic; color: #333;">"${data.feedback}"</div>
-
-    <p style="color: #dc2626; font-weight: bold; margin-top: 10px; font-size: 14px;">Amount Refunded: ${data.refundAmount}</p>
-    <p>This has been credited back to your wallet instantly. You can use it to submit to other playlists that might be a better fit.</p>
-    <div style="margin: 25px 0; padding: 20px; background-color: #f0fdf4; border: 1px solid #16a34a; border-radius: 8px; text-align: center;">
-        <p style="color: #111; font-weight: bold; margin: 0 0 8px 0;">Give your song the mix it deserves</p>
-        <p style="color: #555; font-size: 14px; margin: 0 0 15px 0;">Most songs get rejected because they are not well mixed or arranged. Try mixing with AfroPitch &mdash; a professional engineer works on your track, and your payment stays in escrow until you love the mix.</p>
-        <a href="https://afropitchplay.best/mixing" style="display: inline-block; background-color: #16a34a; color: #ffffff; font-weight: bold; padding: 12px 24px; border-radius: 8px; text-decoration: none;">Mix my song with AfroPitch</a>
-    </div>
+    <p>Thank you for submitting <strong>${data.songTitle}</strong> to <strong>${data.playlistName}</strong>. The curator has listened and decided not to add the song this time.</p>
+    ${reasonHtml}
+    ${mixingBox}
+    ${refundHtml}
+    ${btn(data.dashboardLink, 'View dashboard')}
+    <p>Keep making music. The AfroPitch Team</p>
 `);
+};
 
 export const getSupportTicketTemplate = (data: {
     name: string;

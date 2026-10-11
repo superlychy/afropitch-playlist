@@ -217,7 +217,12 @@ async function handleSubmissionUpdate(record: any) {
             songTitle: record.song_title,
             playlistName: playlistName,
             feedback: record.feedback || 'No specific feedback provided.',
-            refundAmount: `${CURRENCY}${record.amount_paid}`,
+            // Reason code picked in the decline modal; null on rows reviewed
+            // before the decline_reason column existed, which the template
+            // treats as a custom decline using the stored feedback text.
+            reason: record.decline_reason ?? null,
+            amountPaid: Number(record.amount_paid) || 0,
+            currency: CURRENCY,
             dashboardLink: `${SITE_URL}/dashboard/artist`
         });
         await sendEmail(user.email, subject, html);

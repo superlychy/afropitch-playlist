@@ -23,6 +23,7 @@ import { usePagination, PaginationControls, FilterButtons } from "@/components/a
 import { StatCard } from "@/components/dashboards/admin/StatCard";
 import { AlertBanner } from "@/components/dashboards/admin/AlertBanner";
 import { ReviewQueueCard } from "@/components/dashboards/admin/ReviewQueueCard";
+import { DeclineReasonModal, type DeclineReasonCode } from "@/components/dashboards/DeclineReasonModal";
 import { PlaylistRow } from "@/components/dashboards/admin/PlaylistRow";
 import { AdminSidebar, AdminBottomNav, AdminMoreSheet, type PlaylistSubTab, type NavCounts } from "@/components/dashboards/admin/AdminNav";
 import { formatCompact, formatNaira } from "@/components/dashboards/admin/utils";
@@ -146,6 +147,7 @@ export default function AdminDashboard() {
     // Song Management State
     const [expandedPlaylistId, setExpandedPlaylistId] = useState<string | null>(null);
     const [playlistSongs, setPlaylistSongs] = useState<any[]>([]);
+    const [declineTargetId, setDeclineTargetId] = useState<string | null>(null);
     const [allSubmissions, setAllSubmissions] = useState<any[]>([]);
     const [isLoadingSongs, setIsLoadingSongs] = useState(false);
 
@@ -1040,17 +1042,53 @@ export default function AdminDashboard() {
         if (activeTab === 'submissions') fetchAllSubmissions();
     }, [activeTab]);
 
+    const runSubmissionAction = async (submissionId: string, action: 'accepted' | 'declined' | 'archived', feedback: string, trackingSlug: string | null, declineReasonCode?: DeclineReasonCode) => {
+        const sub = playlistSongs.find(s => s.id === submissionId);
+
+        try {
+            const { data, error } = await supabase.rpc('process_submission_review', {
+                p_submission_id: submissionId,
+                p_action: action,
+                p_feedback: feedback,
+                p_curator_id: user?.id,
+                p_tracking_slug: trackingSlug,
+                p_decline_reason: declineReasonCode ?? null
+            });
+
+            if (error) throw error;
+            if (data && data.success === false) throw new Error(data.message || "Review was not applied.");
+
+            const successMsg = action === 'accepted'
+                ? "Song accepted! Artist notified and link tracking generated."
+                : action === 'archived'
+                    ? "Submission archived. Refund processed to artist wallet."
+                    : "Song rejected. Refund processed to artist wallet.";
+            toast(successMsg, "success");
+
+            // Update local state
+            setPlaylistSongs(prev => prev.map(s => s.id === submissionId ? { ...s, status: action } : s));
+            // Keep the pending badge in sync without a reload
+            if (sub?.status === 'pending') {
+                setPendingSubmissionsCount(prev => Math.max(0, prev - 1));
+            }
+        } catch (err: any) {
+            console.error("Submission Action Error:", err);
+            toast(`Error processing submission: ${err.message}`, "error");
+        }
+    };
+
     const handleSubmissionAction = async (submissionId: string, action: 'accepted' | 'declined' | 'archived') => {
         const sub = playlistSongs.find(s => s.id === submissionId);
         if (!sub) return;
 
-        let feedback = "Reviewed by Admin";
         if (action === 'declined') {
-            const reason = prompt("Enter reason for rejection (optional):", "Does not fit playlist vibe");
-            if (reason === null) return; // cancelled
-            if (reason) feedback = reason;
+            // The reason is picked in the DeclineReasonModal; the picked code
+            // decides which decline email template the artist receives.
+            setDeclineTargetId(submissionId);
+            return;
         }
 
+        let feedback = "Reviewed by Admin";
         let trackingSlug = null;
         if (action === 'accepted') {
             // Playlist-first gate: the track must be on the Spotify playlist
@@ -1069,35 +1107,14 @@ export default function AdminDashboard() {
             trackingSlug = `${cleanTitle}-${Math.random().toString(36).substring(2, 7)}`;
         }
 
-        try {
-            const { data, error } = await supabase.rpc('process_submission_review', {
-                p_submission_id: submissionId,
-                p_action: action,
-                p_feedback: feedback,
-                p_curator_id: user?.id,
-                p_tracking_slug: trackingSlug
-            });
+        await runSubmissionAction(submissionId, action, feedback, trackingSlug);
+    };
 
-            if (error) throw error;
-            if (data && data.success === false) throw new Error(data.message || "Review was not applied.");
-
-            const successMsg = action === 'accepted'
-                ? "Song accepted! Artist notified and link tracking generated."
-                : action === 'archived'
-                    ? "Submission archived. Refund processed to artist wallet."
-                    : "Song rejected. Refund processed to artist wallet.";
-            toast(successMsg, "success");
-
-            // Update local state
-            setPlaylistSongs(prev => prev.map(s => s.id === submissionId ? { ...s, status: action } : s));
-            // Keep the pending badge in sync without a reload
-            if (sub.status === 'pending') {
-                setPendingSubmissionsCount(prev => Math.max(0, prev - 1));
-            }
-        } catch (err: any) {
-            console.error("Submission Action Error:", err);
-            toast(`Error processing submission: ${err.message}`, "error");
-        }
+    const confirmAdminDecline = async (reasonCode: DeclineReasonCode, feedback: string) => {
+        const targetId = declineTargetId;
+        setDeclineTargetId(null);
+        if (!targetId) return;
+        await runSubmissionAction(targetId, 'declined', feedback || "Declined", null, reasonCode);
     };
 
     // CHAT FUNCTIONS
@@ -2858,6 +2875,14 @@ export default function AdminDashboard() {
                 onTestWebhook={handleTestWebhook}
                 onLogout={logout}
             />
+
+            {/* DECLINE MODAL */}
+            {declineTargetId && (
+                <DeclineReasonModal
+                    onClose={() => setDeclineTargetId(null)}
+                    onConfirm={confirmAdminDecline}
+                />
+            )}
 
             {/* CHAT MODAL */}
             {showChat && activeTicket && (

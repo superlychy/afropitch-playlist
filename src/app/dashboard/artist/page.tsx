@@ -636,14 +636,6 @@ export default function ArtistDashboard() {
                           <b className="text-red-300">Curator:</b> {sub.feedback}
                         </div>
                       )}
-                      {(sub.status === "declined" || sub.status === "rejected" || sub.status === "archived") && (
-                        <button
-                          onClick={() => router.push(`/mixing?song=${encodeURIComponent(sub.song_title)}&submission=${sub.id}`)}
-                          className="mt-2.5 w-full border border-[#22C55E]/40 bg-[#22C55E]/[0.08] text-[#22C55E] rounded-xl py-[11px] text-[13px] font-bold"
-                        >
-                          Get it professionally mixed
-                        </button>
-                      )}
                     </div>
                   ))}
                 </div>
@@ -677,13 +669,6 @@ export default function ArtistDashboard() {
                               className="border border-white/[0.08] bg-[#141417] hover:bg-white/5 text-white rounded-[10px] px-3.5 py-2 text-xs font-bold shrink-0"
                             >
                               Smart link
-                            </button>
-                          ) : (sub.status === "declined" || sub.status === "rejected" || sub.status === "archived") ? (
-                            <button
-                              onClick={() => router.push(`/mixing?song=${encodeURIComponent(sub.song_title)}&submission=${sub.id}`)}
-                              className="border border-[#22C55E]/40 text-[#22C55E] hover:bg-[#22C55E]/10 rounded-[10px] px-3.5 py-2 text-xs font-bold shrink-0"
-                            >
-                              Get it mixed
                             </button>
                           ) : (
                             <span className="text-sm font-bold text-white shrink-0">{pricingConfig.currency}{sub.amount_paid}</span>
