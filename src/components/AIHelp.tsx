@@ -50,6 +50,7 @@ export function AIHelp() {
     const [intakeRole, setIntakeRole] = useState<GuestRole | null>(null);
     const [intakeName, setIntakeName] = useState("");
     const [intakeEmail, setIntakeEmail] = useState("");
+    const [intakeError, setIntakeError] = useState("");
 
     // Ticket form state
     const [showTicketForm, setShowTicketForm] = useState(false);
@@ -117,7 +118,7 @@ export function AIHelp() {
         if (isLoading || guest === null) return;
         if (user) { setNeedsIntake(false); seedGreeting(); return; }
         if (messagesRef.current.length > 0) { setNeedsIntake(false); return; }
-        if (guest.email || guest.anonymous) { setNeedsIntake(false); seedGreeting(); return; }
+        if (guest.email || guest.anonymous || guest.name) { setNeedsIntake(false); seedGreeting(); return; }
         setIntakeRole(guest.role ?? null);
         setNeedsIntake(true);
     }, [isLoading, user, guest, seedGreeting]);
@@ -130,11 +131,23 @@ export function AIHelp() {
     const startWithIdentity = () => {
         const name = intakeName.trim();
         const email = intakeEmail.trim();
-        if (!name || !EMAIL_RE.test(email)) return;
+        // A typed-but-invalid email is the one thing that blocks: explain why.
+        if (email && !EMAIL_RE.test(email)) {
+            setIntakeError("That email looks incomplete. Please fix it, or clear it and continue.");
+            return;
+        }
+        // Forwarding to the team is the only gated step: it needs both a
+        // name and a valid email so the team can reply.
+        if (intakeForEscalation && (!name || !email)) {
+            setIntakeError("We need both your name and your email to pass this to the team.");
+            return;
+        }
+        setIntakeError("");
         const identity: GuestIdentity = {
             role: intakeRole ?? guest?.role,
-            name,
-            email,
+            ...(name ? { name } : {}),
+            ...(email ? { email } : {}),
+            ...(!name && !email ? { anonymous: true } : {}),
         };
         saveGuest(identity);
         setNeedsIntake(false);
@@ -197,6 +210,9 @@ export function AIHelp() {
         } else {
             // Anonymous guest: a human handoff needs a name and email first.
             setIntakeRole(guest?.role ?? null);
+            setIntakeName(guest?.name ?? "");
+            setIntakeEmail(guest?.email ?? "");
+            setIntakeError("");
             setIntakeForEscalation(true);
             setNeedsIntake(true);
         }
@@ -457,16 +473,22 @@ export function AIHelp() {
                                                 ))}
                                             </div>
                                         </div>
-                                        <Input value={intakeName} onChange={(e) => setIntakeName(e.target.value)} placeholder="Your name" className="bg-black/50 border-white/10 h-9 text-xs rounded-lg" />
-                                        <Input value={intakeEmail} onChange={(e) => setIntakeEmail(e.target.value)} placeholder="Email for our reply" type="email" className="bg-black/50 border-white/10 h-9 text-xs rounded-lg" />
+                                        <Input value={intakeName} onChange={(e) => { setIntakeName(e.target.value); setIntakeError(""); }} onKeyDown={(e) => { if (e.key === "Enter") startWithIdentity(); }} placeholder="Your name" className="bg-black/50 border-white/10 h-9 text-xs rounded-lg" />
+                                        <Input value={intakeEmail} onChange={(e) => { setIntakeEmail(e.target.value); setIntakeError(""); }} onKeyDown={(e) => { if (e.key === "Enter") startWithIdentity(); }} placeholder="Email for our reply" type="email" className="bg-black/50 border-white/10 h-9 text-xs rounded-lg" />
+                                        {intakeError && <p className="text-xs text-red-400 leading-relaxed">{intakeError}</p>}
                                         <Button
                                             size="sm"
-                                            disabled={!intakeName.trim() || !EMAIL_RE.test(intakeEmail.trim())}
+                                            disabled={intakeForEscalation && (!intakeName.trim() || !EMAIL_RE.test(intakeEmail.trim()))}
                                             onClick={startWithIdentity}
                                             className="w-full bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs"
                                         >
                                             {intakeForEscalation ? "Continue" : "Start chat"}
                                         </Button>
+                                        {!intakeForEscalation && (
+                                            <p className="text-[11px] text-gray-500 leading-relaxed">
+                                                You can start with just your name. Your email is only needed if our team has to reply to you.
+                                            </p>
+                                        )}
                                         {intakeForEscalation ? (
                                             <button
                                                 onClick={() => { setNeedsIntake(false); setIntakeForEscalation(false); }}
