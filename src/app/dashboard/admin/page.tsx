@@ -7,7 +7,7 @@ import { useToast } from "@/components/ui/toast";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Music, Users, Trophy, DollarSign, ShieldAlert, CheckCircle, XCircle, MessageSquare, LogOut, Bell, Plus, Search, Loader2, Send, RefreshCw, Zap, Eye, ChevronLeft, Link2, ShieldCheck } from "lucide-react";
+import { Music, Users, Trophy, DollarSign, ShieldAlert, CheckCircle, XCircle, MessageSquare, LogOut, Bell, Plus, Search, Loader2, Send, RefreshCw, Zap, Eye, ChevronLeft, Link2, ShieldCheck, ArrowDown } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { TransactionsList } from "@/components/TransactionsList";
 import { pricingConfig } from "@/../config/pricing";
@@ -179,6 +179,25 @@ export default function AdminDashboard() {
     const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
     const [chatInput, setChatInput] = useState("");
     const [sendingMsg, setSendingMsg] = useState(false);
+    // "Jump to latest": counts visitor messages that arrived while the admin
+    // was scrolled up in the open support chat.
+    const [chatNewCount, setChatNewCount] = useState(0);
+    const chatBoxRef = useRef<HTMLDivElement>(null);
+    const chatEndRef = useRef<HTMLDivElement>(null);
+    const chatBottomRef = useRef(true);
+
+    const scrollChatToBottom = (smooth = true) => {
+        chatBottomRef.current = true;
+        setChatNewCount(0);
+        requestAnimationFrame(() => chatEndRef.current?.scrollIntoView({ behavior: smooth ? "smooth" : undefined }));
+    };
+    const handleChatScroll = () => {
+        const el = chatBoxRef.current;
+        if (!el) return;
+        const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 60;
+        chatBottomRef.current = nearBottom;
+        if (nearBottom) setChatNewCount(0);
+    };
 
     // Add User State
     const [showAddUser, setShowAddUser] = useState(false);
@@ -1136,6 +1155,10 @@ export default function AdminDashboard() {
         } else {
             setChatMessages([]);
         }
+        // Land on the latest message with a clean counter.
+        setChatNewCount(0);
+        chatBottomRef.current = true;
+        requestAnimationFrame(() => chatEndRef.current?.scrollIntoView());
 
         // Cleanup previous realtime channel
         if (chatChannelRef.current) supabase.removeChannel(chatChannelRef.current);
@@ -1154,6 +1177,13 @@ export default function AdminDashboard() {
                             is_admin: userRef.current?.id === (payload.new as { sender_id: string }).sender_id
                         }];
                     });
+                    // If the admin is reading history, count the new message
+                    // and show the jump-to-latest arrow; otherwise follow down.
+                    if (chatBottomRef.current) {
+                        requestAnimationFrame(() => chatEndRef.current?.scrollIntoView({ behavior: "smooth" }));
+                    } else {
+                        setChatNewCount(c => c + 1);
+                    }
                 }
             )
             .subscribe();
@@ -1177,6 +1207,7 @@ export default function AdminDashboard() {
         };
         setChatMessages(prev => [...prev, optimMsg]);
         setChatInput("");
+        scrollChatToBottom();
 
         const { error } = await supabase.from('support_messages').insert({
             ticket_id: activeTicket.id,
@@ -2919,7 +2950,18 @@ export default function AdminDashboard() {
                         </div>
 
                         {/* Messages */}
-                        <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-black/20">
+                        <div ref={chatBoxRef} onScroll={handleChatScroll} className="relative flex-1 overflow-y-auto p-4 space-y-4 bg-black/20">
+                            {chatNewCount > 0 && (
+                                <button
+                                    onClick={() => scrollChatToBottom()}
+                                    className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white rounded-full pl-3 pr-2 py-1.5 shadow-lg shadow-black/40 text-xs font-bold"
+                                >
+                                    <ArrowDown className="w-4 h-4" />
+                                    <span className="bg-white text-green-700 rounded-full min-w-[18px] h-[18px] flex items-center justify-center text-[10px] px-1">
+                                        {chatNewCount}
+                                    </span>
+                                </button>
+                            )}
                             {chatMessages.length === 0 && (
                                 <div className="text-center text-gray-500 mt-10">No messages yet. Start the conversation.</div>
                             )}
@@ -2931,6 +2973,7 @@ export default function AdminDashboard() {
                                     </div>
                                 </div>
                             ))}
+                            <div ref={chatEndRef} />
                         </div>
 
                         {/* Input */}

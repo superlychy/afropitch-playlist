@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { usePathname } from "next/navigation";
-import { MessageSquare, X, Send, Bot, User, HelpCircle, ChevronRight, TicketPlus, Loader2, ArrowLeft, Headset } from "lucide-react";
+import { MessageSquare, X, Send, Bot, User, HelpCircle, ChevronRight, TicketPlus, Loader2, ArrowLeft, Headset, ArrowDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -84,11 +84,30 @@ export function AIHelp() {
     activeTicketRef.current = activeTicket;
     messagesRef.current = messages;
 
+    // "Jump to latest" state: counts messages that arrived while the visitor
+    // was scrolled up in the open ticket thread.
+    const [threadNewCount, setThreadNewCount] = useState(0);
+    const threadBoxRef = useRef<HTMLDivElement>(null);
+    const threadBottomRef = useRef(true);
+    const threadIdsRef = useRef<Set<string>>(new Set());
+
     const scrollAgent = () => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    const scrollThread = () => threadEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    const scrollThreadToBottom = (smooth = true) => {
+        threadBottomRef.current = true;
+        setThreadNewCount(0);
+        requestAnimationFrame(() => threadEndRef.current?.scrollIntoView({ behavior: smooth ? "smooth" : undefined }));
+    };
+    const handleThreadScroll = () => {
+        const el = threadBoxRef.current;
+        if (!el) return;
+        const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 60;
+        threadBottomRef.current = nearBottom;
+        if (nearBottom) setThreadNewCount(0);
+    };
 
     useEffect(() => { scrollAgent(); }, [messages, isTyping, isOpen, showTicketForm, needsIntake]);
-    useEffect(() => { scrollThread(); }, [thread, isOpen, mode]);
+    // When the ticket thread view opens, land on the latest message.
+    useEffect(() => { if (mode === "ticket") scrollThreadToBottom(false); }, [isOpen, mode]);
 
     const pushAssistant = (text: string, extra?: Partial<Msg>) =>
         setMessages(prev => [...prev, { role: "assistant", text, ...extra }]);
@@ -283,6 +302,19 @@ export function AIHelp() {
             }));
             setThread(msgs);
 
+            // In-chat "jump to latest": count messages that arrived while the
+            // visitor was scrolled up in the open thread. If they are already
+            // at the bottom, just follow the conversation down.
+            const prevIds = threadIdsRef.current;
+            const fresh = msgs.filter(m => !prevIds.has(m.id));
+            threadIdsRef.current = new Set(msgs.map(m => m.id));
+            if (initial) {
+                scrollThreadToBottom(false);
+            } else if (fresh.length > 0 && isOpenRef.current && modeRef.current === "ticket") {
+                if (threadBottomRef.current) scrollThreadToBottom();
+                else setThreadNewCount(c => c + fresh.length);
+            }
+
             // Unread tracking: admin messages newer than what we've seen
             const latestAdmin = [...msgs].reverse().find(m => m.from_admin);
             if (initial) {
@@ -336,7 +368,7 @@ export function AIHelp() {
         if (activeTicket) {
             const latestAdmin = [...thread].reverse().find(m => m.from_admin);
             lastReadRef.current = latestAdmin?.created_at ?? new Date().toISOString();
-            fetchThread(activeTicket);
+            fetchThread(activeTicket, true);
         }
     };
 
@@ -379,6 +411,7 @@ export function AIHelp() {
         const temp: ThreadMsg = { id: `temp-${Date.now()}`, text, from_admin: false, created_at: new Date().toISOString() };
         setThread(prev => [...prev, temp]);
         setTicketInput("");
+        scrollThreadToBottom();
         try {
             const res = await fetch("/api/support/ticket", {
                 method: "POST",
@@ -621,7 +654,18 @@ export function AIHelp() {
                     ) : (
                         <>
                             {/* Live ticket thread */}
-                            <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar bg-white/[0.02]">
+                            <div ref={threadBoxRef} onScroll={handleThreadScroll} className="relative flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar bg-white/[0.02]">
+                                {threadNewCount > 0 && (
+                                    <button
+                                        onClick={() => scrollThreadToBottom()}
+                                        className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white rounded-full pl-3 pr-2 py-1.5 shadow-lg shadow-black/40 text-xs font-bold animate-in slide-in-from-bottom-2"
+                                    >
+                                        <ArrowDown className="w-4 h-4" />
+                                        <span className="bg-white text-green-700 rounded-full min-w-[18px] h-[18px] flex items-center justify-center text-[10px] px-1">
+                                            {threadNewCount}
+                                        </span>
+                                    </button>
+                                )}
                                 {threadLoading ? (
                                     <div className="flex justify-center pt-8"><Loader2 className="w-5 h-5 animate-spin text-green-500" /></div>
                                 ) : thread.length === 0 ? (
