@@ -267,7 +267,7 @@ export function AIHelp() {
         msgs
             .filter(m => m.text)
             .map(m => `${m.role === "user" ? "Visitor" : "AfroPitch Support"}: ${m.text}`)
-            .join("\n");
+            .join("\n\n");
 
     // Turn the agent conversation into a human ticket with the full thread.
     // Only ever called for identified visitors (logged in, or a guest with an

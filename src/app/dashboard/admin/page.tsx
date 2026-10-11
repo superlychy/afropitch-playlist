@@ -141,6 +141,41 @@ function ticketPreview(t: any): string {
     return msg.replace(/\s+/g, " ").trim();
 }
 
+// Renders an agent-escalation transcript so it is easy to scan: each message
+// on its own line, speaker names and section headers in bold. Used only for
+// the team-only transcript row; normal chat messages render as plain text.
+function TranscriptBody({ text }: { text: string }) {
+    const body = text.replace(/^Agent transcript \(team only\)\n?/, "");
+    const lines = body.split("\n");
+    return (
+        <div className="text-sm whitespace-pre-wrap">
+            {lines.map((line, i) => {
+                const speaker = line.match(/^(Visitor|AfroPitch Support):(.*)$/);
+                if (speaker) {
+                    return (
+                        <p key={i}>
+                            <strong className="text-white">{speaker[1]}:</strong>
+                            {speaker[2]}
+                        </p>
+                    );
+                }
+                if (line.trim().endsWith(":") && line.trim().length > 1) {
+                    return (
+                        <p key={i}>
+                            <strong className="text-white">{line}</strong>
+                        </p>
+                    );
+                }
+                return <p key={i}>{line === "" ? "\u00a0" : line}</p>;
+            })}
+        </div>
+    );
+}
+
+function isTranscriptMessage(message: string) {
+    return message.startsWith("Agent transcript (team only)");
+}
+
 export default function AdminDashboard() {
     const { user, isLoading, logout } = useAuth();
     const { toast } = useToast();
@@ -3100,7 +3135,11 @@ export default function AdminDashboard() {
                             {chatMessages.map((msg) => (
                                 <div key={msg.id} className={`flex ${msg.is_admin ? 'justify-end' : 'justify-start'}`}>
                                     <div className={`max-w-[70%] p-3 rounded-xl ${msg.is_admin ? 'bg-green-600 text-white' : 'bg-zinc-800 text-gray-200'}`}>
-                                        <p className="text-sm">{msg.message}</p>
+                                        {isTranscriptMessage(msg.message) ? (
+                                            <TranscriptBody text={msg.message} />
+                                        ) : (
+                                            <p className="text-sm whitespace-pre-wrap">{msg.message}</p>
+                                        )}
                                         <p className="text-[10px] opacity-50 mt-1 text-right">{new Date(msg.created_at).toLocaleTimeString()}</p>
                                     </div>
                                 </div>
