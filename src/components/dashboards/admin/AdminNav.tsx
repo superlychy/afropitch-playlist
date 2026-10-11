@@ -161,6 +161,10 @@ export function AdminBottomNav({
         { tab: "mixing", label: "Mixing", icon: AudioWaveform },
         { tab: "inbox", label: "Inbox", icon: Mail },
     ];
+    // Everything that needs attention but lives only behind "More": its badge
+    // is the sum of those sections, so nothing hides without a signal.
+    // (Playlists and Inbox already badge themselves in the bar.)
+    const moreCount = counts.withdrawals + counts.openTickets + counts.applications;
     return (
         <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-30 bg-[#0E0E10]/95 backdrop-blur border-t border-white/[0.08] flex px-1.5 pt-2.5 pb-[calc(10px+env(safe-area-inset-bottom))]">
             {items.map(item => {
@@ -187,10 +191,15 @@ export function AdminBottomNav({
             })}
             <button
                 onClick={onOpenMore}
-                className="flex-1 flex flex-col items-center gap-[3px] text-[10px] font-semibold text-[#71717A]"
+                className="flex-1 flex flex-col items-center gap-[3px] text-[10px] font-semibold text-[#71717A] relative"
             >
                 <MoreHorizontal className="w-[22px] h-[22px]" />
                 More
+                {moreCount > 0 && (
+                    <span className="absolute top-[-4px] right-[calc(50%-20px)] min-w-[17px] h-[17px] rounded-full bg-red-500 text-white text-[10px] font-extrabold flex items-center justify-center px-1">
+                        {moreCount}
+                    </span>
+                )}
             </button>
         </nav>
     );
