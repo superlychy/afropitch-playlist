@@ -6,12 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { useAuth } from "@/context/AuthContext";
-import { pricingConfig } from "@/../config/pricing";
 
 type Msg = {
     role: "assistant" | "user";
     text: string;
-    isOptions?: boolean;
     isTicketPrompt?: boolean;
 };
 
@@ -24,90 +22,34 @@ type ThreadMsg = {
 
 type ActiveTicket = { ticket_id: string; access_token?: string; subject?: string };
 
-const LS_KEY = "afropitch_support_ticket_v1";
-const CUR = pricingConfig.currency;
+type GuestRole = "artist" | "curator";
+type GuestIdentity = { role?: GuestRole; name?: string; email?: string; anonymous?: boolean };
 
-// FAQ data — scored keyword matching (best match wins, not first match)
-const FAQ_DATA = [
-    {
-        question: "How much does it cost?",
-        keywords: ["price", "cost", "pay", "money", "much", "fee", "pricing"],
-        answer: `We offer transparent pricing:\n• Standard Review: ${CUR}3,000 (3-7 days)\n• Express Review: ${CUR}5,000 (48 hours)\n• Exclusive Pitching: ${CUR}13,500 (VIP Placement)`
-    },
-    {
-        question: "How does the mixing service work?",
-        keywords: ["mix", "master", "mixing", "mastering", "stems", "engineer", "polish"],
-        answer: `Our engineers mix and master your song for you:\n• Demo Polish: ${CUR}35,000 (~3 days)\n• Full Mix: ${CUR}65,000 (~5 days)\n• Mix + Master: ${CUR}100,000 (~7 days)\n\nPick a package on the Mixing page, share your Google Drive link, and pay securely. Your money is held in escrow until you approve the final mix. You'll review a watermarked preview first.`
-    },
-    {
-        question: "Is my payment safe? (Escrow)",
-        keywords: ["escrow", "safe", "secure", "hold my money", "protect"],
-        answer: "Yes. Mixing payments are held in escrow. The engineer only gets paid when you accept the finished mix. If you're not happy, it comes straight back to your wallet."
-    },
-    {
-        question: "Can I pay from outside Nigeria?",
-        keywords: ["ghana", "kenya", "south africa", "outside nigeria", "international", "dollar", "cedi", "rand", "abroad"],
-        answer: "Yes! International Visa and Mastercard payments are accepted. You're charged in naira and your bank handles the currency conversion."
-    },
-    {
-        question: "Do you offer refunds?",
-        keywords: ["refund", "money back", "guarantee"],
-        answer: "Yes! We have a 100% money-back guarantee. If your song is not approved or reviewed within the timeframe, your funds are returned to your wallet instantly."
-    },
-    {
-        question: "Are the curators real?",
-        keywords: ["real", "fake", "bot", "curator"],
-        answer: "Absolutely. We strictly vet every curator to ensure they are real humans with active, organic playlists. We have zero tolerance for bots."
-    },
-    {
-        question: "My song was declined. What now?",
-        keywords: ["declined", "rejected", "not approved", "denied"],
-        answer: "Don't give up on the song! The most common reason is mix quality. Our engineers can professionally mix it for you. Check the Mixing page (from Demo Polish at ₦35,000) and resubmit once it sounds its best."
-    },
-    {
-        question: "How do I withdraw my earnings?",
-        keywords: ["withdraw", "payout", "earnings", "bank", "cash out"],
-        answer: `Go to Dashboard > Withdrawals. You can request a payout to your local bank account once your balance is above the ${CUR}5,000 minimum. Withdrawals are reviewed by our team before they're sent.`
-    },
-    {
-        question: "What is the Featured Artist program?",
-        keywords: ["featured", "feature me", "spotlight", "artist of the week"],
-        answer: "Each week we spotlight one artist on the Featured page, with their bio, Q&A, and a permanent SEO-friendly page. Our team picks artists with quality music and staying power. Keep releasing great music and you could be next!"
-    },
-    {
-        question: "How do I become a curator?",
-        keywords: ["become a curator", "apply as curator", "curator application", "join as curator"],
-        answer: "Head to the Curators section and submit an application with your playlist links. Our team reviews every application. We only accept curators with real, active, organic playlists."
-    },
-    {
-        question: "What genres do you accept?",
-        keywords: ["genre", "style", "type", "music"],
-        answer: "We specialize in African music genres: Afrobeats, Amapiano, Afro-House, Hip Hop, and Francophone African sounds."
-    },
-    {
-        question: "How do I verify my song?",
-        keywords: ["verify", "verification", "check"],
-        answer: "Once your song is reviewed and placed, you will be notified via email and on your dashboard. You can then view the placement details directly."
-    },
-    {
-        question: "Can I talk to a human?",
-        keywords: ["human", "agent", "person", "real person", "call", "phone", "whatsapp", "talk to someone"],
-        answer: "Of course! Open a support ticket below and our team will reply here in the chat (and by email). We typically respond within a day."
-    },
-];
+const LS_KEY = "afropitch_support_ticket_v1";
+const VISITOR_LS_KEY = "afropitch_support_visitor_v1";
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const GREETING = "Hi, this is AfroPitch Support. How can I help you today?";
+const AGENT_FALLBACK =
+    "Our support assistant is unavailable right now. You can open a support ticket and the team will reply here and by email.";
 
 export function AIHelp() {
-    const { user } = useAuth();
+    const { user, isLoading } = useAuth();
     const [isOpen, setIsOpen] = useState(false);
-    const [mode, setMode] = useState<"faq" | "ticket">("faq");
+    const [mode, setMode] = useState<"agent" | "ticket">("agent");
 
-    // FAQ mode state
-    const [messages, setMessages] = useState<Msg[]>([
-        { role: "assistant", text: "Hi! How can we help you today? Select a topic below or type your question." },
-        { role: "assistant", text: "", isOptions: true }
-    ]);
+    // Agent mode state
+    const [messages, setMessages] = useState<Msg[]>([]);
     const [input, setInput] = useState("");
     const [isTyping, setIsTyping] = useState(false);
+    const [agentSending, setAgentSending] = useState(false);
+
+    // Guest identity + intake state
+    const [guest, setGuest] = useState<GuestIdentity | null>(null);
+    const [needsIntake, setNeedsIntake] = useState(false);
+    const [intakeForEscalation, setIntakeForEscalation] = useState(false);
+    const [intakeRole, setIntakeRole] = useState<GuestRole | null>(null);
+    const [intakeName, setIntakeName] = useState("");
+    const [intakeEmail, setIntakeEmail] = useState("");
 
     // Ticket form state
     const [showTicketForm, setShowTicketForm] = useState(false);
@@ -131,62 +73,180 @@ export function AIHelp() {
     const modeRef = useRef(mode);
     const activeTicketRef = useRef(activeTicket);
     const lastReadRef = useRef<string | null>(null);
+    const messagesRef = useRef<Msg[]>([]);
     isOpenRef.current = isOpen;
     modeRef.current = mode;
     activeTicketRef.current = activeTicket;
+    messagesRef.current = messages;
 
-    const scrollFaq = () => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    const scrollAgent = () => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     const scrollThread = () => threadEndRef.current?.scrollIntoView({ behavior: "smooth" });
 
-    useEffect(() => { scrollFaq(); }, [messages, isTyping, isOpen, showTicketForm]);
+    useEffect(() => { scrollAgent(); }, [messages, isTyping, isOpen, showTicketForm, needsIntake]);
     useEffect(() => { scrollThread(); }, [thread, isOpen, mode]);
 
     const pushAssistant = (text: string, extra?: Partial<Msg>) =>
         setMessages(prev => [...prev, { role: "assistant", text, ...extra }]);
 
-    // ---------- FAQ engine (scored keyword match) ----------
-    const getAnswer = (query: string): string | null => {
-        const lower = query.toLowerCase();
-        let best: string | null = null;
-        let bestScore = 0;
-        for (const item of FAQ_DATA) {
-            const score = item.keywords.filter(k => lower.includes(k)).length;
-            if (score > bestScore) { bestScore = score; best = item.answer; }
-        }
-        if (best) return best;
-        if (lower.match(/\b(hi|hello|hey|good (morning|afternoon|evening))\b/))
-            return "Hello! Ask me about pricing, mixing, refunds, withdrawals, or tap a topic below.";
-        return null;
+    // ---------- Guest identity + intake ----------
+    const identified = !!user || !!guest?.email;
+    const visitorRole: GuestRole | undefined = user
+        ? user.role === "curator"
+            ? "curator"
+            : user.role === "artist"
+                ? "artist"
+                : undefined
+        : guest?.role;
+
+    const seedGreeting = useCallback(() => {
+        setMessages(prev => (prev.length ? prev : [{ role: "assistant", text: GREETING }]));
+    }, []);
+
+    // Load any stored guest identity once.
+    useEffect(() => {
+        try {
+            const raw = localStorage.getItem(VISITOR_LS_KEY);
+            setGuest(raw ? (JSON.parse(raw) as GuestIdentity) : {});
+        } catch { setGuest({}); }
+    }, []);
+
+    // Decide whether the guest intake shows before chatting. Logged-in users
+    // never see it; guests with a stored identity or a stored "anonymous"
+    // choice skip it as well.
+    useEffect(() => {
+        if (isLoading || guest === null) return;
+        if (user) { setNeedsIntake(false); seedGreeting(); return; }
+        if (messagesRef.current.length > 0) { setNeedsIntake(false); return; }
+        if (guest.email || guest.anonymous) { setNeedsIntake(false); seedGreeting(); return; }
+        setIntakeRole(guest.role ?? null);
+        setNeedsIntake(true);
+    }, [isLoading, user, guest, seedGreeting]);
+
+    const saveGuest = (g: GuestIdentity) => {
+        setGuest(g);
+        try { localStorage.setItem(VISITOR_LS_KEY, JSON.stringify(g)); } catch { /* ignore */ }
     };
 
-    const handleSend = async (textOverride?: string) => {
-        const textToSend = (textOverride || input).trim();
-        if (!textToSend) return;
+    const startWithIdentity = () => {
+        const name = intakeName.trim();
+        const email = intakeEmail.trim();
+        if (!name || !EMAIL_RE.test(email)) return;
+        const identity: GuestIdentity = {
+            role: intakeRole ?? guest?.role,
+            name,
+            email,
+        };
+        saveGuest(identity);
+        setNeedsIntake(false);
+        seedGreeting();
+        if (intakeForEscalation) {
+            setIntakeForEscalation(false);
+            void createEscalationTicket(messagesRef.current, identity);
+        }
+    };
 
-        setMessages(prev => [...prev, { role: "user", text: textToSend }]);
+    const continueAnonymous = () => {
+        saveGuest({ role: intakeRole ?? guest?.role, anonymous: true });
+        setNeedsIntake(false);
+        seedGreeting();
+    };
+
+    // ---------- Support agent ----------
+    const buildTranscript = (msgs: Msg[]) =>
+        msgs
+            .filter(m => m.text)
+            .map(m => `${m.role === "user" ? "Visitor" : "AfroPitch Support"}: ${m.text}`)
+            .join("\n");
+
+    // Turn the agent conversation into a human ticket with the full thread.
+    // Only ever called for identified visitors (logged in, or a guest with an
+    // email); anonymous guests are never forwarded to the team.
+    const createEscalationTicket = async (msgs: Msg[], identity?: GuestIdentity) => {
+        const name = user ? "" : (identity?.name ?? guest?.name ?? "");
+        const email = user ? "" : (identity?.email ?? guest?.email ?? "");
+        setIsTyping(true);
+        try {
+            const res = await fetch("/api/support/ticket", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    subject: "Support agent escalation",
+                    message: `Chat with AfroPitch Support agent:\n\n${buildTranscript(msgs)}\n\nThe agent determined this needs a human.`,
+                    name: name.trim(),
+                    email: email.trim(),
+                }),
+            });
+            const json = await res.json().catch(() => null);
+            setIsTyping(false);
+            if (json?.ok) {
+                openTicketMode({ ticket_id: json.ticket_id, access_token: json.access_token, subject: "Support agent escalation" });
+            } else {
+                pushAssistant("Sorry, I could not pass this on just now. Please open a support ticket below and the team will pick it up.");
+                openTicketForm();
+            }
+        } catch {
+            setIsTyping(false);
+            pushAssistant("Sorry, I could not pass this on just now. Please open a support ticket below and the team will pick it up.");
+            openTicketForm();
+        }
+    };
+
+    const handleEscalation = (msgs: Msg[]) => {
+        if (identified) {
+            void createEscalationTicket(msgs);
+        } else {
+            // Anonymous guest: a human handoff needs a name and email first.
+            setIntakeRole(guest?.role ?? null);
+            setIntakeForEscalation(true);
+            setNeedsIntake(true);
+        }
+    };
+
+    const handleSend = async () => {
+        const textToSend = input.trim();
+        if (!textToSend || agentSending) return;
+
+        const history: Msg[] = [...messagesRef.current, { role: "user", text: textToSend }];
+        setMessages(history);
         setInput("");
         setShowTicketForm(false);
         setIsTyping(true);
+        setAgentSending(true);
 
-        setTimeout(() => {
-            const answer = getAnswer(textToSend);
+        try {
+            const res = await fetch("/api/support/agent", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    messages: history.filter(m => m.text).map(m => ({ role: m.role, text: m.text })),
+                    visitor: { kind: user ? "user" : "guest", role: visitorRole, identified },
+                }),
+            });
+            const json = await res.json().catch(() => null);
             setIsTyping(false);
-            if (answer) {
-                pushAssistant(answer);
+            if (json?.ok && typeof json.reply === "string" && json.reply.trim()) {
+                const finalHistory: Msg[] = [...history, { role: "assistant", text: json.reply }];
+                setMessages(finalHistory);
+                if (json.escalate) handleEscalation(finalHistory);
             } else {
-                setTicketSubject(textToSend.slice(0, 120));
-                pushAssistant(
-                    activeTicket
-                        ? "I don't have an answer for that, but you can continue your open conversation with our team, or open a fresh ticket below."
-                        : "I don't have an answer for that yet, but I can open a support ticket and our team will get back to you right here in the chat.",
-                    { isTicketPrompt: true }
-                );
+                pushAssistant(AGENT_FALLBACK, { isTicketPrompt: true });
             }
-        }, 500);
+        } catch {
+            setIsTyping(false);
+            pushAssistant(AGENT_FALLBACK, { isTicketPrompt: true });
+        } finally {
+            setAgentSending(false);
+        }
     };
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (e.key === "Enter") handleSend();
+    };
+
+    const openTicketForm = () => {
+        if (!user && guest?.name && !ticketName) setTicketName(guest.name);
+        if (!user && guest?.email && !ticketEmail) setTicketEmail(guest.email);
+        setShowTicketForm(true);
     };
 
     // ---------- Live ticket thread ----------
@@ -347,7 +407,7 @@ export function AIHelp() {
                     <div className="p-4 border-b border-white/10 flex justify-between items-center bg-gradient-to-r from-green-900/40 to-black">
                         <div className="flex items-center gap-3">
                             {mode === "ticket" ? (
-                                <button onClick={() => setMode("faq")} className="w-8 h-8 rounded-full bg-green-500/15 flex items-center justify-center hover:bg-green-500/25 transition-colors" title="Back to topics">
+                                <button onClick={() => setMode("agent")} className="w-8 h-8 rounded-full bg-green-500/15 flex items-center justify-center hover:bg-green-500/25 transition-colors" title="Back to support assistant">
                                     <ArrowLeft className="w-4 h-4 text-green-400" />
                                 </button>
                             ) : (
@@ -356,10 +416,10 @@ export function AIHelp() {
                                 </div>
                             )}
                             <div>
-                                <p className="font-bold text-white text-sm">{mode === "ticket" ? "Support chat" : "Help Center"}</p>
+                                <p className="font-bold text-white text-sm">{mode === "ticket" ? "Support chat" : "AfroPitch Support"}</p>
                                 <p className="text-[10px] text-green-400 font-medium flex items-center gap-1">
                                     <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-                                    {mode === "ticket" ? "Our team typically replies within a day" : "Automated Support"}
+                                    {mode === "ticket" ? "Our team typically replies within a day" : "Ask us anything about AfroPitch"}
                                 </p>
                             </div>
                         </div>
@@ -368,118 +428,169 @@ export function AIHelp() {
                         </Button>
                     </div>
 
-                    {mode === "faq" ? (
-                        <>
-                            {/* Messages Area */}
-                            <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar bg-white/[0.02]">
-                                {messages.map((m, i) => (
-                                    <div key={i} className={`flex flex-col ${m.role === "user" ? "items-end" : "items-start"} animate-in slide-in-from-bottom-2 duration-300`}>
-                                        {m.text && (
-                                            <div className={`flex gap-2 max-w-[85%] ${m.role === "user" ? "flex-row-reverse" : "flex-row"}`}>
-                                                <div className={`w-6 h-6 rounded-full flex-shrink-0 flex items-center justify-center mt-1 ${m.role === "user" ? "bg-white/10" : "bg-green-500/10"}`}>
-                                                    {m.role === "user" ? <User className="w-3 h-3 text-gray-400" /> : <Bot className="w-3 h-3 text-green-500" />}
-                                                </div>
-                                                <div className={`rounded-2xl px-4 py-2.5 text-sm leading-relaxed whitespace-pre-line shadow-sm ${m.role === "user" ? "bg-green-600 text-white rounded-tr-none" : "bg-zinc-800/80 border border-white/5 text-gray-200 rounded-tl-none"}`}>
-                                                    {m.text}
-                                                </div>
-                                            </div>
-                                        )}
-
-                                        {m.isOptions && (
-                                            <div className="mt-2 ml-8 space-y-2 w-[80%]">
-                                                {activeTicket && (
+                    {mode === "agent" ? (
+                        needsIntake ? (
+                            <>
+                                {/* Guest intake: who are you? (skippable, but an
+                                    unnamed guest is never forwarded to the team) */}
+                                <div className="flex-1 overflow-y-auto p-4 custom-scrollbar bg-white/[0.02]">
+                                    <div className="rounded-xl border border-green-500/30 bg-zinc-900/80 p-4 space-y-3 animate-in slide-in-from-bottom-2">
+                                        <p className="text-sm font-bold text-white">
+                                            {intakeForEscalation ? "One more step" : "Hi, this is AfroPitch Support"}
+                                        </p>
+                                        <p className="text-xs text-gray-400 leading-relaxed">
+                                            {intakeForEscalation
+                                                ? "To pass this conversation to the team, we need your name and email so they can reply to you here and by email."
+                                                : "Tell us a little about you so we can help you properly. You can also continue without a name, but then we cannot pass anything to the team for you."}
+                                        </p>
+                                        <div>
+                                            <p className="text-xs text-gray-300 mb-1.5">Are you an artist or a curator?</p>
+                                            <div className="flex gap-2">
+                                                {(["artist", "curator"] as GuestRole[]).map(r => (
                                                     <button
-                                                        onClick={enterTicketMode}
-                                                        className="w-full text-left text-xs bg-green-500/15 hover:bg-green-500/25 border border-green-500/40 rounded-lg p-2.5 transition-all text-green-300 flex justify-between items-center"
+                                                        key={r}
+                                                        onClick={() => setIntakeRole(r)}
+                                                        className={`flex-1 text-xs rounded-lg p-2.5 border transition-all ${intakeRole === r ? "bg-green-500/20 border-green-500/50 text-green-300" : "bg-white/5 border-white/10 text-gray-300 hover:bg-green-500/10 hover:border-green-500/30"}`}
                                                     >
-                                                        <span className="flex items-center gap-2"><Headset className="w-3.5 h-3.5" /> Continue your support chat {unread > 0 && <span className="bg-green-500 text-black text-[10px] font-bold rounded-full px-1.5">{unread} new</span>}</span>
-                                                        <ChevronRight className="w-3 h-3" />
-                                                    </button>
-                                                )}
-                                                {FAQ_DATA.map((faq) => (
-                                                    <button
-                                                        key={faq.question}
-                                                        onClick={() => handleSend(faq.question)}
-                                                        className="w-full text-left text-xs bg-white/5 hover:bg-green-500/10 hover:border-green-500/30 border border-white/10 rounded-lg p-2.5 transition-all text-gray-300 hover:text-green-400 flex justify-between items-center group"
-                                                    >
-                                                        {faq.question}
-                                                        <ChevronRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                        {r === "artist" ? "Artist" : "Curator"}
                                                     </button>
                                                 ))}
                                             </div>
+                                        </div>
+                                        <Input value={intakeName} onChange={(e) => setIntakeName(e.target.value)} placeholder="Your name" className="bg-black/50 border-white/10 h-9 text-xs rounded-lg" />
+                                        <Input value={intakeEmail} onChange={(e) => setIntakeEmail(e.target.value)} placeholder="Email for our reply" type="email" className="bg-black/50 border-white/10 h-9 text-xs rounded-lg" />
+                                        <Button
+                                            size="sm"
+                                            disabled={!intakeName.trim() || !EMAIL_RE.test(intakeEmail.trim())}
+                                            onClick={startWithIdentity}
+                                            className="w-full bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs"
+                                        >
+                                            {intakeForEscalation ? "Continue" : "Start chat"}
+                                        </Button>
+                                        {intakeForEscalation ? (
+                                            <button
+                                                onClick={() => { setNeedsIntake(false); setIntakeForEscalation(false); }}
+                                                className="w-full text-center text-xs text-gray-500 hover:text-gray-300 transition-colors"
+                                            >
+                                                Not now
+                                            </button>
+                                        ) : (
+                                            <button
+                                                onClick={continueAnonymous}
+                                                className="w-full text-center text-xs text-gray-400 hover:text-gray-200 underline underline-offset-2 transition-colors"
+                                            >
+                                                Continue without name
+                                            </button>
                                         )}
+                                    </div>
+                                    <div ref={messagesEndRef} />
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                {/* Messages Area */}
+                                <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar bg-white/[0.02]">
+                                    {activeTicket && (
+                                        <button
+                                            onClick={enterTicketMode}
+                                            className="w-full text-left text-xs bg-green-500/15 hover:bg-green-500/25 border border-green-500/40 rounded-lg p-2.5 transition-all text-green-300 flex justify-between items-center animate-in slide-in-from-bottom-2"
+                                        >
+                                            <span className="flex items-center gap-2"><Headset className="w-3.5 h-3.5" /> Continue your support chat {unread > 0 && <span className="bg-green-500 text-black text-[10px] font-bold rounded-full px-1.5">{unread} new</span>}</span>
+                                            <ChevronRight className="w-3 h-3" />
+                                        </button>
+                                    )}
+                                    {messages.map((m, i) => (
+                                        <div key={i} className={`flex flex-col ${m.role === "user" ? "items-end" : "items-start"} animate-in slide-in-from-bottom-2 duration-300`}>
+                                            {m.text && (
+                                                <div className={`flex gap-2 max-w-[85%] ${m.role === "user" ? "flex-row-reverse" : "flex-row"}`}>
+                                                    <div className={`w-6 h-6 rounded-full flex-shrink-0 flex items-center justify-center mt-1 ${m.role === "user" ? "bg-white/10" : "bg-green-500/10"}`}>
+                                                        {m.role === "user" ? <User className="w-3 h-3 text-gray-400" /> : <Bot className="w-3 h-3 text-green-500" />}
+                                                    </div>
+                                                    <div className={`rounded-2xl px-4 py-2.5 text-sm leading-relaxed whitespace-pre-line shadow-sm ${m.role === "user" ? "bg-green-600 text-white rounded-tr-none" : "bg-zinc-800/80 border border-white/5 text-gray-200 rounded-tl-none"}`}>
+                                                        {m.text}
+                                                    </div>
+                                                </div>
+                                            )}
 
-                                        {m.isTicketPrompt && (
-                                            <div className="mt-2 ml-8 w-[80%] space-y-2">
-                                                {activeTicket && (
+                                            {m.isTicketPrompt && (
+                                                <div className="mt-2 ml-8 w-[80%] space-y-2">
+                                                    {activeTicket && (
+                                                        <button
+                                                            onClick={enterTicketMode}
+                                                            className="w-full text-left text-xs bg-green-500/10 hover:bg-green-500/20 border border-green-500/30 rounded-lg p-2.5 transition-all text-green-300 flex justify-between items-center"
+                                                        >
+                                                            <span className="flex items-center gap-2"><Headset className="w-3.5 h-3.5" /> Continue your open conversation</span>
+                                                            <ChevronRight className="w-3 h-3" />
+                                                        </button>
+                                                    )}
                                                     <button
-                                                        onClick={enterTicketMode}
+                                                        onClick={openTicketForm}
                                                         className="w-full text-left text-xs bg-green-500/10 hover:bg-green-500/20 border border-green-500/30 rounded-lg p-2.5 transition-all text-green-300 flex justify-between items-center"
                                                     >
-                                                        <span className="flex items-center gap-2"><Headset className="w-3.5 h-3.5" /> Continue your open conversation</span>
+                                                        <span className="flex items-center gap-2"><TicketPlus className="w-3.5 h-3.5" /> Open a support ticket</span>
                                                         <ChevronRight className="w-3 h-3" />
                                                     </button>
-                                                )}
-                                                <button
-                                                    onClick={() => setShowTicketForm(true)}
-                                                    className="w-full text-left text-xs bg-green-500/10 hover:bg-green-500/20 border border-green-500/30 rounded-lg p-2.5 transition-all text-green-300 flex justify-between items-center"
-                                                >
-                                                    <span className="flex items-center gap-2"><TicketPlus className="w-3.5 h-3.5" /> Open a support ticket</span>
-                                                    <ChevronRight className="w-3 h-3" />
-                                                </button>
-                                            </div>
-                                        )}
-                                    </div>
-                                ))}
-
-                                {showTicketForm && (
-                                    <div className="rounded-xl border border-green-500/30 bg-zinc-900/80 p-3 space-y-2 animate-in slide-in-from-bottom-2">
-                                        <p className="text-xs font-bold text-white">Open a support ticket</p>
-                                        {!user && (
-                                            <>
-                                                <Input value={ticketName} onChange={(e) => setTicketName(e.target.value)} placeholder="Your name" className="bg-black/50 border-white/10 h-9 text-xs rounded-lg" />
-                                                <Input value={ticketEmail} onChange={(e) => setTicketEmail(e.target.value)} placeholder="Email for our reply" type="email" className="bg-black/50 border-white/10 h-9 text-xs rounded-lg" />
-                                            </>
-                                        )}
-                                        <Input value={ticketSubject} onChange={(e) => setTicketSubject(e.target.value)} placeholder="Subject" className="bg-black/50 border-white/10 h-9 text-xs rounded-lg" />
-                                        <textarea value={ticketMessage} onChange={(e) => setTicketMessage(e.target.value)} placeholder="Describe the issue…" rows={3} className="w-full bg-black/50 border border-white/10 rounded-lg text-xs p-2 text-white" />
-                                        <div className="flex gap-2">
-                                            <Button size="sm" disabled={ticketSending || !ticketSubject.trim() || !ticketMessage.trim() || (!user && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(ticketEmail.trim()))} onClick={submitTicket} className="bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs">
-                                                {ticketSending && <Loader2 className="w-3 h-3 mr-1 animate-spin" />}
-                                                Send ticket
-                                            </Button>
-                                            <Button size="sm" variant="ghost" onClick={() => setShowTicketForm(false)} className="text-xs text-gray-500 rounded-lg">Cancel</Button>
+                                                </div>
+                                            )}
                                         </div>
-                                    </div>
-                                )}
+                                    ))}
 
-                                {isTyping && (
-                                    <div className="flex justify-start animate-in fade-in">
-                                        <div className="flex gap-2 max-w-[85%]">
-                                            <div className="w-6 h-6 rounded-full bg-green-500/10 flex-shrink-0 flex items-center justify-center mt-1">
-                                                <Bot className="w-3 h-3 text-green-500" />
-                                            </div>
-                                            <div className="bg-zinc-800/80 border border-white/5 rounded-2xl rounded-tl-none px-4 py-3 flex items-center gap-1">
-                                                <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-bounce [animation-delay:-0.3s]" />
-                                                <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-bounce [animation-delay:-0.15s]" />
-                                                <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-bounce" />
+                                    {showTicketForm && (
+                                        <div className="rounded-xl border border-green-500/30 bg-zinc-900/80 p-3 space-y-2 animate-in slide-in-from-bottom-2">
+                                            <p className="text-xs font-bold text-white">Open a support ticket</p>
+                                            {!user && (
+                                                <>
+                                                    <Input value={ticketName} onChange={(e) => setTicketName(e.target.value)} placeholder="Your name" className="bg-black/50 border-white/10 h-9 text-xs rounded-lg" />
+                                                    <Input value={ticketEmail} onChange={(e) => setTicketEmail(e.target.value)} placeholder="Email for our reply" type="email" className="bg-black/50 border-white/10 h-9 text-xs rounded-lg" />
+                                                </>
+                                            )}
+                                            <Input value={ticketSubject} onChange={(e) => setTicketSubject(e.target.value)} placeholder="Subject" className="bg-black/50 border-white/10 h-9 text-xs rounded-lg" />
+                                            <textarea value={ticketMessage} onChange={(e) => setTicketMessage(e.target.value)} placeholder="Describe the issue…" rows={3} className="w-full bg-black/50 border border-white/10 rounded-lg text-xs p-2 text-white" />
+                                            <div className="flex gap-2">
+                                                <Button size="sm" disabled={ticketSending || !ticketSubject.trim() || !ticketMessage.trim() || (!user && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(ticketEmail.trim()))} onClick={submitTicket} className="bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs">
+                                                    {ticketSending && <Loader2 className="w-3 h-3 mr-1 animate-spin" />}
+                                                    Send ticket
+                                                </Button>
+                                                <Button size="sm" variant="ghost" onClick={() => setShowTicketForm(false)} className="text-xs text-gray-500 rounded-lg">Cancel</Button>
                                             </div>
                                         </div>
-                                    </div>
-                                )}
-                                <div ref={messagesEndRef} />
-                            </div>
+                                    )}
 
-                            {/* Input Area */}
-                            <div className="p-3 bg-zinc-900 border-t border-white/10 flex gap-2 items-center">
-                                <div className="relative flex-1">
-                                    <Input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={handleKeyDown} placeholder="Ask a question..." className="bg-black/50 border-white/10 h-10 pr-4 text-sm focus-visible:ring-green-500/50 rounded-full" />
+                                    {isTyping && (
+                                        <div className="flex justify-start animate-in fade-in">
+                                            <div className="flex gap-2 max-w-[85%]">
+                                                <div className="w-6 h-6 rounded-full bg-green-500/10 flex-shrink-0 flex items-center justify-center mt-1">
+                                                    <Bot className="w-3 h-3 text-green-500" />
+                                                </div>
+                                                <div className="bg-zinc-800/80 border border-white/5 rounded-2xl rounded-tl-none px-4 py-3 flex items-center gap-1">
+                                                    <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-bounce [animation-delay:-0.3s]" />
+                                                    <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-bounce [animation-delay:-0.15s]" />
+                                                    <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-bounce" />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                    <div ref={messagesEndRef} />
                                 </div>
-                                <Button size="icon" className={`h-10 w-10 rounded-full transition-all ${input.trim() ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-white/10 text-gray-500'}`} onClick={() => handleSend()} disabled={!input.trim()}>
-                                    <Send className="w-4 h-4 ml-0.5" />
-                                </Button>
-                            </div>
-                        </>
+
+                                {/* Input Area */}
+                                <div className="bg-zinc-900 border-t border-white/10">
+                                    <div className="px-3 pt-2 flex justify-center">
+                                        <button onClick={openTicketForm} className="text-[11px] text-gray-500 hover:text-green-400 flex items-center gap-1 transition-colors">
+                                            <TicketPlus className="w-3 h-3" /> Open a support ticket
+                                        </button>
+                                    </div>
+                                    <div className="p-3 pt-2 flex gap-2 items-center">
+                                        <div className="relative flex-1">
+                                            <Input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={handleKeyDown} placeholder="Ask a question..." className="bg-black/50 border-white/10 h-10 pr-4 text-sm focus-visible:ring-green-500/50 rounded-full" />
+                                        </div>
+                                        <Button size="icon" className={`h-10 w-10 rounded-full transition-all ${input.trim() ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-white/10 text-gray-500'}`} onClick={() => handleSend()} disabled={!input.trim() || agentSending}>
+                                            <Send className="w-4 h-4 ml-0.5" />
+                                        </Button>
+                                    </div>
+                                </div>
+                            </>
+                        )
                     ) : (
                         <>
                             {/* Live ticket thread */}
