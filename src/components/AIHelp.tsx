@@ -250,7 +250,9 @@ export function AIHelp() {
         seedGreeting();
         if (intakeForEscalation) {
             setIntakeForEscalation(false);
-            void createEscalationTicket(messagesRef.current, identity);
+            const pendingSummary = pendingSummaryRef.current;
+            pendingSummaryRef.current = undefined;
+            void createEscalationTicket(messagesRef.current, pendingSummary, identity);
         }
     };
 
@@ -270,17 +272,21 @@ export function AIHelp() {
     // Turn the agent conversation into a human ticket with the full thread.
     // Only ever called for identified visitors (logged in, or a guest with an
     // email); anonymous guests are never forwarded to the team.
-    const createEscalationTicket = async (msgs: Msg[], identity?: GuestIdentity) => {
+    const createEscalationTicket = async (msgs: Msg[], summary?: string, identity?: GuestIdentity) => {
         const name = user ? "" : (identity?.name ?? guest?.name ?? "");
         const email = user ? "" : (identity?.email ?? guest?.email ?? "");
         setIsTyping(true);
         try {
+            const cleanSummary = (summary || "").trim().slice(0, 1500);
+            const summaryBlock = cleanSummary
+                ? `Issue summary (from AfroPitch Support agent):\n${cleanSummary}\n\n`
+                : "";
             const res = await fetch("/api/support/ticket", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     subject: "Support agent escalation",
-                    message: `Chat with AfroPitch Support agent:\n\n${buildTranscript(msgs)}\n\nThe agent determined this needs a human.`,
+                    message: `Chat with AfroPitch Support agent:\n\n${summaryBlock}Full conversation:\n${buildTranscript(msgs)}\n\nThe agent determined this needs a human.`,
                     name: name.trim(),
                     email: email.trim(),
                     agent_escalation: true,
@@ -301,11 +307,15 @@ export function AIHelp() {
         }
     };
 
-    const handleEscalation = (msgs: Msg[]) => {
+    // The agent's handoff brief survives the anonymous-guest identity step.
+    const pendingSummaryRef = useRef<string | undefined>(undefined);
+
+    const handleEscalation = (msgs: Msg[], summary?: string) => {
         if (identified) {
-            void createEscalationTicket(msgs);
+            void createEscalationTicket(msgs, summary);
         } else {
             // Anonymous guest: a human handoff needs a name and email first.
+            pendingSummaryRef.current = summary;
             setIntakeRole(guest?.role ?? null);
             setIntakeName(guest?.name ?? "");
             setIntakeEmail(guest?.email ?? "");
@@ -340,7 +350,7 @@ export function AIHelp() {
             if (json?.ok && typeof json.reply === "string" && json.reply.trim()) {
                 const finalHistory: Msg[] = [...history, { role: "assistant", text: json.reply }];
                 setMessages(finalHistory);
-                if (json.escalate) handleEscalation(finalHistory);
+                if (json.escalate) handleEscalation(finalHistory, typeof json.summary === "string" ? json.summary : undefined);
             } else {
                 pushAssistant(AGENT_FALLBACK, { isTicketPrompt: true });
             }

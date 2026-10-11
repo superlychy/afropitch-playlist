@@ -7,9 +7,10 @@ import { SUPPORT_SYSTEM_PROMPT } from "@/lib/support-knowledge";
 // (kind / role / identified, never names or emails), and this route asks
 // Google Gemini to answer from the approved knowledge base in
 // src/lib/support-knowledge.ts. The model answers with a JSON object:
-// { reply, escalate }. Escalations are turned into real support tickets by
-// the widget, not here, because only the widget knows whether the visitor is
-// identified (anonymous guests are never forwarded to the team).
+// { reply, escalate, summary }. Escalations are turned into real support
+// tickets by the widget, not here, because only the widget knows whether
+// the visitor is identified (anonymous guests are never forwarded to the
+// team). The summary is the agent's handoff brief for the human team.
 //
 // The API key is read at request time only, so builds never require it.
 // If no key is configured, the route returns 503 and the widget falls back
@@ -75,24 +76,25 @@ async function callGemini(
     });
 }
 
-function extractReply(data: unknown): { reply: string; escalate: boolean } {
+function extractReply(data: unknown): { reply: string; escalate: boolean; summary: string } {
     const root = data as {
         candidates?: { content?: { parts?: { text?: string }[] } }[];
     } | null;
     const raw =
         root?.candidates?.[0]?.content?.parts?.map((p) => p?.text ?? "").join("") ?? "";
     const text = raw.trim();
-    if (!text) return { reply: "", escalate: false };
+    if (!text) return { reply: "", escalate: false, summary: "" };
     try {
-        const parsed = JSON.parse(text) as { reply?: unknown; escalate?: unknown };
+        const parsed = JSON.parse(text) as { reply?: unknown; escalate?: unknown; summary?: unknown };
         if (parsed && typeof parsed.reply === "string") {
-            return { reply: parsed.reply.trim(), escalate: parsed.escalate === true };
+            const summary = typeof parsed.summary === "string" ? parsed.summary.trim().slice(0, 1500) : "";
+            return { reply: parsed.reply.trim(), escalate: parsed.escalate === true, summary };
         }
     } catch {
         // Model ignored the JSON contract: fall through and use the raw text.
     }
     const cleaned = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
-    return { reply: cleaned, escalate: false };
+    return { reply: cleaned, escalate: false, summary: "" };
 }
 
 export async function POST(req: NextRequest) {
@@ -148,11 +150,11 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ ok: false, error: "agent_unavailable" }, { status: 502 });
         }
         const data: unknown = await res.json().catch(() => null);
-        const { reply, escalate } = extractReply(data);
+        const { reply, escalate, summary } = extractReply(data);
         if (!reply) {
             return NextResponse.json({ ok: false, error: "agent_unavailable" }, { status: 502 });
         }
-        return NextResponse.json({ ok: true, reply, escalate });
+        return NextResponse.json({ ok: true, reply, escalate, summary });
     } catch {
         return NextResponse.json({ ok: false, error: "agent_unavailable" }, { status: 502 });
     }

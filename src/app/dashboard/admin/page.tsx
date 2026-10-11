@@ -118,6 +118,17 @@ function ticketDisplayName(t: any): string {
 function ticketPreview(t: any): string {
     let msg = String(t?.message || "").replace(/^\s*From:[^\n]*\n+/, "");
     if (t?.subject === "Support agent escalation") {
+        // Prefer the agent's handoff brief: it says what the visitor wants
+        // and the facts gathered, in one or two lines.
+        const summaryMatch = msg.match(/Issue summary[^\n]*\n([\s\S]*?)\n\s*\n/);
+        if (summaryMatch) {
+            const lines = summaryMatch[1]
+                .split("\n")
+                .map(s => s.trim().replace(/^[-•]\s*/, ""))
+                .filter(Boolean)
+                .slice(0, 2);
+            if (lines.length) return lines.join(" · ");
+        }
         msg = msg
             .replace(/^Chat with AfroPitch Support agent:\s*\n+/, "")
             .replace(/\n*The agent determined this needs a human\.\s*$/, "");
