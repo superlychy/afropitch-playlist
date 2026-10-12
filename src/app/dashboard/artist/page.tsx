@@ -21,6 +21,7 @@ import { ArtistMixingOrders } from "@/components/ArtistMixingOrders";
 import { ReferralCard } from "@/components/ReferralCard";
 import { CoverArt } from "@/components/dashboards/artist/CoverArt";
 import { SmartLinkCard } from "@/components/dashboards/artist/SmartLinkCard";
+import { ArtistProfileEditor } from "@/components/dashboards/artist/ArtistProfileEditor";
 
 const PayWithPaystack = dynamic(() => import("@/components/PaystackButton"), { ssr: false });
 
@@ -594,6 +595,13 @@ export default function ArtistDashboard() {
               ))
             )}
           </section>
+
+          {/* ===== My public profile ===== */}
+          {user?.id && (
+            <section id="public-profile" className="pt-4 scroll-mt-20">
+              <ArtistProfileEditor userId={user.id} />
+            </section>
+          )}
 
           {/* ===== Recent submissions ===== */}
           <section id="submissions" className="pt-4 scroll-mt-20">

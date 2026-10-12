@@ -1,7 +1,8 @@
 export const dynamic = 'force-dynamic';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
-import { redirect } from 'next/navigation';
 import { Metadata } from 'next';
+import { ArtistFanPage, type FanSong } from '@/components/ArtistFanPage';
+import type { ArtistProfile } from '@/components/ArtistCard';
 
 const getAdminSupabase = () => createAdminClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -12,10 +13,12 @@ interface Props {
   params: { slug: string };
 }
 
+const CLICKS_NEEDED = 100;
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const supabase = getAdminSupabase();
   const { slug } = await Promise.resolve(params);
-  
+
   const { data: sub } = await supabase
     .from('submissions')
     .select('song_title, artist_name, song_link, playlist:playlists(name)')
@@ -26,9 +29,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   const playlist = sub.playlist as { name: string } | { name: string }[] | null;
   const playlistName = Array.isArray(playlist) ? playlist[0]?.name : playlist?.name;
-  
+
   return {
-    title: `🎵 ${sub.song_title} by ${sub.artist_name} | AfroPitch`,
+    title: `${sub.song_title} by ${sub.artist_name} | AfroPitch`,
     description: `Listen to "${sub.song_title}" by ${sub.artist_name} on ${playlistName || "AfroPitch"}. Stream now and help it trend!`,
     openGraph: {
       title: `${sub.song_title} - ${sub.artist_name}`,
@@ -54,11 +57,12 @@ export default async function TrackPage({ params }: Props) {
     );
   }
 
-  // 1. Fetch Submission with full details
+  // 1. Fetch the tracked submission.
   const { data: submission, error } = await supabase
     .from('submissions')
     .select(`
-      id, song_title, artist_name, song_link, clicks,
+      id, artist_id, song_title, artist_name, song_link, apple_music_url,
+      audiomack_url, boomplay_url, cover_art_url, clicks,
       playlist:playlists (name, playlist_link)
     `)
     .eq('tracking_slug', slug)
@@ -75,7 +79,7 @@ export default async function TrackPage({ params }: Props) {
     );
   }
 
-  // 2. Increment Clicks
+  // 2. Log the click against THIS song (trial + trending systems depend on it).
   const { headers } = await import('next/headers');
   const headerList = await headers();
   const forwardedFor = headerList.get('x-forwarded-for');
@@ -86,113 +90,57 @@ export default async function TrackPage({ params }: Props) {
     submission_id: submission.id,
     ip_address: ip,
   });
-
-  // 3. Get new click count for trending progress
   const newClicks = (submission.clicks || 0) + 1;
-  const clicksNeeded = 100;
-  const progress = Math.min(Math.round((newClicks / clicksNeeded) * 100), 100);
-  const isTrending = newClicks >= clicksNeeded;
 
-  // 4. Resolve Target URL
-  let rawUrl = Array.isArray(submission.playlist)
-    ? submission.playlist[0]?.playlist_link
-    : (submission.playlist as any)?.playlist_link || submission.song_link;
+  // 3. Load the artist's fan page data.
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('id, full_name, profile_slug, photo_url, bio, instagram, twitter, tiktok, youtube, website')
+    .eq('id', submission.artist_id)
+    .single();
 
-  if (!rawUrl) rawUrl = submission.song_link;
+  const { data: acceptedSongs } = await supabase
+    .from('submissions')
+    .select(
+      'id, song_title, song_link, apple_music_url, audiomack_url, boomplay_url, cover_art_url, playlist:playlists(name, playlist_link)'
+    )
+    .eq('artist_id', submission.artist_id)
+    .eq('status', 'accepted')
+    .order('created_at', { ascending: false });
 
-  if (rawUrl && !rawUrl.startsWith('http://') && !rawUrl.startsWith('https://')) {
-    rawUrl = 'https://' + rawUrl;
+  const norm = (s: any): FanSong => ({
+    ...s,
+    playlist: Array.isArray(s.playlist) ? s.playlist[0] ?? null : s.playlist,
+  });
+  const songs: FanSong[] = ((acceptedSongs || []) as any[]).map(norm);
+  // The clicked song stays featured even if it is not accepted (yet).
+  if (!songs.some((s) => s.id === submission.id)) {
+    songs.unshift(norm(submission));
   }
 
-  // 5. For GET requests, show the landing page before redirecting
-  // This lets the artist see click counts and share their link
-  const playlistName = Array.isArray(submission.playlist)
-    ? submission.playlist[0]?.name
-    : (submission.playlist as any)?.name;
+  const playlist = submission.playlist as { name: string } | { name: string }[] | null;
+  const playlistName = Array.isArray(playlist) ? playlist[0]?.name : playlist?.name;
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-black via-zinc-900 to-green-950 text-white p-4">
-      <div className="max-w-md w-full text-center space-y-8 animate-in fade-in duration-500">
-        {/* Song Info */}
-        <div className="space-y-3">
-          <p className="text-green-400 text-sm font-bold uppercase tracking-widest">
-            {playlistName || "AfroPitch Playlist"}
-          </p>
-          <h1 className="text-3xl font-extrabold text-white">{submission.song_title}</h1>
-          <p className="text-xl text-gray-400">by {submission.artist_name}</p>
-        </div>
-
-        {/* Trending Progress */}
-        <div className="bg-white/5 rounded-2xl p-6 border border-white/10 space-y-4">
-          <div className="flex justify-between items-center text-sm">
-            <span className="text-gray-400">Viral Progress</span>
-            <span className={`font-bold ${isTrending ? "text-yellow-400" : "text-green-400"}`}>
-              {newClicks}/{clicksNeeded} Clicks
-            </span>
-          </div>
-          <div className="h-3 w-full bg-black/50 rounded-full overflow-hidden">
-            <div
-              className={`h-full rounded-full transition-all duration-1000 ${
-                isTrending
-                  ? "bg-gradient-to-r from-yellow-500 to-amber-400"
-                  : "bg-gradient-to-r from-green-600 to-emerald-400"
-              }`}
-              style={{ width: `${progress}%` }}
-            />
-          </div>
-          {isTrending && (
-            <div className="flex items-center justify-center gap-2 text-yellow-400 font-bold animate-pulse">
-              <span>🔥</span> TRENDING <span>🔥</span>
-            </div>
-          )}
-          {!isTrending && (
-            <p className="text-xs text-gray-500">
-              Share this link to boost your ranking! {clicksNeeded - newClicks} more clicks to trend.
+    <div className="min-h-screen bg-gradient-to-br from-black via-zinc-900 to-green-950 text-white">
+      <main className="w-full mx-auto max-w-3xl px-4 py-16 md:py-20">
+        {profile ? (
+          <ArtistFanPage
+            profile={profile as ArtistProfile}
+            songs={songs}
+            featuredSongId={submission.id}
+            viral={{ clicks: newClicks, needed: CLICKS_NEEDED }}
+          />
+        ) : (
+          <div className="text-center">
+            <p className="text-green-400 text-sm font-bold uppercase tracking-widest">
+              {playlistName || "AfroPitch Playlist"}
             </p>
-          )}
-        </div>
-
-        {/* Share Buttons */}
-        <div className="flex justify-center gap-4">
-          <a
-            href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(
-              `Check out "${submission.song_title}" by ${submission.artist_name} on AfroPitch! 🎵`
-            )}&url=${encodeURIComponent(`https://afropitchplay.best/track/${slug}`)}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="bg-[#1DA1F2] hover:bg-[#1a8cd8] text-white px-6 py-3 rounded-full font-bold transition-all hover:scale-105"
-          >
-            Share on X
-          </a>
-          <a
-            href={`https://wa.me/?text=${encodeURIComponent(
-              `Check out "${submission.song_title}" by ${submission.artist_name}! 🎵 https://afropitchplay.best/track/${slug}`
-            )}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="bg-[#25D366] hover:bg-[#20bd5a] text-white px-6 py-3 rounded-full font-bold transition-all hover:scale-105"
-          >
-            Share on WhatsApp
-          </a>
-        </div>
-
-        {/* Stream Now Button (redirects to playlist) */}
-        {rawUrl && (
-          <a
-            href={rawUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-block bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-500 hover:to-emerald-400 text-white font-bold text-lg px-10 py-4 rounded-full shadow-xl shadow-green-500/20 hover:shadow-green-500/40 transition-all hover:scale-105"
-          >
-            🎧 Stream Now
-          </a>
+            <h1 className="text-3xl font-extrabold text-white mt-2">{submission.song_title}</h1>
+            <p className="text-xl text-gray-400">by {submission.artist_name}</p>
+          </div>
         )}
-
-        {/* Footer */}
-        <p className="text-xs text-gray-600">
-          Powered by <span className="text-green-600 font-bold">AfroPitch</span>
-        </p>
-      </div>
+      </main>
     </div>
   );
 }
