@@ -293,9 +293,12 @@ export default async function EventsPage({
             .limit(12)
     );
 
-    const live = ((liveData ?? []) as EventRow[]).filter((e) => !bannerIdSet.has(e.id));
-    const upcoming = ((upcomingData ?? []) as EventRow[]).filter((e) => !bannerIdSet.has(e.id));
-    const past = ((pastData ?? []) as EventRow[]).filter((e) => !bannerIdSet.has(e.id));
+    // Banner events are excluded from the regular lists to avoid duplication —
+    // but not when searching, so a search always shows every match.
+    const excludeBanners = !q;
+    const live = ((liveData ?? []) as EventRow[]).filter((e) => !excludeBanners || !bannerIdSet.has(e.id));
+    const upcoming = ((upcomingData ?? []) as EventRow[]).filter((e) => !excludeBanners || !bannerIdSet.has(e.id));
+    const past = ((pastData ?? []) as EventRow[]).filter((e) => !excludeBanners || !bannerIdSet.has(e.id));
     const totalPages = Math.max(1, Math.ceil((upcomingCount ?? 0) / PER_PAGE));
     const pageHref = (p: number) => `/events${buildQs({ page: p, category, location, q })}`;
 
