@@ -29,6 +29,7 @@ import {
   Users,
   ArrowRight,
   Music2,
+  ExternalLink,
 } from "lucide-react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
@@ -1009,16 +1010,35 @@ function SubmitForm() {
                       { key: "boomplay", label: "Boomplay" },
                       { key: "deezer", label: "Deezer" },
                       { key: "youtubeMusic", label: "YouTube Music" },
-                    ].map((f) => (
-                      <div key={f.key} className="space-y-1">
-                        <span className="text-[11px] text-zinc-400">{f.label}</span>
-                        <Input
-                          placeholder="https://..."
-                          value={platformLinks[f.key as keyof typeof platformLinks]}
-                          onChange={(e) => setPlatformLinks((p) => ({ ...p, [f.key]: e.target.value }))}
-                        />
-                      </div>
-                    ))}
+                    ].map((f) => {
+                      const val = platformLinks[f.key as keyof typeof platformLinks];
+                      const href = val.trim().startsWith("http") ? val.trim() : `https://${val.trim()}`;
+                      return (
+                        <div key={f.key} className="space-y-1">
+                          <span className="text-[11px] text-zinc-400">{f.label}</span>
+                          <div className="relative">
+                            <Input
+                              placeholder="https://..."
+                              value={val}
+                              onChange={(e) => setPlatformLinks((p) => ({ ...p, [f.key]: e.target.value }))}
+                              className="pr-10"
+                            />
+                            {val.trim() && (
+                              <a
+                                href={href}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                title={`Open ${f.label} link`}
+                                aria-label={`Open ${f.label} link`}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-[#22C55E] transition-colors"
+                              >
+                                <ExternalLink className="w-4 h-4" />
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
                 <div className="space-y-2">
