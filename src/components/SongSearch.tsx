@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Music, Search, ExternalLink, Loader2, Link as LinkIcon } from "lucide-react";
+import { Music, Search, ExternalLink, Loader2, Link as LinkIcon, ClipboardPaste } from "lucide-react";
 
 interface Song {
   id: string; name: string; artists: string; album: string;
@@ -19,6 +19,7 @@ export function SongSearch({ value, onChange }: { value: string; onChange: (url:
   const [show, setShow] = useState(false);
   const [searchEnabled, setSearchEnabled] = useState(true);
   const [notConfigured, setNotConfigured] = useState(false);
+  const [pasteMsg, setPasteMsg] = useState("");
   const debounceRef = useRef<any>(undefined);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -63,6 +64,34 @@ export function SongSearch({ value, onChange }: { value: string; onChange: (url:
 
   const fmt = (ms: number) => `${Math.floor(ms / 60000)}:${String(Math.floor((ms % 60000) / 1000)).padStart(2, "0")}`;
 
+  // One-tap paste: reads the clipboard and drops the copied link into the field.
+  const pasteFromClipboard = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (text && text.trim()) {
+        onChange(text.trim());
+        setPasteMsg("");
+      } else {
+        setPasteMsg("Clipboard is empty — copy your song link first.");
+      }
+    } catch {
+      setPasteMsg("Clipboard blocked — long-press the field and choose Paste.");
+    }
+    setTimeout(() => setPasteMsg(""), 4000);
+  };
+
+  const pasteButton = (
+    <button
+      type="button"
+      onClick={pasteFromClipboard}
+      title="Paste from clipboard"
+      aria-label="Paste link from clipboard"
+      className="p-1.5 -m-1.5 text-gray-400 hover:text-white transition-colors"
+    >
+      <ClipboardPaste className="h-4 w-4" />
+    </button>
+  );
+
   // If Spotify search is not configured, show simple link input
   if (notConfigured) {
     return (
@@ -76,12 +105,14 @@ export function SongSearch({ value, onChange }: { value: string; onChange: (url:
             placeholder="Paste your song link here (Spotify, Apple Music, Audiomack, YouTube...)"
             value={value}
             onChange={(e) => onChange(e.target.value)}
-            className="bg-white/5 border-white/10 text-white placeholder:text-gray-500 pr-10"
+            className="bg-white/5 border-white/10 text-white placeholder:text-gray-500 pr-16"
           />
-          {value && (
-            <ExternalLink className="absolute right-3 top-2.5 h-4 w-4 text-green-500" />
-          )}
+          <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
+            {value && <ExternalLink className="h-4 w-4 text-green-500" />}
+            {pasteButton}
+          </div>
         </div>
+        {pasteMsg && <p className="text-xs text-yellow-400/90">{pasteMsg}</p>}
         <p className="text-xs text-gray-500 flex items-center gap-1">
           <Music className="w-3 h-3" />
           Paste a link from Spotify, Apple Music, Audiomack, SoundCloud, BoomPlay, or YouTube
@@ -163,13 +194,19 @@ export function SongSearch({ value, onChange }: { value: string; onChange: (url:
         <Label className="text-xs text-gray-500 flex items-center gap-1">
           <LinkIcon className="w-3 h-3" /> Or paste link directly
         </Label>
-        <Input
-          type="url"
-          placeholder="https://open.spotify.com/track/..."
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          className="bg-white/5 border-white/10 text-white placeholder:text-gray-600 text-sm mt-1"
-        />
+        <div className="relative mt-1">
+          <Input
+            type="url"
+            placeholder="https://open.spotify.com/track/..."
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            className="bg-white/5 border-white/10 text-white placeholder:text-gray-600 text-sm pr-10"
+          />
+          <div className="absolute right-3 top-1/2 -translate-y-1/2">
+            {pasteButton}
+          </div>
+        </div>
+        {pasteMsg && <p className="text-xs text-yellow-400/90 mt-1">{pasteMsg}</p>}
       </div>
     </div>
   );
