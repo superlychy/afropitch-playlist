@@ -2,6 +2,7 @@ import Link from "next/link";
 import { pricingConfig } from "@/../config/pricing";
 import { CheckCircle2, ArrowRight } from "lucide-react";
 import { RecentApprovals } from "@/components/RecentApprovals";
+import { PartnerSpotlight } from "@/components/PartnerSpotlight";
 import { HomeFaq } from "@/components/HomeFaq";
 import { FAQS, HOMEPAGE_TEASER_QUESTIONS } from "@/lib/faqs";
 
@@ -83,6 +84,9 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {/* Partner spotlight: renders nothing until the admin switches it on. */}
+      <PartnerSpotlight />
 
       {/* Feature Highlight / Why Section (Restored & Enhanced) */}
       <section className="py-24 px-4 max-w-7xl mx-auto grid md:grid-cols-2 gap-16 items-center animate-fade-in-up" style={{ animationDelay: '0.2s' }}>

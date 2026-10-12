@@ -76,6 +76,118 @@ const inputCls =
     "w-full rounded-xl bg-black/40 border border-white/10 px-4 py-2.5 text-white text-sm focus:outline-none focus:border-yellow-500/60";
 const labelCls = "text-sm text-gray-300 block mb-1.5";
 
+// Homepage partner spotlight: one curated slot, ships OFF.
+// Fields save when you leave them; the preview shows the result.
+function HomepageSpotlightCard({
+    settings,
+    saving,
+    onSave,
+}: {
+    settings: Record<string, any>;
+    saving: boolean;
+    onSave: (key: string, value: any) => void;
+}) {
+    const enabled = settings["spotlight_enabled"] === true;
+    const str = (k: string) => (typeof settings[k] === "string" ? (settings[k] as string) : "");
+    const label = str("spotlight_label") || "Partner";
+    const headline = str("spotlight_headline");
+    const subtext = str("spotlight_subtext");
+    const imageUrl = str("spotlight_image_url");
+    const linkUrl = str("spotlight_link_url");
+
+    const field = (
+        key: string,
+        title: string,
+        placeholder: string,
+        hint?: string,
+        mono?: boolean
+    ) => (
+        <div>
+            <label className={labelCls}>
+                {title} {hint && <span className="text-gray-500">({hint})</span>}
+            </label>
+            <input
+                defaultValue={str(key)}
+                key={`${key}:${str(key)}`}
+                placeholder={placeholder}
+                disabled={saving}
+                onBlur={(e) => {
+                    const v = e.target.value.trim();
+                    if (v !== str(key)) onSave(key, v || null);
+                }}
+                className={`${inputCls}${mono ? " font-mono" : ""}`}
+            />
+        </div>
+    );
+
+    return (
+        <Card className="border-yellow-500/25 bg-yellow-950/10">
+            <CardHeader>
+                <CardTitle className="text-white text-base">Homepage spotlight</CardTitle>
+                <CardDescription>
+                    One curated partner slot on the homepage, below the trust strip. Switched
+                    off until a deal goes live. Fields save when you leave them.
+                </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+                <label className="flex items-center gap-3 text-sm text-gray-200 cursor-pointer">
+                    <input
+                        type="checkbox"
+                        checked={enabled}
+                        disabled={saving}
+                        onChange={(e) => onSave("spotlight_enabled", e.target.checked)}
+                        className="w-5 h-5 accent-yellow-500"
+                    />
+                    <span>
+                        <span className="font-semibold text-white">Show homepage spotlight</span>
+                        <span className="text-gray-500"> — needs a headline and an image to appear</span>
+                    </span>
+                </label>
+
+                <div className="grid sm:grid-cols-2 gap-4">
+                    {field("spotlight_label", "Eyebrow label", "Partner")}
+                    {field("spotlight_headline", "Headline", "Detty December Fest is here")}
+                </div>
+                {field("spotlight_subtext", "Subtext", "13 days of concerts, culture and raves across Lagos.", "optional")}
+                {field("spotlight_image_url", "Image URL", "https://…", "paste or upload in an event and copy the URL", true)}
+                {field("spotlight_link_url", "Link URL", "https://…", "optional — where the banner points", true)}
+
+                {headline && imageUrl ? (
+                    <div className="pt-2">
+                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                            Preview — this is how it will look on the homepage
+                        </p>
+                        <div className="rounded-2xl overflow-hidden border border-yellow-500/25 bg-white/[0.03]">
+                            <div className="flex flex-col sm:flex-row">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img src={imageUrl} alt="" className="w-full sm:w-40 h-32 sm:h-auto object-cover flex-shrink-0" />
+                                <div className="p-5 min-w-0 flex-1">
+                                    <p className="text-[11px] font-bold text-yellow-400 uppercase tracking-widest mb-2">
+                                        {label}
+                                    </p>
+                                    <p className="text-white font-extrabold text-lg leading-tight">{headline}</p>
+                                    {subtext && <p className="text-gray-400 text-sm mt-2">{subtext}</p>}
+                                </div>
+                            </div>
+                        </div>
+                        {!enabled && (
+                            <p className="text-xs text-amber-500 mt-2">
+                                Preview only — the switch above is off, so the homepage shows nothing.
+                            </p>
+                        )}
+                    </div>
+                ) : (
+                    enabled && (
+                        <p className="text-xs text-amber-500">
+                            The switch is on but the spotlight needs a headline and an image before it appears.
+                        </p>
+                    )
+                )}
+            </CardContent>
+        </Card>
+    );
+}
+
 // Partner placement controls. Everything ships OFF; the switches go live
 // only when a partnership deal is signed. The preview shows exactly how
 // the banner will look on /events before anything is switched on.
@@ -98,6 +210,13 @@ function PartnerPlacementCard({
             : "";
     const publishedEvents = events.filter((e) => e.status === "published");
     const previewEvent = publishedEvents.find((e) => e.id === bannerEventId) ?? null;
+
+    // Searchable picker state (the native select doesn't scale to 100+ events).
+    const [pickerOpen, setPickerOpen] = useState(false);
+    const [pickerQuery, setPickerQuery] = useState("");
+    const pickerMatches = publishedEvents
+        .filter((e) => e.title.toLowerCase().includes(pickerQuery.trim().toLowerCase()))
+        .slice(0, 8);
 
     return (
         <Card className="border-yellow-500/25 bg-yellow-950/10">
@@ -124,21 +243,46 @@ function PartnerPlacementCard({
                     </span>
                 </label>
 
-                <div>
+                <div className="relative">
                     <label className={labelCls}>Featured event for the banner</label>
-                    <select
-                        value={bannerEventId}
+                    <input
+                        value={pickerOpen ? pickerQuery : previewEvent?.title ?? ""}
+                        placeholder="Type to search published events…"
                         disabled={saving}
-                        onChange={(e) => onSave("partner_banner_event_id", e.target.value || null)}
+                        onFocus={() => { setPickerQuery(""); setPickerOpen(true); }}
+                        onChange={(e) => { setPickerQuery(e.target.value); setPickerOpen(true); }}
+                        onBlur={() => setTimeout(() => setPickerOpen(false), 150)}
                         className={inputCls}
-                    >
-                        <option value="">Pick a published event…</option>
-                        {publishedEvents.map((e) => (
-                            <option key={e.id} value={e.id}>
-                                {e.title}
-                            </option>
-                        ))}
-                    </select>
+                    />
+                    {pickerOpen && (
+                        <div className="absolute z-20 mt-1 w-full rounded-xl border border-white/15 bg-[#141414] shadow-xl max-h-64 overflow-auto">
+                            {bannerEventId && (
+                                <button
+                                    type="button"
+                                    onMouseDown={(e) => e.preventDefault()}
+                                    onClick={() => { onSave("partner_banner_event_id", null); setPickerOpen(false); }}
+                                    className="w-full text-left px-4 py-2.5 text-sm text-gray-500 hover:bg-white/5"
+                                >
+                                    Clear selection
+                                </button>
+                            )}
+                            {pickerMatches.map((e) => (
+                                <button
+                                    key={e.id}
+                                    type="button"
+                                    onMouseDown={(e2) => e2.preventDefault()}
+                                    onClick={() => { onSave("partner_banner_event_id", e.id); setPickerOpen(false); }}
+                                    className="w-full text-left px-4 py-2.5 text-sm text-white hover:bg-white/5"
+                                >
+                                    {e.title}
+                                    <span className="text-gray-600"> · {e.city}</span>
+                                </button>
+                            ))}
+                            {pickerMatches.length === 0 && (
+                                <p className="px-4 py-2.5 text-sm text-gray-600">No published events match.</p>
+                            )}
+                        </div>
+                    )}
                 </div>
 
                 <label className="flex items-center gap-3 text-sm text-gray-200 cursor-pointer">
@@ -625,6 +769,12 @@ export function AdminEvents() {
 
             <PartnerPlacementCard
                 events={events}
+                settings={settings}
+                saving={savingSettings}
+                onSave={saveSetting}
+            />
+
+            <HomepageSpotlightCard
                 settings={settings}
                 saving={savingSettings}
                 onSave={saveSetting}

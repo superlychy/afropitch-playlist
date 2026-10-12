@@ -150,7 +150,7 @@ function PartnerBanner({ event, showPresale }: { event: EventRow; showPresale: b
     );
 }
 
-type EventsSearchParams = { page?: string; category?: string; location?: string };
+type EventsSearchParams = { page?: string; category?: string; location?: string; q?: string };
 
 const parseFilters = (sp: EventsSearchParams) => {
     const page = Math.max(1, parseInt(sp.page ?? "1", 10) || 1);
@@ -158,14 +158,16 @@ const parseFilters = (sp: EventsSearchParams) => {
         ? (sp.category as string)
         : null;
     const location = sp.location?.trim() ? sp.location.trim().slice(0, 80) : null;
-    return { page, category, location };
+    const q = sp.q?.trim() ? sp.q.trim().slice(0, 80) : null;
+    return { page, category, location, q };
 };
 
-const buildQs = (f: { page?: number; category?: string | null; location?: string | null }) => {
+const buildQs = (f: { page?: number; category?: string | null; location?: string | null; q?: string | null }) => {
     const qs = new URLSearchParams({
         ...(f.page && f.page > 1 ? { page: String(f.page) } : {}),
         ...(f.category ? { category: f.category } : {}),
         ...(f.location ? { location: f.location } : {}),
+        ...(f.q ? { q: f.q } : {}),
     }).toString();
     return qs ? `?${qs}` : "";
 };
@@ -209,7 +211,7 @@ export default async function EventsPage({
 }: {
     searchParams: Promise<EventsSearchParams>;
 }) {
-    const { page, category, location: locationParam } = parseFilters(await searchParams);
+    const { page, category, location: locationParam, q } = parseFilters(await searchParams);
     const supabase = await createClient();
     const nowIso = new Date().toISOString();
     const baseSelect =
@@ -253,11 +255,20 @@ export default async function EventsPage({
     );
     const location = locations.some((l) => l.city === locationParam) ? locationParam : null;
 
-    const applyFilters = <T,>(q: T): T => {
+    const applyFilters = <T,>(q2: T): T => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        let query = q as any;
+        let query = q2 as any;
         if (category) query = query.eq("category", category);
         if (location) query = query.eq("city", location);
+        if (q) {
+            // Escape PostgREST `or` special chars so the search term can't break the filter.
+            const safe = q.replace(/[%(),]/g, "").trim();
+            if (safe) {
+                query = query.or(
+                    `title.ilike.%${safe}%,venue.ilike.%${safe}%,city.ilike.%${safe}%,organizer.ilike.%${safe}%`
+                );
+            }
+        }
         return query as T;
     };
 
@@ -303,7 +314,7 @@ export default async function EventsPage({
     const upcoming = ((upcomingData ?? []) as EventRow[]).filter((e) => e.id !== bannerEvent?.id);
     const past = ((pastData ?? []) as EventRow[]).filter((e) => e.id !== bannerEvent?.id);
     const totalPages = Math.max(1, Math.ceil((upcomingCount ?? 0) / PER_PAGE));
-    const pageHref = (p: number) => `/events${buildQs({ page: p, category, location })}`;
+    const pageHref = (p: number) => `/events${buildQs({ page: p, category, location, q })}`;
 
     const pillCls = (active: boolean) =>
         `rounded-full px-4 py-1.5 text-sm font-semibold transition-colors ${
@@ -324,14 +335,36 @@ export default async function EventsPage({
                 </p>
             </div>
 
+            <form action="/events" method="get" className="flex justify-center mb-6">
+                {category && <input type="hidden" name="category" value={category} />}
+                {location && <input type="hidden" name="location" value={location} />}
+                <div className="relative w-full max-w-md">
+                    <input
+                        type="search"
+                        name="q"
+                        defaultValue={q ?? ""}
+                        placeholder="Search events, venues, cities…"
+                        className="w-full rounded-full bg-white/5 border border-white/15 px-5 py-2.5 text-sm text-white placeholder:text-gray-500 focus:outline-none focus:border-yellow-500/60"
+                    />
+                    {q && (
+                        <Link
+                            href={`/events${buildQs({ category, location })}`}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-500 hover:text-white"
+                        >
+                            Clear
+                        </Link>
+                    )}
+                </div>
+            </form>
+
             <div className="flex flex-wrap justify-center gap-2 mb-4">
-                <Link href={`/events${buildQs({ location })}`} className={pillCls(!category)}>
+                <Link href={`/events${buildQs({ location, q })}`} className={pillCls(!category)}>
                     All
                 </Link>
                 {Object.entries(CATEGORY_LABELS).map(([key, label]) => (
                     <Link
                         key={key}
-                        href={`/events${buildQs({ category: key, location })}`}
+                        href={`/events${buildQs({ category: key, location, q })}`}
                         className={pillCls(category === key)}
                     >
                         {label}
@@ -343,13 +376,13 @@ export default async function EventsPage({
                 <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1 mr-1">
                     <MapPin className="w-3.5 h-3.5" /> Location
                 </span>
-                <Link href={`/events${buildQs({ category })}`} className={pillCls(!location)}>
+                <Link href={`/events${buildQs({ category, q })}`} className={pillCls(!location)}>
                     All locations
                 </Link>
                 {locations.map((l) => (
                     <Link
                         key={l.city}
-                        href={`/events${buildQs({ category, location: l.city })}`}
+                        href={`/events${buildQs({ category, location: l.city, q })}`}
                         className={pillCls(location === l.city)}
                     >
                         {l.city}
