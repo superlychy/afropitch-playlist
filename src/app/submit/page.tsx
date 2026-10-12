@@ -194,7 +194,7 @@ function SubmitForm() {
         const { data, error } = await withTimeout(
           supabasePublic
             .from("profiles")
-            .select("*, playlists(count)")
+            .select("id, full_name, role, verification_status, bio, avatar_url, playlists(count)")
             .or("role.eq.curator,role.eq.admin"),
           "Curators fetch"
         );
