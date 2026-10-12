@@ -74,7 +74,7 @@ const toLocalInput = (iso: string | null) => {
 const fromLocalInput = (local: string) => (local ? new Date(local).toISOString() : null);
 
 const inputCls =
-    "w-full rounded-xl bg-black/40 border border-white/10 px-4 py-2.5 text-white text-sm focus:outline-none focus:border-yellow-500/60";
+    "w-full rounded-xl bg-black/40 border border-white/10 px-4 py-2.5 text-white text-sm focus:outline-none focus:border-yellow-500/60 [&>option]:bg-[#141414]";
 const labelCls = "text-sm text-gray-300 block mb-1.5";
 
 // Homepage partner spotlight: one curated slot, ships OFF.
@@ -857,6 +857,64 @@ export function AdminEvents() {
     const drafts = events.filter((e) => e.status === "draft");
     const published = events.filter((e) => e.status === "published");
 
+    // Admin list filters (client-side; all events are already loaded).
+    const [fq, setFq] = useState("");
+    const [fStatus, setFStatus] = useState<"all" | "published" | "draft">("all");
+    const [fCat, setFCat] = useState("");
+    const [fCountry, setFCountry] = useState("");
+    const [fState, setFState] = useState("");
+    const [fCity, setFCity] = useState("");
+
+    const adminTree: Record<string, Record<string, string[]>> = {};
+    {
+        const tmp: Record<string, Record<string, Set<string>>> = {};
+        for (const e of events) {
+            const c = (e.country ?? "").trim() || "Unknown";
+            const s = (e.state ?? "").trim() || (e.city ?? "").trim() || "Unknown";
+            const ct = (e.city ?? "").trim();
+            if (!ct) continue;
+            tmp[c] ??= {};
+            tmp[c][s] ??= new Set();
+            tmp[c][s].add(ct);
+        }
+        for (const [c, states] of Object.entries(tmp)) {
+            adminTree[c] = {};
+            for (const [s, cities] of Object.entries(states)) {
+                adminTree[c][s] = [...cities].sort();
+            }
+        }
+    }
+    const fCountries = Object.keys(adminTree).sort();
+    const fStates = fCountry ? Object.keys(adminTree[fCountry] ?? {}).sort() : [];
+    const fCities = fCountry && fState ? (adminTree[fCountry]?.[fState] ?? []) : [];
+
+    const filteredEvents = events
+        .filter((e) => {
+            if (fStatus !== "all" && e.status !== fStatus) return false;
+            if (fCat && e.category !== fCat) return false;
+            if (fCity && e.city !== fCity) return false;
+            else if (fState && (e.state ?? "") !== fState) return false;
+            else if (fCountry && e.country !== fCountry) return false;
+            if (fq.trim() && !e.title.toLowerCase().includes(fq.trim().toLowerCase())) return false;
+            return true;
+        })
+        .sort((a, b) => {
+            // Drafts first, then by soonest date.
+            if (a.status !== b.status) return a.status === "draft" ? -1 : 1;
+            return new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime();
+        });
+
+    const clearAdminFilters = () => {
+        setFq("");
+        setFStatus("all");
+        setFCat("");
+        setFCountry("");
+        setFState("");
+        setFCity("");
+    };
+    const adminFiltersActive =
+        fq.trim() !== "" || fStatus !== "all" || fCat !== "" || fCountry !== "";
+
     return (
         <div className="space-y-6">
             <div className="flex items-center justify-between">
@@ -898,40 +956,242 @@ export function AdminEvents() {
                 </Card>
             )}
 
-            {drafts.length > 0 && (
-                <div className="space-y-3">
-                    <h3 className="text-sm font-bold text-yellow-400 uppercase tracking-widest">Drafts ({drafts.length})</h3>
-                    {drafts.map((e) => {
-                        const f = getEdit(e);
+            {/* Event manager: search + status/category/location filters, one unified list. */}
+            <div className="space-y-3">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                    <h3 className="text-sm font-bold text-gray-300 uppercase tracking-widest">
+                        All events ({filteredEvents.length}
+                        {adminFiltersActive ? ` of ${events.length}` : ""})
+                    </h3>
+                    {adminFiltersActive && (
+                        <button
+                            type="button"
+                            onClick={clearAdminFilters}
+                            className="text-xs text-gray-500 hover:text-white"
+                        >
+                            Clear filters
+                        </button>
+                    )}
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                    <input
+                        type="search"
+                        value={fq}
+                        onChange={(e) => setFq(e.target.value)}
+                        placeholder="Search by title…"
+                        aria-label="Search events"
+                        className="rounded-full bg-white/5 border border-white/15 px-4 py-2 text-sm text-white placeholder:text-gray-500 focus:outline-none focus:border-yellow-500/60 w-full sm:w-56"
+                    />
+                    <select
+                        value={fStatus}
+                        onChange={(e) => setFStatus(e.target.value as "all" | "published" | "draft")}
+                        aria-label="Filter by status"
+                        className={inputCls}
+                    >
+                        <option value="all">All statuses ({events.length})</option>
+                        <option value="published">Published ({published.length})</option>
+                        <option value="draft">Drafts ({drafts.length})</option>
+                    </select>
+                    <select
+                        value={fCat}
+                        onChange={(e) => setFCat(e.target.value)}
+                        aria-label="Filter by category"
+                        className={inputCls}
+                    >
+                        <option value="">All categories</option>
+                        {CATEGORIES.map((c) => (
+                            <option key={c} value={c}>
+                                {CATEGORY_LABELS[c] ?? c}
+                            </option>
+                        ))}
+                    </select>
+                    <select
+                        value={fCountry}
+                        onChange={(e) => {
+                            setFCountry(e.target.value);
+                            setFState("");
+                            setFCity("");
+                        }}
+                        aria-label="Filter by country"
+                        className={inputCls}
+                    >
+                        <option value="">All countries</option>
+                        {fCountries.map((c) => (
+                            <option key={c} value={c}>
+                                {c}
+                            </option>
+                        ))}
+                    </select>
+                    {fCountry && fStates.length > 0 && (
+                        <select
+                            value={fState}
+                            onChange={(e) => {
+                                setFState(e.target.value);
+                                setFCity("");
+                            }}
+                            aria-label="Filter by state or province"
+                            className={inputCls}
+                        >
+                            <option value="">All states</option>
+                            {fStates.map((s) => (
+                                <option key={s} value={s}>
+                                    {s}
+                                </option>
+                            ))}
+                        </select>
+                    )}
+                    {fCountry && fState && fCities.length > 0 && (
+                        <select
+                            value={fCity}
+                            onChange={(e) => setFCity(e.target.value)}
+                            aria-label="Filter by city"
+                            className={inputCls}
+                        >
+                            <option value="">All cities</option>
+                            {fCities.map((c) => (
+                                <option key={c} value={c}>
+                                    {c}
+                                </option>
+                            ))}
+                        </select>
+                    )}
+                </div>
+
+                {filteredEvents.length === 0 ? (
+                    <Card className="border-dashed border-white/10 bg-white/5">
+                        <CardContent className="pt-10 pb-10 text-center">
+                            <p className="text-gray-400">
+                                {events.length === 0
+                                    ? "No events yet. Create the first one above."
+                                    : "No events match these filters."}
+                            </p>
+                            {adminFiltersActive && (
+                                <button
+                                    type="button"
+                                    onClick={clearAdminFilters}
+                                    className="mt-2 text-sm text-yellow-400 hover:text-yellow-300"
+                                >
+                                    Clear filters
+                                </button>
+                            )}
+                        </CardContent>
+                    </Card>
+                ) : (
+                    filteredEvents.map((e) => {
                         const isOpen = expanded === e.id;
+                        const isDraft = e.status === "draft";
                         return (
                             <Card key={e.id} className="border-white/10 bg-white/5">
-                                <CardContent className="pt-5 pb-5">
+                                <CardContent className="pt-4 pb-4">
                                     <div className="flex items-start justify-between gap-4 flex-wrap">
                                         <div className="min-w-0">
-                                            <p className="text-white font-bold text-lg">{e.title}</p>
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                                <p className="text-white font-semibold">{e.title}</p>
+                                                <span
+                                                    className={`text-[10px] font-bold uppercase tracking-wider rounded-full px-2 py-0.5 ${
+                                                        isDraft
+                                                            ? "bg-yellow-500/15 text-yellow-400"
+                                                            : "bg-green-500/15 text-green-400"
+                                                    }`}
+                                                >
+                                                    {isDraft ? "Draft" : "Published"}
+                                                </span>
+                                            </div>
                                             <p className="text-sm text-gray-500">
-                                                {e.starts_at ? new Date(e.starts_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : ""} · {e.city}
+                                                {e.starts_at
+                                                    ? new Date(e.starts_at).toLocaleDateString(undefined, {
+                                                          month: "short",
+                                                          day: "numeric",
+                                                          year: "numeric",
+                                                      })
+                                                    : ""}{" "}
+                                                · {e.city}
+                                                {e.state ? `, ${e.state}` : ""} ·{" "}
+                                                {CATEGORY_LABELS[e.category] ?? e.category}
                                             </p>
+                                            {!isDraft && (
+                                                <p className="text-xs text-gray-600 font-mono">/events/{e.slug}</p>
+                                            )}
                                             {sourceLine(e)}
+                                            {!isDraft &&
+                                                interestCounts[e.id] &&
+                                                (interestCounts[e.id].interested > 0 ||
+                                                    interestCounts[e.id].not > 0) && (
+                                                    <p className="text-xs text-gray-500 mt-1">
+                                                        <span className="text-green-400">
+                                                            {interestCounts[e.id].interested} interested
+                                                        </span>
+                                                        {" · "}
+                                                        <span className="text-red-400">
+                                                            {interestCounts[e.id].not} not interested
+                                                        </span>
+                                                    </p>
+                                                )}
                                         </div>
                                         <div className="flex gap-2 flex-wrap">
-                                            <Button size="sm" variant="outline" onClick={() => setExpanded(isOpen ? null : e.id)} className="border-white/15 rounded-xl">
-                                                {isOpen ? "Hide" : <><Eye className="w-3.5 h-3.5 mr-1" /> Edit</>}
+                                            {!isDraft && (
+                                                <a
+                                                    href={`https://afropitchplay.best/events/${e.slug}`}
+                                                    target="_blank"
+                                                    rel="noreferrer"
+                                                >
+                                                    <Button size="sm" variant="outline" className="border-white/15 rounded-xl">
+                                                        <ExternalLink className="w-3.5 h-3.5 mr-1" /> View
+                                                    </Button>
+                                                </a>
+                                            )}
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={() => setExpanded(isOpen ? null : e.id)}
+                                                className="border-white/15 rounded-xl"
+                                            >
+                                                <Eye className="w-3.5 h-3.5 mr-1" /> Edit
                                             </Button>
+                                            {isDraft ? (
+                                                <Button
+                                                    size="sm"
+                                                    onClick={() => setStatus(e, "published")}
+                                                    disabled={saving === e.id}
+                                                    className="bg-yellow-500 hover:bg-yellow-400 text-black rounded-xl font-bold"
+                                                >
+                                                    Publish
+                                                </Button>
+                                            ) : (
+                                                <Button
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    onClick={() => setStatus(e, "draft")}
+                                                    disabled={saving === e.id}
+                                                    className="text-gray-400 hover:text-white rounded-xl"
+                                                >
+                                                    Unpublish
+                                                </Button>
+                                            )}
                                         </div>
                                     </div>
                                     {isOpen && (
-                                        <div className="mt-5 space-y-4 border-t border-white/10 pt-5">
-                                            {renderForm(f, (p) => setEdit(e.id, p), false, e.id)}
+                                        <div className="mt-4 space-y-4 border-t border-white/10 pt-4">
+                                            {renderForm(getEdit(e), (p) => setEdit(e.id, p), false, e.id)}
                                             <div className="flex gap-2 flex-wrap">
-                                                <Button size="sm" onClick={() => saveEvent(e)} disabled={saving === e.id} className="bg-white/10 hover:bg-white/15 text-white rounded-xl">
-                                                    {saving === e.id ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : null} Save edits
+                                                <Button
+                                                    size="sm"
+                                                    onClick={() => saveEvent(e)}
+                                                    disabled={saving === e.id}
+                                                    className="bg-white/10 hover:bg-white/15 text-white rounded-xl"
+                                                >
+                                                    {saving === e.id ? (
+                                                        <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
+                                                    ) : null}{" "}
+                                                    Save edits
                                                 </Button>
-                                                <Button size="sm" onClick={() => setStatus(e, "published")} disabled={saving === e.id} className="bg-yellow-500 hover:bg-yellow-400 text-black rounded-xl font-bold">
-                                                    Publish
-                                                </Button>
-                                                <Button size="sm" variant="ghost" onClick={() => deleteEvent(e)} className="text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-xl">
+                                                <Button
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    onClick={() => deleteEvent(e)}
+                                                    className="text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-xl"
+                                                >
                                                     <Trash2 className="w-3.5 h-3.5 mr-1" /> Delete
                                                 </Button>
                                             </div>
@@ -940,69 +1200,9 @@ export function AdminEvents() {
                                 </CardContent>
                             </Card>
                         );
-                    })}
-                </div>
-            )}
-
-            {published.length > 0 && (
-                <div className="space-y-3">
-                    <h3 className="text-sm font-bold text-green-400 uppercase tracking-widest">Published ({published.length})</h3>
-                    {published.map((e) => (
-                        <Card key={e.id} className="border-white/10 bg-white/5">
-                            <CardContent className="pt-4 pb-4 flex items-center justify-between gap-4 flex-wrap">
-                                <div className="min-w-0">
-                                    <p className="text-white font-semibold">{e.title}</p>
-                                    <p className="text-xs text-gray-500 font-mono">/events/{e.slug}</p>
-                                    {sourceLine(e)}
-                                    {interestCounts[e.id] && (interestCounts[e.id].interested > 0 || interestCounts[e.id].not > 0) && (
-                                        <p className="text-xs text-gray-500 mt-1">
-                                            <span className="text-green-400">{interestCounts[e.id].interested} interested</span>
-                                            {" · "}
-                                            <span className="text-red-400">{interestCounts[e.id].not} not interested</span>
-                                        </p>
-                                    )}
-                                </div>
-                                <div className="flex gap-2">
-                                    <a href={`https://afropitchplay.best/events/${e.slug}`} target="_blank" rel="noreferrer">
-                                        <Button size="sm" variant="outline" className="border-white/15 rounded-xl">
-                                            <ExternalLink className="w-3.5 h-3.5 mr-1" /> View
-                                        </Button>
-                                    </a>
-                                    <Button size="sm" variant="outline" onClick={() => setExpanded(expanded === e.id ? null : e.id)} className="border-white/15 rounded-xl">
-                                        <Eye className="w-3.5 h-3.5 mr-1" /> Edit
-                                    </Button>
-                                    <Button size="sm" variant="ghost" onClick={() => setStatus(e, "draft")} className="text-gray-400 hover:text-white rounded-xl">
-                                        Unpublish
-                                    </Button>
-                                </div>
-                            </CardContent>
-                            {expanded === e.id && (
-                                <CardContent className="pt-0 pb-5">
-                                    <div className="space-y-4 border-t border-white/10 pt-5">
-                                        {renderForm(getEdit(e), (p) => setEdit(e.id, p), false, e.id)}
-                                        <div className="flex gap-2 flex-wrap">
-                                            <Button size="sm" onClick={() => saveEvent(e)} disabled={saving === e.id} className="bg-white/10 hover:bg-white/15 text-white rounded-xl">
-                                                {saving === e.id ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : null} Save edits
-                                            </Button>
-                                            <Button size="sm" variant="ghost" onClick={() => deleteEvent(e)} className="text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-xl">
-                                                <Trash2 className="w-3.5 h-3.5 mr-1" /> Delete
-                                            </Button>
-                                        </div>
-                                    </div>
-                                </CardContent>
-                            )}
-                        </Card>
-                    ))}
-                </div>
-            )}
-
-            {events.length === 0 && (
-                <Card className="border-dashed border-white/10 bg-white/5">
-                    <CardContent className="pt-10 pb-10 text-center">
-                        <p className="text-gray-400">No events yet. Create the first one above.</p>
-                    </CardContent>
-                </Card>
-            )}
+                    })
+                )}
+            </div>
 
             <p className="text-xs text-gray-600">
                 <ChevronDown className="w-3 h-3 inline mr-1" />
