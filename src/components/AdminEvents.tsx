@@ -212,20 +212,53 @@ function PartnerPlacementCard({
     // site_settings.value is TEXT ("true"/"false", id, or ""); parse tolerantly
     // because values may also be edited by hand in the dashboard.
     const isOn = (v: unknown) => v === true || v === "true";
-    const asId = (v: unknown) =>
-        typeof v === "string" && v !== "" && v !== "null" ? v : "";
+    const parseIds = (v: unknown): string[] => {
+        if (typeof v !== "string" || !v || v === "null") return [];
+        try {
+            const a = JSON.parse(v);
+            if (Array.isArray(a)) return a.filter((x) => typeof x === "string" && x);
+        } catch {
+            /* not JSON — fall through */
+        }
+        return v.includes(",")
+            ? v.split(",").map((s) => s.trim()).filter(Boolean)
+            : [v];
+    };
     const bannerOn = isOn(settings["partner_banner_enabled"]);
     const badgeOn = isOn(settings["presale_badge_enabled"]);
-    const bannerEventId = asId(settings["partner_banner_event_id"]);
+    let bannerIds = parseIds(settings["partner_banner_event_ids"]);
+    if (bannerIds.length === 0) {
+        const single = settings["partner_banner_event_id"];
+        if (typeof single === "string" && single !== "" && single !== "null") {
+            bannerIds = [single];
+        }
+    }
     const publishedEvents = events.filter((e) => e.status === "published");
-    const previewEvent = publishedEvents.find((e) => e.id === bannerEventId) ?? null;
+    const selectedEvents = bannerIds
+        .map((id) => publishedEvents.find((e) => e.id === id))
+        .filter((e): e is EventItem => !!e);
+    const nowMs = Date.now();
 
     // Searchable picker state (the native select doesn't scale to 100+ events).
     const [pickerOpen, setPickerOpen] = useState(false);
     const [pickerQuery, setPickerQuery] = useState("");
     const pickerMatches = publishedEvents
+        .filter((e) => !bannerIds.includes(e.id))
         .filter((e) => e.title.toLowerCase().includes(pickerQuery.trim().toLowerCase()))
         .slice(0, 8);
+
+    const saveIds = (ids: string[]) => {
+        // Write the array key; clear the legacy single key so the two can't disagree.
+        onSave("partner_banner_event_ids", JSON.stringify(ids));
+        onSave("partner_banner_event_id", "");
+    };
+    const addBanner = (id: string) => {
+        if (bannerIds.includes(id) || bannerIds.length >= 5) return;
+        saveIds([...bannerIds, id]);
+        setPickerOpen(false);
+        setPickerQuery("");
+    };
+    const removeBanner = (id: string) => saveIds(bannerIds.filter((x) => x !== id));
 
     return (
         <Card className="border-yellow-500/25 bg-yellow-950/10">
@@ -253,44 +286,72 @@ function PartnerPlacementCard({
                 </label>
 
                 <div className="relative">
-                    <label className={labelCls}>Featured event for the banner</label>
-                    <input
-                        value={pickerOpen ? pickerQuery : previewEvent?.title ?? ""}
-                        placeholder="Type to search published events…"
-                        disabled={saving}
-                        onFocus={() => { setPickerQuery(""); setPickerOpen(true); }}
-                        onChange={(e) => { setPickerQuery(e.target.value); setPickerOpen(true); }}
-                        onBlur={() => setTimeout(() => setPickerOpen(false), 150)}
-                        className={inputCls}
-                    />
-                    {pickerOpen && (
-                        <div className="absolute z-20 mt-1 w-full rounded-xl border border-white/15 bg-[#141414] shadow-xl max-h-64 overflow-auto">
-                            {bannerEventId && (
-                                <button
-                                    type="button"
-                                    onMouseDown={(e) => e.preventDefault()}
-                                    onClick={() => { onSave("partner_banner_event_id", null); setPickerOpen(false); }}
-                                    className="w-full text-left px-4 py-2.5 text-sm text-gray-500 hover:bg-white/5"
-                                >
-                                    Clear selection
-                                </button>
-                            )}
-                            {pickerMatches.map((e) => (
-                                <button
-                                    key={e.id}
-                                    type="button"
-                                    onMouseDown={(e2) => e2.preventDefault()}
-                                    onClick={() => { onSave("partner_banner_event_id", e.id); setPickerOpen(false); }}
-                                    className="w-full text-left px-4 py-2.5 text-sm text-white hover:bg-white/5"
-                                >
-                                    {e.title}
-                                    <span className="text-gray-600"> · {e.city}</span>
-                                </button>
-                            ))}
-                            {pickerMatches.length === 0 && (
-                                <p className="px-4 py-2.5 text-sm text-gray-600">No published events match.</p>
-                            )}
+                    <label className={labelCls}>
+                        Featured events for the banner{" "}
+                        <span className="text-gray-500">(up to 5 — several become a swipeable carousel)</span>
+                    </label>
+                    {selectedEvents.length > 0 && (
+                        <div className="flex flex-wrap gap-2 mb-2">
+                            {selectedEvents.map((e) => {
+                                const ended = new Date(e.ends_at).getTime() < nowMs;
+                                return (
+                                    <span
+                                        key={e.id}
+                                        className="inline-flex items-center gap-2 rounded-full bg-white/5 border border-white/15 pl-3 pr-1.5 py-1 text-sm text-white"
+                                    >
+                                        <span className="max-w-[220px] truncate">{e.title}</span>
+                                        {ended && (
+                                            <span className="text-[10px] font-bold text-amber-400 uppercase">ended</span>
+                                        )}
+                                        <button
+                                            type="button"
+                                            onClick={() => removeBanner(e.id)}
+                                            disabled={saving}
+                                            aria-label={`Remove ${e.title}`}
+                                            className="w-6 h-6 rounded-full bg-white/10 hover:bg-red-500/30 text-gray-300 hover:text-white text-xs"
+                                        >
+                                            ×
+                                        </button>
+                                    </span>
+                                );
+                            })}
                         </div>
+                    )}
+                    {bannerIds.length < 5 && (
+                        <>
+                            <input
+                                value={pickerOpen ? pickerQuery : ""}
+                                placeholder={
+                                    selectedEvents.length === 0
+                                        ? "Type to search published events…"
+                                        : "Add another…"
+                                }
+                                disabled={saving}
+                                onFocus={() => { setPickerQuery(""); setPickerOpen(true); }}
+                                onChange={(e) => { setPickerQuery(e.target.value); setPickerOpen(true); }}
+                                onBlur={() => setTimeout(() => setPickerOpen(false), 150)}
+                                className={inputCls}
+                            />
+                            {pickerOpen && (
+                                <div className="absolute z-20 mt-1 w-full rounded-xl border border-white/15 bg-[#141414] shadow-xl max-h-64 overflow-auto">
+                                    {pickerMatches.map((e) => (
+                                        <button
+                                            key={e.id}
+                                            type="button"
+                                            onMouseDown={(e2) => e2.preventDefault()}
+                                            onClick={() => addBanner(e.id)}
+                                            className="w-full text-left px-4 py-2.5 text-sm text-white hover:bg-white/5"
+                                        >
+                                            {e.title}
+                                            <span className="text-gray-600"> · {e.city}</span>
+                                        </button>
+                                    ))}
+                                    {pickerMatches.length === 0 && (
+                                        <p className="px-4 py-2.5 text-sm text-gray-600">No published events match.</p>
+                                    )}
+                                </div>
+                            )}
+                        </>
                     )}
                 </div>
 
@@ -308,54 +369,76 @@ function PartnerPlacementCard({
                     </span>
                 </label>
 
-                {previewEvent ? (
-                    <div className="pt-2">
-                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-                            Preview — this is how it will look on /events
+                {selectedEvents.length > 0 ? (
+                    <div className="pt-2 space-y-3">
+                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                            Preview — this is how {selectedEvents.length > 1 ? "the carousel" : "it"} will look on /events
                         </p>
-                        <div className="rounded-2xl overflow-hidden border border-yellow-500/40 bg-gradient-to-br from-yellow-950/30 via-white/5 to-white/5">
-                            <div className="flex flex-col sm:flex-row">
-                                {previewEvent.image_url ? (
-                                    // eslint-disable-next-line @next/next/no-img-element
-                                    <img
-                                        src={previewEvent.image_url}
-                                        alt=""
-                                        className="w-full sm:w-48 h-36 sm:h-auto object-cover flex-shrink-0"
-                                    />
-                                ) : (
-                                    <div className="w-full sm:w-48 h-36 sm:h-auto bg-gradient-to-br from-green-900/50 to-yellow-900/50 flex-shrink-0" />
-                                )}
-                                <div className="p-5 min-w-0 flex-1">
-                                    <div className="flex items-center gap-2 flex-wrap mb-2">
-                                        <span className="text-[11px] font-bold text-yellow-400 uppercase tracking-widest">
-                                            Partner event
-                                        </span>
-                                        {previewEvent.is_presale && (
-                                            <span className="inline-flex items-center text-[11px] font-bold bg-yellow-500 text-black rounded-full px-2.5 py-0.5 uppercase tracking-wider">
-                                                AfroPitch presale
-                                            </span>
-                                        )}
+                        {selectedEvents.map((previewEvent) => {
+                            const ended = new Date(previewEvent.ends_at).getTime() < nowMs;
+                            const live =
+                                new Date(previewEvent.starts_at).getTime() <= nowMs &&
+                                new Date(previewEvent.ends_at).getTime() >= nowMs;
+                            return (
+                                <div key={previewEvent.id}>
+                                    <div className="rounded-2xl overflow-hidden border border-yellow-500/40 bg-gradient-to-br from-yellow-950/30 via-white/5 to-white/5">
+                                        <div className="flex flex-col sm:flex-row">
+                                            {previewEvent.image_url ? (
+                                                // eslint-disable-next-line @next/next/no-img-element
+                                                <img
+                                                    src={previewEvent.image_url}
+                                                    alt=""
+                                                    className="w-full sm:w-48 h-36 sm:h-auto object-cover flex-shrink-0"
+                                                />
+                                            ) : (
+                                                <div className="w-full sm:w-48 h-36 sm:h-auto bg-gradient-to-br from-green-900/50 to-yellow-900/50 flex-shrink-0" />
+                                            )}
+                                            <div className="p-5 min-w-0 flex-1">
+                                                <div className="flex items-center gap-2 flex-wrap mb-2">
+                                                    {live ? (
+                                                        <span className="inline-flex items-center gap-1 text-[11px] font-bold bg-red-600 text-white rounded-full px-2.5 py-0.5 uppercase tracking-wider">
+                                                            <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" /> Live now
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-[11px] font-bold text-yellow-400 uppercase tracking-widest">
+                                                            Partner event
+                                                        </span>
+                                                    )}
+                                                    {previewEvent.is_presale && (
+                                                        <span className="inline-flex items-center text-[11px] font-bold bg-yellow-500 text-black rounded-full px-2.5 py-0.5 uppercase tracking-wider">
+                                                            AfroPitch presale
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <p className="text-white font-extrabold text-xl leading-tight">
+                                                    {previewEvent.title}
+                                                </p>
+                                                <p className="text-sm text-gray-400 mt-2">
+                                                    {new Date(previewEvent.starts_at).toLocaleDateString(undefined, {
+                                                        month: "short",
+                                                        day: "numeric",
+                                                        year: "numeric",
+                                                    })}{" "}
+                                                    · {previewEvent.city}
+                                                    {previewEvent.venue ? ` · ${previewEvent.venue}` : ""}
+                                                </p>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <p className="text-white font-extrabold text-xl leading-tight">
-                                        {previewEvent.title}
-                                    </p>
-                                    <p className="text-sm text-gray-400 mt-2">
-                                        {new Date(previewEvent.starts_at).toLocaleDateString(undefined, {
-                                            month: "short",
-                                            day: "numeric",
-                                            year: "numeric",
-                                        })}{" "}
-                                        · {previewEvent.city}
-                                        {previewEvent.venue ? ` · ${previewEvent.venue}` : ""}
-                                    </p>
+                                    {ended ? (
+                                        <p className="text-xs text-amber-500 mt-1">
+                                            This event has ended — it switches off by itself and won't show publicly.
+                                        </p>
+                                    ) : (
+                                        !bannerOn && (
+                                            <p className="text-xs text-amber-500 mt-1">
+                                                Preview only — the switch above is off, so the public site shows nothing.
+                                            </p>
+                                        )
+                                    )}
                                 </div>
-                            </div>
-                        </div>
-                        {!bannerOn && (
-                            <p className="text-xs text-amber-500 mt-2">
-                                Banner preview only — the switch above is off, so the public site shows nothing.
-                            </p>
-                        )}
+                            );
+                        })}
                     </div>
                 ) : (
                     bannerOn && (

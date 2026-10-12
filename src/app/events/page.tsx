@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase-server";
 import { Card, CardContent } from "@/components/ui/card";
+import { EventSearchBox } from "@/components/EventSearchBox";
+import { BannerCarousel, type BannerEvent } from "@/components/BannerCarousel";
 import { CalendarDays, MapPin, Ticket } from "lucide-react";
 
 interface EventRow {
@@ -101,55 +103,6 @@ function EventCard({ event, live, showPresale }: { event: EventRow; live?: boole
     );
 }
 
-function PartnerBanner({ event, showPresale }: { event: EventRow; showPresale: boolean }) {
-    return (
-        <section className="mb-12">
-            <Link href={`/events/${event.slug}`} className="block group">
-                <Card className="overflow-hidden border-yellow-500/40 bg-gradient-to-br from-yellow-950/30 via-white/5 to-white/5 group-hover:border-yellow-500/70 transition-colors">
-                    <CardContent className="p-0">
-                        <div className="flex flex-col sm:flex-row">
-                            {event.image_url ? (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img
-                                    src={event.image_url}
-                                    alt={event.title}
-                                    className="w-full sm:w-64 h-44 sm:h-auto object-cover flex-shrink-0"
-                                />
-                            ) : (
-                                <div className="w-full sm:w-64 h-44 sm:h-auto bg-gradient-to-br from-green-900/50 to-yellow-900/50 flex items-center justify-center flex-shrink-0">
-                                    <Ticket className="w-12 h-12 text-gray-600" />
-                                </div>
-                            )}
-                            <div className="p-6 sm:p-8 min-w-0 flex-1">
-                                <div className="flex items-center gap-2 flex-wrap mb-3">
-                                    <span className="text-[11px] font-bold text-yellow-400 uppercase tracking-widest">
-                                        Partner event
-                                    </span>
-                                    {showPresale && event.is_presale && <PresaleBadge />}
-                                </div>
-                                <h2 className="text-white font-extrabold text-2xl sm:text-3xl leading-tight group-hover:text-yellow-300 transition-colors">
-                                    {event.title}
-                                </h2>
-                                <p className="text-sm text-gray-300 mt-3 flex items-center gap-1.5">
-                                    <CalendarDays className="w-4 h-4 flex-shrink-0" />
-                                    {formatDateRange(event.starts_at, event.ends_at)}
-                                </p>
-                                <p className="text-sm text-gray-400 mt-1.5 flex items-center gap-1.5">
-                                    <MapPin className="w-4 h-4 flex-shrink-0" />
-                                    {event.city}{event.venue ? ` · ${event.venue}` : ""}
-                                </p>
-                                <span className="inline-block mt-5 rounded-xl bg-yellow-500 px-5 py-2.5 text-sm font-bold text-black">
-                                    Get tickets
-                                </span>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-            </Link>
-        </section>
-    );
-}
-
 type EventsSearchParams = { page?: string; category?: string; location?: string; q?: string };
 
 const parseFilters = (sp: EventsSearchParams) => {
@@ -224,20 +177,47 @@ export default async function EventsPage({
     const isOn = (v: unknown) => v === true || v === "true";
     const asId = (v: unknown) =>
         typeof v === "string" && v !== "" && v !== "null" ? v : null;
+    // Banner event ids: JSON array in partner_banner_event_ids, falling back
+    // to the old single partner_banner_event_id key.
+    const parseIds = (v: unknown): string[] => {
+        if (typeof v !== "string" || !v || v === "null") return [];
+        try {
+            const a = JSON.parse(v);
+            if (Array.isArray(a)) return a.filter((x) => typeof x === "string" && x);
+        } catch {
+            /* not JSON — fall through */
+        }
+        return v.includes(",")
+            ? v.split(",").map((s) => s.trim()).filter(Boolean)
+            : [v];
+    };
     const bannerEnabled = isOn(settings.get("partner_banner_enabled"));
     const badgeEnabled = isOn(settings.get("presale_badge_enabled"));
-    const bannerEventId = asId(settings.get("partner_banner_event_id"));
+    let bannerIds = parseIds(settings.get("partner_banner_event_ids"));
+    if (bannerIds.length === 0) {
+        const single = asId(settings.get("partner_banner_event_id"));
+        if (single) bannerIds = [single];
+    }
 
-    let bannerEvent: EventRow | null = null;
-    if (bannerEnabled && bannerEventId) {
-        const { data: be } = await supabase
+    let bannerEvents: BannerEvent[] = [];
+    if (bannerEnabled && bannerIds.length > 0) {
+        const { data: bes } = await supabase
             .from("events")
             .select(baseSelect)
-            .eq("id", bannerEventId)
+            .in("id", bannerIds)
             .eq("status", "published")
-            .maybeSingle();
-        bannerEvent = (be as EventRow | null) ?? null;
+            // Auto-off: an ended event drops out of the banner by itself.
+            .gt("ends_at", nowIso)
+            .order("starts_at", { ascending: true });
+        const nowMs = Date.now();
+        bannerEvents = ((bes as EventRow[] | null) ?? []).map((e) => ({
+            ...e,
+            live:
+                new Date(e.starts_at).getTime() <= nowMs &&
+                new Date(e.ends_at).getTime() >= nowMs,
+        }));
     }
+    const bannerIdSet = new Set(bannerEvents.map((e) => e.id));
 
     // Location list is built from the published events themselves, so a new
     // city appears in the filter automatically when its first event publishes.
@@ -265,8 +245,10 @@ export default async function EventsPage({
             // Escape PostgREST `or` special chars so the search term can't break the filter.
             const safe = q.replace(/[%(),]/g, "").trim();
             if (safe) {
+                // Note: the outer parens are required — without them PostgREST
+                // rejects the query when combined with the other filters.
                 query = query.or(
-                    `title.ilike.%${safe}%,venue.ilike.%${safe}%,city.ilike.%${safe}%,organizer.ilike.%${safe}%`
+                    `(title.ilike.%${safe}%,venue.ilike.%${safe}%,city.ilike.%${safe}%,organizer.ilike.%${safe}%)`
                 );
             }
         }
@@ -311,9 +293,9 @@ export default async function EventsPage({
             .limit(12)
     );
 
-    const live = ((liveData ?? []) as EventRow[]).filter((e) => e.id !== bannerEvent?.id);
-    const upcoming = ((upcomingData ?? []) as EventRow[]).filter((e) => e.id !== bannerEvent?.id);
-    const past = ((pastData ?? []) as EventRow[]).filter((e) => e.id !== bannerEvent?.id);
+    const live = ((liveData ?? []) as EventRow[]).filter((e) => !bannerIdSet.has(e.id));
+    const upcoming = ((upcomingData ?? []) as EventRow[]).filter((e) => !bannerIdSet.has(e.id));
+    const past = ((pastData ?? []) as EventRow[]).filter((e) => !bannerIdSet.has(e.id));
     const totalPages = Math.max(1, Math.ceil((upcomingCount ?? 0) / PER_PAGE));
     const pageHref = (p: number) => `/events${buildQs({ page: p, category, location, q })}`;
 
@@ -336,27 +318,9 @@ export default async function EventsPage({
                 </p>
             </div>
 
-            <form action="/events" method="get" className="flex justify-center mb-6">
-                {category && <input type="hidden" name="category" value={category} />}
-                {location && <input type="hidden" name="location" value={location} />}
-                <div className="relative w-full max-w-md">
-                    <input
-                        type="search"
-                        name="q"
-                        defaultValue={q ?? ""}
-                        placeholder="Search events, venues, cities…"
-                        className="w-full rounded-full bg-white/5 border border-white/15 px-5 py-2.5 text-sm text-white placeholder:text-gray-500 focus:outline-none focus:border-yellow-500/60"
-                    />
-                    {q && (
-                        <Link
-                            href={`/events${buildQs({ category, location })}`}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-500 hover:text-white"
-                        >
-                            Clear
-                        </Link>
-                    )}
-                </div>
-            </form>
+            <div className="flex justify-center mb-6">
+                <EventSearchBox initial={q ?? ""} category={category} location={location} />
+            </div>
 
             <div className="flex flex-wrap justify-center gap-2 mb-4">
                 <Link href={`/events${buildQs({ location, q })}`} className={pillCls(!category)}>
@@ -391,7 +355,9 @@ export default async function EventsPage({
                 ))}
             </div>
 
-            {bannerEvent && <PartnerBanner event={bannerEvent} showPresale={badgeEnabled} />}
+            {bannerEvents.length > 0 && (
+                <BannerCarousel banners={bannerEvents} showPresale={badgeEnabled} />
+            )}
 
             {live.length > 0 && (
                 <section className="mb-12">
