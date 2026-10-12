@@ -9,65 +9,84 @@ import { NextRequest, NextResponse } from "next/server";
 
 const UA = "Mozilla/5.0 (AfroPitch)";
 
-async function findItunes(title: string, artist: string): Promise<string | null> {
+// Normalize for comparison: lowercase, drop bracketed tags like "(feat. X)"
+// or "[remix]", strip feat/ft/featuring credits, remove punctuation.
+function normalize(s: string): string {
+    return s
+        .toLowerCase()
+        .replace(/[\(\[][^\)\]]*[\)\]]/g, " ")
+        .replace(/\b(feat|ft|featuring)\b\.?\s+.+$/g, " ")
+        .replace(/[^a-z0-9\s]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+}
+
+function scoreMatch(title: string, artist: string, rt: string, ra: string): number {
+    const t = normalize(title);
+    const a = normalize(artist);
+    const nt = normalize(rt);
+    const na = normalize(ra);
+    if (!t || !nt) return 0;
+    let score = 0;
+    if (nt.includes(t) || t.includes(nt)) score += 2;
+    if (a && na && (na.includes(a) || a.includes(na))) score += 2;
+    return score;
+}
+
+async function fetchJson(url: string): Promise<any | null> {
     try {
-        const q = encodeURIComponent(`${artist} ${title}`);
-        const res = await fetch(
-            `https://itunes.apple.com/search?term=${q}&media=music&entity=song&limit=5`,
-            { headers: { "User-Agent": UA }, signal: AbortSignal.timeout(8000) }
-        );
+        const res = await fetch(url, {
+            headers: { "User-Agent": UA },
+            signal: AbortSignal.timeout(8000),
+        });
         if (!res.ok) return null;
-        const data = await res.json();
-        const t = title.toLowerCase();
-        const a = artist.toLowerCase();
-        // Prefer a result whose title and artist both resemble the query.
-        const results: any[] = data.results || [];
-        const scored = results
-            .map((r) => {
-                const rt = String(r.trackName || "").toLowerCase();
-                const ra = String(r.artistName || "").toLowerCase();
-                let score = 0;
-                if (rt.includes(t) || t.includes(rt)) score += 2;
-                if (ra.includes(a) || a.includes(ra)) score += 2;
-                return { r, score };
-            })
-            .sort((x, y) => y.score - x.score);
-        const best = scored[0];
-        if (best && best.score >= 2 && best.r.trackViewUrl) return best.r.trackViewUrl;
-        return null;
+        return await res.json();
     } catch {
         return null;
     }
 }
 
-async function findDeezer(title: string, artist: string): Promise<string | null> {
-    try {
-        const q = encodeURIComponent(`${artist} ${title}`);
-        const res = await fetch(`https://api.deezer.com/search?limit=5&q=${q}`, {
-            headers: { "User-Agent": UA },
-            signal: AbortSignal.timeout(8000),
-        });
-        if (!res.ok) return null;
-        const data = await res.json();
-        const t = title.toLowerCase();
-        const a = artist.toLowerCase();
-        const tracks: any[] = data.data || [];
-        const scored = tracks
-            .map((tr) => {
-                const rt = String(tr.title || "").toLowerCase();
-                const ra = String(tr.artist?.name || "").toLowerCase();
-                let score = 0;
-                if (rt.includes(t) || t.includes(rt)) score += 2;
-                if (ra.includes(a) || a.includes(ra)) score += 2;
-                return { tr, score };
-            })
-            .sort((x, y) => y.score - x.score);
-        const best = scored[0];
-        if (best && best.score >= 2 && best.tr.link) return best.tr.link;
-        return null;
-    } catch {
-        return null;
+async function findItunes(title: string, artist: string): Promise<string | null> {
+    // Try "artist title" first, then title-only as a fallback.
+    const queries = [`${artist} ${title}`, title];
+    let best: { url: string; score: number } | null = null;
+    for (const q of queries) {
+        const data = await fetchJson(
+            `https://itunes.apple.com/search?term=${encodeURIComponent(q)}&media=music&entity=song&limit=8`
+        );
+        const results: any[] = data?.results || [];
+        for (const r of results) {
+            const score = scoreMatch(title, artist, String(r.trackName || ""), String(r.artistName || ""));
+            if (r.trackViewUrl && (!best || score > best.score)) {
+                best = { url: r.trackViewUrl, score };
+            }
+        }
+        if (best && best.score >= 4) break; // strong match, stop searching
     }
+    return best && best.score >= 2 ? best.url : null;
+}
+
+async function findDeezer(title: string, artist: string): Promise<string | null> {
+    // Strict artist/track search first, then a general query as fallback.
+    const queries = [
+        `artist:"${artist}" track:"${title}"`,
+        `${artist} ${title}`,
+    ];
+    let best: { url: string; score: number } | null = null;
+    for (const q of queries) {
+        const data = await fetchJson(
+            `https://api.deezer.com/search?limit=8&q=${encodeURIComponent(q)}`
+        );
+        const tracks: any[] = data?.data || [];
+        for (const tr of tracks) {
+            const score = scoreMatch(title, artist, String(tr.title || ""), String(tr.artist?.name || ""));
+            if (tr.link && (!best || score > best.score)) {
+                best = { url: tr.link, score };
+            }
+        }
+        if (best && best.score >= 4) break; // strong match, stop searching
+    }
+    return best && best.score >= 2 ? best.url : null;
 }
 
 export async function POST(req: NextRequest) {
