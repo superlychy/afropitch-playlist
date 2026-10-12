@@ -1,9 +1,27 @@
 import Link from "next/link";
+import { Star } from "lucide-react";
 import { ArtistSocials, type ArtistProfile } from "./ArtistCard";
 
+export interface PublishedFeature {
+    slug: string | null;
+    headline: string | null;
+    story: string | null;
+    qa: { q: string; a: string }[] | null;
+}
+
 // The artist page: photo, bio, socials.
-// The bio always shows; feature Q&A answers are reserved for Spotlight features.
-export function ArtistFanPage({ profile }: { profile: ArtistProfile }) {
+// The bio always shows; the story + Q&A only appear once the artist has a
+// published Spotlight feature.
+export function ArtistFanPage({
+    profile,
+    feature,
+}: {
+    profile: ArtistProfile;
+    feature?: PublishedFeature | null;
+}) {
+    const qa = Array.isArray(feature?.qa) ? feature.qa.filter((item) => item?.a?.trim()) : [];
+    const showFeature = !!feature && (!!feature.story?.trim() || qa.length > 0);
+
     return (
         <div>
             {/* Header */}
@@ -19,10 +37,51 @@ export function ArtistFanPage({ profile }: { profile: ArtistProfile }) {
                 </div>
                 <div className="min-w-0">
                     <h1 className="text-3xl font-extrabold text-white">{profile.full_name}</h1>
-                    {profile.bio && <p className="text-zinc-400 text-sm mt-2 max-w-xl">{profile.bio}</p>}
+                    {profile.bio && (
+                        <p className="text-zinc-400 text-sm mt-2 max-w-xl text-left whitespace-pre-line">
+                            {profile.bio}
+                        </p>
+                    )}
                     <ArtistSocials profile={profile} className="mt-4 justify-center sm:justify-start" />
                 </div>
             </div>
+
+            {/* Spotlight feature: unlocked by a published feature */}
+            {showFeature && (
+                <section className="mt-10 bg-white/[0.03] border border-white/10 rounded-3xl p-6 sm:p-8">
+                    <div className="flex items-center gap-2 mb-4">
+                        <Star className="w-4 h-4 text-yellow-400 fill-yellow-400" />
+                        <span className="text-xs font-extrabold uppercase tracking-widest text-yellow-400">
+                            {feature.headline?.trim() || "Featured Artist"}
+                        </span>
+                    </div>
+                    {feature.story?.trim() && (
+                        <p className="text-zinc-300 text-sm leading-relaxed whitespace-pre-line">
+                            {feature.story}
+                        </p>
+                    )}
+                    {qa.length > 0 && (
+                        <div className="mt-6 space-y-5">
+                            {qa.map((item, i) => (
+                                <div key={i}>
+                                    <p className="text-white font-bold text-sm">{item.q}</p>
+                                    <p className="text-zinc-400 text-sm mt-1 leading-relaxed whitespace-pre-line">
+                                        {item.a}
+                                    </p>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                    {feature.slug && (
+                        <Link
+                            href={`/featured/${feature.slug}`}
+                            className="inline-block mt-6 text-xs font-bold text-[#22C55E] hover:underline"
+                        >
+                            Read the full feature
+                        </Link>
+                    )}
+                </section>
+            )}
 
             <p className="text-center text-zinc-600 text-xs mt-12">
                 Discover African music on <Link href="/" className="text-zinc-400 font-semibold">AfroPitch</Link>

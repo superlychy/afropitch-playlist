@@ -14,7 +14,10 @@ interface Props {
     params: { slug: string };
 }
 
-async function getArtist(slug: string): Promise<{ profile: ArtistProfile } | null> {
+async function getArtist(slug: string): Promise<{
+    profile: ArtistProfile;
+    feature: { slug: string | null; headline: string | null; story: string | null; qa: { q: string; a: string }[] | null } | null;
+} | null> {
     const supabase = getAdminSupabase();
     const { data: profile } = await supabase
         .from("profiles")
@@ -23,7 +26,17 @@ async function getArtist(slug: string): Promise<{ profile: ArtistProfile } | nul
         .single();
     if (!profile) return null;
 
-    return { profile: profile as ArtistProfile };
+    // A published Spotlight feature unlocks the story + Q&A on the artist page.
+    const { data: feature } = await supabase
+        .from("featured_artists")
+        .select("slug, headline, story, qa")
+        .eq("artist_id", profile.id)
+        .eq("status", "published")
+        .order("week_start", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+    return { profile: profile as ArtistProfile, feature };
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -66,7 +79,7 @@ export default async function ArtistPage({ params }: Props) {
             >
                 <ArrowLeft className="w-4 h-4" /> Home
             </Link>
-            <ArtistFanPage profile={data.profile} />
+            <ArtistFanPage profile={data.profile} feature={data.feature} />
         </main>
     );
 }
