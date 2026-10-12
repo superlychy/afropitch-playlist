@@ -30,6 +30,7 @@ import {
   ArrowRight,
   Music2,
   ExternalLink,
+  ChevronDown,
 } from "lucide-react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
@@ -96,6 +97,7 @@ function SubmitForm() {
   });
   const [findingLinks, setFindingLinks] = useState(false);
   const [linksHint, setLinksHint] = useState("");
+  const [showPlatformLinks, setShowPlatformLinks] = useState(false);
 
   const findPlatformLinks = async () => {
     if (!songTitle.trim() || !artistName.trim()) {
@@ -117,6 +119,7 @@ function SubmitForm() {
           apple: p.apple || json.appleMusic || "",
           deezer: p.deezer || json.deezer || "",
         }));
+        setShowPlatformLinks(true);
         setLinksHint("Found these — please check they are your song before submitting.");
       } else {
         setLinksHint("No matches found — paste your links manually.");
@@ -988,22 +991,32 @@ function SubmitForm() {
                   />
                 </div>
 
-                {/* Other platform links (optional) — shown on the fan page */}
-                <div className="space-y-2 rounded-lg border border-white/10 p-4">
+                {/* Other platform links (optional) — collapsed, shown on the fan page */}
+                <div className="rounded-lg border border-white/10 p-4">
                   <div className="flex items-center justify-between gap-2">
-                    <Label>Other platform links <span className="text-zinc-500 font-normal">(optional)</span></Label>
+                    <button
+                      type="button"
+                      onClick={() => setShowPlatformLinks((v) => !v)}
+                      className="flex items-center gap-1.5 text-sm font-medium text-white"
+                      aria-expanded={showPlatformLinks}
+                    >
+                      Other platform links <span className="text-zinc-500 font-normal text-xs">(optional)</span>
+                      <ChevronDown className={`w-4 h-4 text-zinc-500 transition-transform ${showPlatformLinks ? "rotate-180" : ""}`} />
+                    </button>
                     <button
                       type="button"
                       onClick={findPlatformLinks}
                       disabled={findingLinks}
                       className="text-xs font-bold text-[#22C55E] hover:underline disabled:opacity-50"
                     >
-                      {findingLinks ? "Searching..." : "Find Apple + Deezer links"}
+                      {findingLinks ? "Searching..." : "Find all links"}
                     </button>
                   </div>
-                  <p className="text-[11px] text-zinc-500">These appear on your fan page so listeners can pick their app. Auto-find covers Apple Music and Deezer only; Spotify, Audiomack, Boomplay and YouTube Music are pasted manually.</p>
-                  {linksHint && <p className="text-[11px] text-yellow-400/90">{linksHint}</p>}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {showPlatformLinks && (
+                    <div className="space-y-2 mt-2">
+                      <p className="text-[11px] text-zinc-500">These appear on your fan page so listeners can pick their app. Auto-find covers Apple Music and Deezer only; Spotify, Audiomack, Boomplay and YouTube Music are pasted manually.</p>
+                      {linksHint && <p className="text-[11px] text-yellow-400/90">{linksHint}</p>}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {[
                       { key: "apple", label: "Apple Music / iTunes" },
                       { key: "audiomack", label: "Audiomack" },
@@ -1039,7 +1052,9 @@ function SubmitForm() {
                         </div>
                       );
                     })}
-                  </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label>Email</Label>
