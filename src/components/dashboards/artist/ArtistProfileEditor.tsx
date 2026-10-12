@@ -68,7 +68,7 @@ export function ArtistProfileEditor({ userId }: { userId: string }) {
 
     const save = async () => {
         setSaving(true);
-        const { error } = await supabase
+        const { data, error } = await supabase
             .from("profiles")
             .update({
                 bio: bio.trim(),
@@ -80,10 +80,16 @@ export function ArtistProfileEditor({ userId }: { userId: string }) {
                 feature_answers: answers,
                 updated_at: new Date().toISOString(),
             })
-            .eq("id", userId);
+            .eq("id", userId)
+            .select("id");
         setSaving(false);
-        if (error) toast("Could not save your profile.", "error");
-        else toast("Profile saved.");
+        if (error) {
+            toast(`Could not save: ${error.message}`, "error");
+        } else if (!data || data.length === 0) {
+            toast("Save did not apply. Please log out and log back in, then try again.", "error");
+        } else {
+            toast("Profile saved.");
+        }
     };
 
     const uploadPhoto = async (file: File) => {
