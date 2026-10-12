@@ -22,6 +22,7 @@ import { ReferralCard } from "@/components/ReferralCard";
 import { CoverArt } from "@/components/dashboards/artist/CoverArt";
 import { SmartLinkCard } from "@/components/dashboards/artist/SmartLinkCard";
 import { ArtistProfileEditor } from "@/components/dashboards/artist/ArtistProfileEditor";
+import { ProfileCompletionBanner } from "@/components/dashboards/artist/ProfileCompletionBanner";
 
 const PayWithPaystack = dynamic(() => import("@/components/PaystackButton"), { ssr: false });
 
@@ -66,14 +67,6 @@ export default function ArtistDashboard() {
 
   // Profile Modal State
   const [showProfile, setShowProfile] = useState(false);
-  const [profileName, setProfileName] = useState("");
-  const [profileEmail, setProfileEmail] = useState("");
-  const [profileBio, setProfileBio] = useState("");
-  const [profileIg, setProfileIg] = useState("");
-  const [profileTwitter, setProfileTwitter] = useState("");
-  const [profileTiktok, setProfileTiktok] = useState("");
-  const [profileWeb, setProfileWeb] = useState("");
-  const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
 
   // Support Modal State
   const [showSupport, setShowSupport] = useState(false);
@@ -107,13 +100,6 @@ export default function ArtistDashboard() {
 
   useEffect(() => {
     if (user) {
-      setProfileName(user.name || "");
-      setProfileEmail(user.email || "");
-      setProfileBio(user.bio || "");
-      setProfileIg(user.instagram || "");
-      setProfileTwitter(user.twitter || "");
-      setProfileTiktok(user.tiktok || "");
-      setProfileWeb(user.website || "");
       fetchSubmissions();
       fetchLinkStats();
       fetchNotifications();
@@ -163,31 +149,6 @@ export default function ArtistDashboard() {
       }
       setLinkStats(grouped);
     }
-  };
-
-  const handleUpdateProfile = async () => {
-    if (!user) return;
-    setIsUpdatingProfile(true);
-
-    const { error } = await supabase
-      .from("profiles")
-      .update({
-        full_name: profileName,
-        bio: profileBio,
-        instagram: profileIg,
-        twitter: profileTwitter,
-        tiktok: profileTiktok,
-        website: profileWeb,
-      })
-      .eq("id", user.id);
-
-    if (error) {
-      toast("Error updating profile: " + error.message, "error");
-    } else {
-      toast("Profile saved!", "success");
-      setShowProfile(false);
-    }
-    setIsUpdatingProfile(false);
   };
 
   // Support Functions
@@ -576,10 +537,10 @@ export default function ArtistDashboard() {
             )}
           </section>
 
-          {/* ===== My public profile ===== */}
+          {/* ===== Public profile progress (full editor lives in the Profile popup) ===== */}
           {user?.id && (
-            <section id="public-profile" className="pt-4 scroll-mt-20">
-              <ArtistProfileEditor userId={user.id} />
+            <section className="pt-4">
+              <ProfileCompletionBanner userId={user.id} onOpen={() => setShowProfile(true)} />
             </section>
           )}
 
@@ -875,35 +836,11 @@ export default function ArtistDashboard() {
       )}
 
       {/* ===== Profile Modal ===== */}
-      {showProfile && (
+      {showProfile && user?.id && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm px-4">
           <div className="bg-[#141417] border border-white/[0.08] p-6 rounded-2xl w-full max-w-md space-y-4 max-h-[90vh] overflow-y-auto">
-            <h3 className="font-bold text-white text-lg">Artist profile</h3>
-            <div className="space-y-2">
-              <Label>Bio / pitch</Label>
-              <Textarea value={profileBio} onChange={(e) => setProfileBio(e.target.value)} placeholder="Short bio for curators..." className="bg-black/40 border-white/10 text-white" />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Instagram</Label>
-                <Input value={profileIg} onChange={(e) => setProfileIg(e.target.value)} placeholder="@username" className="bg-black/40 border-white/10 text-white" />
-              </div>
-              <div className="space-y-2">
-                <Label>X</Label>
-                <Input value={profileTwitter} onChange={(e) => setProfileTwitter(e.target.value)} placeholder="@username" className="bg-black/40 border-white/10 text-white" />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>TikTok</Label>
-                <Input value={profileTiktok} onChange={(e) => setProfileTiktok(e.target.value)} placeholder="@username" className="bg-black/40 border-white/10 text-white" />
-              </div>
-              <div className="space-y-2">
-                <Label>Website / EPK</Label>
-                <Input value={profileWeb} onChange={(e) => setProfileWeb(e.target.value)} placeholder="https://" className="bg-black/40 border-white/10 text-white" />
-              </div>
-            </div>
-            <div className="flex justify-between items-center pt-1">
+            <ArtistProfileEditor userId={user.id} />
+            <div className="flex justify-between items-center pt-1 border-t border-white/10">
               <div className="flex gap-1">
                 <Button variant="ghost" size="sm" className="text-zinc-400" onClick={() => { setShowProfile(false); setShowSupport(true); }}>
                   <HelpCircle className="w-4 h-4 mr-1" /> Support
@@ -912,12 +849,7 @@ export default function ArtistDashboard() {
                   <LogOut className="w-4 h-4 mr-1" /> Log out
                 </Button>
               </div>
-              <div className="flex gap-2">
-                <Button variant="ghost" onClick={() => setShowProfile(false)}>Cancel</Button>
-                <Button className="bg-[#22C55E] hover:bg-[#1aa34e] text-[#04120a]" onClick={handleUpdateProfile} disabled={isUpdatingProfile}>
-                  {isUpdatingProfile ? "Saving..." : "Save profile"}
-                </Button>
-              </div>
+              <Button variant="ghost" onClick={() => setShowProfile(false)}>Close</Button>
             </div>
           </div>
         </div>
