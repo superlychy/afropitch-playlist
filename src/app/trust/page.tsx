@@ -58,6 +58,20 @@ export default function TrustPage() {
                     <li>If not accepted, you receive honest, constructive feedback to help you improve.</li>
                 </ul>
             </div>
+
+            <Card className="bg-white/5 border-white/10">
+                <CardContent className="pt-6 pb-6 text-center space-y-2">
+                    <div className="mx-auto w-12 h-12 bg-white/10 rounded-full flex items-center justify-center">
+                        <ShieldCheck className="w-6 h-6 text-green-400" />
+                    </div>
+                    <h3 className="text-lg font-bold text-white">Registered Business</h3>
+                    <p className="text-gray-400 text-sm max-w-xl mx-auto">
+                        Afropitch play Enterprises is a business name registered with the
+                        Corporate Affairs Commission (CAC) of Nigeria.
+                    </p>
+                    <p className="text-gray-500 text-sm">RC No: 9930721</p>
+                </CardContent>
+            </Card>
         </div>
     );
 }
