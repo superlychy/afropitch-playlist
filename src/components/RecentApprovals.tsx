@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
 import { Music, CheckCircle2 } from "lucide-react";
 
 interface Approval {
@@ -23,15 +22,16 @@ export function RecentApprovals() {
 
     useEffect(() => {
         const fetchApprovals = async () => {
-            const { data } = await supabase
-                .from('submissions')
-                .select('id, song_title, created_at, artist:profiles!artist_id(full_name), playlist:playlists(name)')
-                .eq('status', 'accepted')
-                .order('created_at', { ascending: false })
-                .limit(10);
-
-            if (data) {
-                setApprovals(data as any); // Casting for ease due to join structure
+            // Served by a tiny public API route (service role, server-side)
+            // so the browser never queries profiles directly.
+            try {
+                const res = await fetch('/api/public/recent-approvals');
+                const json = await res.json();
+                if (json?.success && Array.isArray(json.approvals)) {
+                    setApprovals(json.approvals as any);
+                }
+            } catch (err) {
+                console.error('Recent approvals fetch failed', err);
             }
             setLoading(false);
         };
