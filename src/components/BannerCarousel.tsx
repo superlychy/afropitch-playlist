@@ -113,32 +113,36 @@ export function BannerCarousel({
 
     return (
         <section className="mb-12">
-            <div
-                ref={trackRef}
-                onScroll={onScroll}
-                className="flex gap-4 overflow-x-auto snap-x snap-mandatory pb-2 -mx-4 px-4"
-                style={{ scrollbarWidth: "none" }}
-            >
-                {banners.map((b) => (
-                    <div key={b.id} className="snap-center shrink-0 w-full sm:w-[85%]">
-                        <BannerCard event={b} showPresale={showPresale} />
+            {banners.length === 1 ? (
+                <BannerCard event={banners[0]} showPresale={showPresale} />
+            ) : (
+                <>
+                    <div
+                        ref={trackRef}
+                        onScroll={onScroll}
+                        className="flex gap-4 overflow-x-auto snap-x snap-mandatory pb-2"
+                        style={{ scrollbarWidth: "none" }}
+                    >
+                        {banners.map((b) => (
+                            <div key={b.id} className="snap-center shrink-0 w-full">
+                                <BannerCard event={b} showPresale={showPresale} />
+                            </div>
+                        ))}
                     </div>
-                ))}
-            </div>
-            {banners.length > 1 && (
-                <div className="flex justify-center gap-2 mt-3">
-                    {banners.map((b, i) => (
-                        <button
-                            key={b.id}
-                            type="button"
-                            onClick={() => goTo(i)}
-                            aria-label={`Show ${b.title}`}
-                            className={`h-2 rounded-full transition-all ${
-                                i === active ? "w-6 bg-yellow-500" : "w-2 bg-white/20 hover:bg-white/40"
-                            }`}
-                        />
-                    ))}
-                </div>
+                    <div className="flex justify-center gap-2 mt-3">
+                        {banners.map((b, i) => (
+                            <button
+                                key={b.id}
+                                type="button"
+                                onClick={() => goTo(i)}
+                                aria-label={`Show ${b.title}`}
+                                className={`h-2 rounded-full transition-all ${
+                                    i === active ? "w-6 bg-yellow-500" : "w-2 bg-white/20 hover:bg-white/40"
+                                }`}
+                            />
+                        ))}
+                    </div>
+                </>
             )}
         </section>
     );
