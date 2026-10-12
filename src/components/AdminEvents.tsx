@@ -850,20 +850,22 @@ export function AdminEvents() {
         </div>
     );
 
-    if (loading) {
-        return <div className="flex items-center gap-2 text-gray-400 py-10"><Loader2 className="w-5 h-5 animate-spin" /> Loading events…</div>;
-    }
-
-    const drafts = events.filter((e) => e.status === "draft");
-    const published = events.filter((e) => e.status === "published");
-
     // Admin list filters (client-side; all events are already loaded).
+    // NOTE: hooks must stay above the early return below — otherwise React
+    // throws a hooks-order error (#310) once loading finishes.
     const [fq, setFq] = useState("");
     const [fStatus, setFStatus] = useState<"all" | "published" | "draft">("all");
     const [fCat, setFCat] = useState("");
     const [fCountry, setFCountry] = useState("");
     const [fState, setFState] = useState("");
     const [fCity, setFCity] = useState("");
+
+    if (loading) {
+        return <div className="flex items-center gap-2 text-gray-400 py-10"><Loader2 className="w-5 h-5 animate-spin" /> Loading events…</div>;
+    }
+
+    const drafts = events.filter((e) => e.status === "draft");
+    const published = events.filter((e) => e.status === "published");
 
     const adminTree: Record<string, Record<string, string[]>> = {};
     {
