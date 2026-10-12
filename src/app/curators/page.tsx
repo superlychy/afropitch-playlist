@@ -16,7 +16,7 @@ export default function CuratorsPage() {
             // 1. Fetch Real Curators
             const { data: realCurators } = await supabase
                 .from('profiles')
-                .select('*, playlists(*)')
+                .select('id, full_name, bio, verification_status, avatar_url, playlists(id)')
                 .eq('role', 'curator')
                 .eq('verification_status', 'verified');
 
