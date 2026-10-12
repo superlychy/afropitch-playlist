@@ -36,6 +36,7 @@ export interface User {
   bio?: string;
   instagram?: string;
   twitter?: string;
+  tiktok?: string;
   website?: string;
   created_at?: string;
 }
@@ -110,6 +111,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           bio: profile.bio,
           instagram: profile.instagram,
           twitter: profile.twitter,
+          tiktok: profile.tiktok,
           website: profile.website,
           created_at: profile.created_at || session.user.created_at,
         });

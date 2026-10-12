@@ -569,7 +569,7 @@ export function AIHelp() {
     };
 
     return (
-        <div className={`fixed right-6 bottom-24 sm:bottom-6 z-50 flex-col items-end font-sans ${onAdminDashboard ? "hidden lg:flex" : "flex"}`}>
+        <div className={`fixed right-6 bottom-24 sm:bottom-6 z-40 flex-col items-end font-sans ${onAdminDashboard ? "hidden lg:flex" : "flex"}`}>
             {isOpen && (
                 <Card className="mb-4 w-[350px] max-w-[calc(100vw-2rem)] h-[500px] max-h-[calc(100dvh-12rem)] bg-zinc-950/95 border border-green-500/30 backdrop-blur-xl flex flex-col shadow-2xl rounded-2xl overflow-hidden animate-in slide-in-from-bottom-5 zoom-in-95">
                     {/* Header */}

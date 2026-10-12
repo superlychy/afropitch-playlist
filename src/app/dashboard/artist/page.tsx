@@ -71,13 +71,9 @@ export default function ArtistDashboard() {
   const [profileBio, setProfileBio] = useState("");
   const [profileIg, setProfileIg] = useState("");
   const [profileTwitter, setProfileTwitter] = useState("");
+  const [profileTiktok, setProfileTiktok] = useState("");
   const [profileWeb, setProfileWeb] = useState("");
   const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
-
-  // Bank details (used by profile settings; also pre-fills mixing refund forms)
-  const [bankName, setBankName] = useState("");
-  const [accountNumber, setAccountNumber] = useState("");
-  const [accountName, setAccountName] = useState("");
 
   // Support Modal State
   const [showSupport, setShowSupport] = useState(false);
@@ -116,27 +112,13 @@ export default function ArtistDashboard() {
       setProfileBio(user.bio || "");
       setProfileIg(user.instagram || "");
       setProfileTwitter(user.twitter || "");
+      setProfileTiktok(user.tiktok || "");
       setProfileWeb(user.website || "");
       fetchSubmissions();
       fetchLinkStats();
       fetchNotifications();
-      fetchBankDetails();
     }
   }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const fetchBankDetails = async () => {
-    if (!user) return;
-    const { data } = await supabase
-      .from("profiles")
-      .select("bank_name, account_number, account_name")
-      .eq("id", user.id)
-      .single();
-    if (data) {
-      setBankName(data.bank_name || "");
-      setAccountNumber(data.account_number || "");
-      setAccountName(data.account_name || "");
-    }
-  };
 
   const fetchNotifications = async () => {
     if (!user) return;
@@ -194,10 +176,8 @@ export default function ArtistDashboard() {
         bio: profileBio,
         instagram: profileIg,
         twitter: profileTwitter,
+        tiktok: profileTiktok,
         website: profileWeb,
-        bank_name: bankName,
-        account_number: accountNumber,
-        account_name: accountName,
       })
       .eq("id", user.id);
 
@@ -909,29 +889,18 @@ export default function ArtistDashboard() {
                 <Input value={profileIg} onChange={(e) => setProfileIg(e.target.value)} placeholder="@username" className="bg-black/40 border-white/10 text-white" />
               </div>
               <div className="space-y-2">
-                <Label>Twitter</Label>
+                <Label>X</Label>
                 <Input value={profileTwitter} onChange={(e) => setProfileTwitter(e.target.value)} placeholder="@username" className="bg-black/40 border-white/10 text-white" />
               </div>
             </div>
-            <div className="space-y-2">
-              <Label>Website / EPK</Label>
-              <Input value={profileWeb} onChange={(e) => setProfileWeb(e.target.value)} placeholder="https://" className="bg-black/40 border-white/10 text-white" />
-            </div>
-            <div className="pt-2 border-t border-white/10">
-              <p className="text-xs text-zinc-500 mb-3">Bank details, used for withdrawals.</p>
+            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Bank name</Label>
-                <Input value={bankName} onChange={(e) => setBankName(e.target.value)} placeholder="e.g. GTBank" className="bg-black/40 border-white/10 text-white" />
+                <Label>TikTok</Label>
+                <Input value={profileTiktok} onChange={(e) => setProfileTiktok(e.target.value)} placeholder="@username" className="bg-black/40 border-white/10 text-white" />
               </div>
-              <div className="grid grid-cols-2 gap-4 mt-3">
-                <div className="space-y-2">
-                  <Label>Account number</Label>
-                  <Input value={accountNumber} onChange={(e) => setAccountNumber(e.target.value)} placeholder="0123456789" className="bg-black/40 border-white/10 text-white" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Account name</Label>
-                  <Input value={accountName} onChange={(e) => setAccountName(e.target.value)} placeholder="Full name" className="bg-black/40 border-white/10 text-white" />
-                </div>
+              <div className="space-y-2">
+                <Label>Website / EPK</Label>
+                <Input value={profileWeb} onChange={(e) => setProfileWeb(e.target.value)} placeholder="https://" className="bg-black/40 border-white/10 text-white" />
               </div>
             </div>
             <div className="flex justify-between items-center pt-1">
