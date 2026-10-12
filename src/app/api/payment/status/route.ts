@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { createClient as createAuthClient } from "@/lib/supabase-server";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -14,21 +15,32 @@ const PAYSTACK_SECRET =
 
 /**
  * GET /api/payment/status
- * Check payment status and verify if deposit was credited
+ * Check payment status and verify if deposit was credited.
+ * Authenticated: the caller may only check their OWN status (userId comes
+ * from the session, never the query string).
  * 
  * Query params:
  * - reference: Paystack transaction reference
- * - userId: User ID to verify ownership
  */
 export async function GET(req: Request) {
   try {
+    // The caller may only check their OWN payment status: the userId comes
+    // from the session, never from the query string.
+    const auth = await createAuthClient();
+    const {
+      data: { user },
+    } = await auth.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: "Not signed in" }, { status: 401 });
+    }
+    const userId = user.id;
+
     const { searchParams } = new URL(req.url);
     const reference = searchParams.get("reference");
-    const userId = searchParams.get("userId");
 
-    if (!reference || !userId) {
+    if (!reference) {
       return NextResponse.json(
-        { error: "Missing reference or userId" },
+        { error: "Missing reference" },
         { status: 400 }
       );
     }

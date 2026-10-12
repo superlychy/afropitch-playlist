@@ -52,10 +52,6 @@ interface Playlist {
   songCount?: number;
 }
 
-const PayWithPaystack = dynamic(() => import("@/components/PaystackButton"), {
-  ssr: false,
-});
-
 function SubmitForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -860,7 +856,7 @@ function SubmitForm() {
             <Button
               size="default"
               onClick={proceedToDetails}
-              className="bg-green-600 hover:bg-green-700 text-white font-bold text-sm md:text-lg px-6 md:px-8 py-2 md:py-6 rounded-full shadow-lg shadow-green-900/20 h-10 md:h-12 flex items-center"
+              className="bg-green-600 hover:bg-green-700 text-white font-bold text-sm md:text-lg px-6 md:px-8 py-2 md:py-6 rounded-full shadow-lg shadow-green-900/20 h-11 md:h-12 flex items-center"
             >
               Continue <ArrowRight className="ml-2 w-4 h-4 md:w-5 md:h-5" />
             </Button>
@@ -1018,7 +1014,7 @@ function SubmitForm() {
                       {linksHint && <p className="text-[11px] text-yellow-400/90">{linksHint}</p>}
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {[
-                      { key: "apple", label: "Apple Music / iTunes" },
+                      { key: "apple", label: "Apple Music" },
                       { key: "audiomack", label: "Audiomack" },
                       { key: "boomplay", label: "Boomplay" },
                       { key: "deezer", label: "Deezer" },
@@ -1043,7 +1039,7 @@ function SubmitForm() {
                                 rel="noopener noreferrer"
                                 title={`Open ${f.label} link`}
                                 aria-label={`Open ${f.label} link`}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-[#22C55E] transition-colors"
+                                className="absolute right-1 top-1/2 -translate-y-1/2 min-h-[44px] min-w-[44px] flex items-center justify-center text-zinc-500 hover:text-[#22C55E] transition-colors"
                               >
                                 <ExternalLink className="w-4 h-4" />
                               </a>

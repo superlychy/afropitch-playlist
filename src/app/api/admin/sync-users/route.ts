@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { requireAdmin } from "@/lib/require-admin";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -12,6 +13,10 @@ const supabase = createClient(
  */
 export async function POST() {
   try {
+    const admin = await requireAdmin();
+    if (!admin.ok) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: admin.status });
+    }
     // Get all auth users via admin API
     const {
       data: { users: authUsers },

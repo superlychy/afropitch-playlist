@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { requireAdmin } from "@/lib/require-admin";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -17,6 +18,10 @@ const supabase = createClient(
  */
 export async function GET(req: Request) {
   try {
+    const admin = await requireAdmin();
+    if (!admin.ok) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: admin.status });
+    }
     const { searchParams } = new URL(req.url);
     const type = searchParams.get("type") || "all";
     const limit = parseInt(searchParams.get("limit") || "20");

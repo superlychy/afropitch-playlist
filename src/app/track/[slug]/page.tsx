@@ -105,7 +105,7 @@ export default async function TrackPage({ params }: Props) {
     if (url?.trim()) platforms.push({ label, url: url.trim() });
   };
   push("Spotify", submission.song_link);
-  push("iTunes", submission.apple_music_url);
+  push("Apple Music", submission.apple_music_url);
   push("Audiomack", submission.audiomack_url);
   push("Boomplay", submission.boomplay_url);
   push("Deezer", submission.deezer_url);

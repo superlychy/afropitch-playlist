@@ -21,7 +21,11 @@ export async function POST(req: Request) {
     const rawBody = await req.text();
 
     if (!WEBHOOK_SIGNING_SECRET) {
-      console.warn("[Paystack Webhook] No signing secret set — skipping signature check");
+      // Fail closed: without a signing secret we cannot authenticate the
+      // sender, so no webhook is processed. This also prevents a
+      // misconfigured deploy from silently accepting forged events.
+      console.error("[Paystack Webhook] No signing secret set — rejecting webhook");
+      return NextResponse.json({ error: "Webhook not configured" }, { status: 503 });
     } else {
       const signature = req.headers.get("x-paystack-signature") || "";
       const expected = crypto

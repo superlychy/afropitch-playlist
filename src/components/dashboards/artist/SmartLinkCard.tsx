@@ -95,8 +95,33 @@ export function SmartLinkCard({
       });
       const j = await res.json();
       if (!res.ok) throw new Error(j.error || "Save failed");
-      toast("Smart link updated!", "success");
-      setEditing(false);
+      // Resync the form with what actually saved (cleared links come back
+      // null). Rejected fields keep the artist's typed value so they can fix
+      // it instead of seeing their input vanish.
+      const rejected = new Set(Object.keys(j.fieldErrors || {}));
+      setForm((f) => {
+        const next = { ...f } as Record<string, string>;
+        for (const [k, v] of Object.entries((j.updates || {}) as Record<string, string | null>)) {
+          if (k in next && !rejected.has(k)) next[k] = v ?? "";
+          else if (k in next && rejected.has(k)) next[k] = f[k as keyof typeof f] as string;
+        }
+        return next as typeof f;
+      });
+      const COLUMN_LABELS: Record<string, string> = {
+        apple_music_url: "Apple Music",
+        audiomack_url: "Audiomack",
+        boomplay_url: "Boomplay",
+        deezer_url: "Deezer",
+        youtube_music_url: "YouTube Music",
+        cover_art_url: "Cover art",
+      };
+      if (rejected.size > 0) {
+        const names = [...rejected].map((k) => COLUMN_LABELS[k] || k).join(", ");
+        toast(`Saved, but these links were not valid and were left unchanged: ${names}.`, "error");
+      } else {
+        toast("Smart link updated!", "success");
+        setEditing(false);
+      }
       onSaved();
     } catch (e: any) {
       toast(e.message || "Save failed", "error");

@@ -66,25 +66,49 @@ export async function POST(req: NextRequest) {
   if (subErr || !sub) return NextResponse.json({ error: "Submission not found" }, { status: 404 });
   if (sub.artist_id !== user.id) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
+  // Only fields the client actually sent are touched: an absent key means
+  // "leave as-is". An explicit empty string clears the link. A present but
+  // invalid URL is rejected per-field (reported, never nulled), so a typo
+  // can never erase a good link while the UI claims success.
   const updates: Record<string, string | null> = {};
+  const fieldErrors: Record<string, string> = {};
   for (const [field, hosts] of Object.entries(FIELD_HOSTS)) {
-    updates[field] = cleanPlatformUrl(body[field], hosts);
+    if (!(field in body)) continue;
+    const raw = body[field];
+    if (typeof raw === "string" && raw.trim() === "") {
+      updates[field] = null;
+      continue;
+    }
+    const ok = cleanPlatformUrl(raw, hosts);
+    if (ok) updates[field] = ok;
+    else fieldErrors[field] = "That is not a valid link for this platform.";
   }
-  updates.cover_art_url = cleanGenericUrl(body.cover_art_url);
-
-  // Backfill cover art from the Spotify link when the artist didn't supply one.
-  if (!updates.cover_art_url && !sub.cover_art_url && sub.song_link) {
-    const art = await getSpotifyArtwork(sub.song_link);
-    if (art) updates.cover_art_url = art;
+  if ("cover_art_url" in body) {
+    const raw = body.cover_art_url;
+    if (typeof raw === "string" && raw.trim() === "") {
+      updates.cover_art_url = null;
+    } else {
+      const art = cleanGenericUrl(raw);
+      if (art) updates.cover_art_url = art;
+      else fieldErrors.cover_art_url = "That is not a valid URL.";
+    }
   }
 
-  const { error: updErr } = await supabase.from("submissions").update(updates).eq("id", submission_id);
-  if (updErr) return NextResponse.json({ error: "Update failed" }, { status: 500 });
+  if (Object.keys(updates).length > 0) {
+    // Backfill cover art from the Spotify link when the artist didn't supply one.
+    if (!("cover_art_url" in updates) && !sub.cover_art_url && sub.song_link) {
+      const art = await getSpotifyArtwork(sub.song_link);
+      if (art) updates.cover_art_url = art;
+    }
 
-  // Bust the edge cache so the public page shows the new links right away.
-  if (sub.tracking_slug) {
-    revalidatePath(`/track/${sub.tracking_slug}`);
+    const { error: updErr } = await supabase.from("submissions").update(updates).eq("id", submission_id);
+    if (updErr) return NextResponse.json({ error: "Update failed" }, { status: 500 });
+
+    // Bust the edge cache so the public page shows the new links right away.
+    if (sub.tracking_slug) {
+      revalidatePath(`/track/${sub.tracking_slug}`);
+    }
   }
 
-  return NextResponse.json({ ok: true, updates });
+  return NextResponse.json({ ok: true, updates, fieldErrors });
 }

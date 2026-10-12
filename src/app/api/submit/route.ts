@@ -1,17 +1,61 @@
 import { NextResponse } from "next/server";
 import { createClient as createAuthClient } from "@/lib/supabase-server";
+import { createClient as createAdminClient } from "@supabase/supabase-js";
 import { getSpotifyArtwork } from "@/lib/spotifyArt";
 
-const VALID_DOMAINS = [
+const VALID_HOSTS = new Set([
   "open.spotify.com",
   "spotify.com",
   "music.apple.com",
   "audiomack.com",
+  "www.audiomack.com",
   "soundcloud.com",
+  "www.soundcloud.com",
   "boomplay.com",
+  "www.boomplay.com",
   "youtube.com",
+  "www.youtube.com",
   "youtu.be",
-];
+  "music.youtube.com",
+  "www.music.youtube.com",
+]);
+
+function isValidSongLink(url: string): boolean {
+  try {
+    const u = new URL(url.startsWith("http") ? url : `https://${url}`);
+    const host = u.hostname.toLowerCase();
+    if (!["http:", "https:"].includes(u.protocol)) return false;
+    return [...VALID_HOSTS].some((d) => host === d || host.endsWith(`.${d}`));
+  } catch {
+    return false;
+  }
+}
+
+// Per-field official hosts for the optional platform links (same allowlist
+// as the dashboard editor). Prevents a phishing URL being saved as e.g.
+// the "Apple Music" link shown on the public song page.
+const FIELD_HOSTS: Record<string, Set<string>> = {
+  apple_music_url: new Set(["music.apple.com"]),
+  audiomack_url: new Set(["audiomack.com", "www.audiomack.com"]),
+  boomplay_url: new Set(["boomplay.com", "www.boomplay.com"]),
+  deezer_url: new Set(["deezer.com", "www.deezer.com"]),
+  youtube_music_url: new Set(["music.youtube.com", "www.music.youtube.com"]),
+};
+
+function cleanPlatformUrl(v: unknown, hosts: Set<string>): string | null {
+  if (typeof v !== "string") return null;
+  const t = v.trim();
+  if (!t) return null;
+  let u: URL;
+  try {
+    u = new URL(t);
+  } catch {
+    return null;
+  }
+  if (u.protocol !== "https:" && u.protocol !== "http:") return null;
+  if (!hosts.has(u.hostname.toLowerCase())) return null;
+  return t.slice(0, 500);
+}
 
 export async function POST(req: Request) {
   try {
@@ -37,9 +81,8 @@ export async function POST(req: Request) {
       );
     }
 
-    // Validate song link format
-    const linkUrl = String(song_link).toLowerCase();
-    if (!VALID_DOMAINS.some((d) => linkUrl.includes(d))) {
+    // Validate song link format (hostname check, not substring).
+    if (!isValidSongLink(String(song_link))) {
       return NextResponse.json(
         {
           success: false,
@@ -107,11 +150,13 @@ export async function POST(req: Request) {
     }
 
     // Optional platform links (fan page): attached to the just-created
-    // submissions with a follow-up update. The money RPC is untouched.
-    // Best effort — a failure here must never fail the submission.
+    // submissions with a follow-up update using the service role, because
+    // artists have no direct UPDATE grant on submissions. The money RPC is
+    // untouched. Each link is host-validated so a wrong-host URL is rejected
+    // rather than silently dropped. Best effort: a failure here must never
+    // fail the submission itself.
     try {
       const pl = platform_links || {};
-      const clean: Record<string, string> = {};
       const map: Record<string, string> = {
         apple: "apple_music_url",
         audiomack: "audiomack_url",
@@ -119,20 +164,34 @@ export async function POST(req: Request) {
         deezer: "deezer_url",
         youtubeMusic: "youtube_music_url",
       };
+      const clean: Record<string, string> = {};
+      const rejected: string[] = [];
       for (const [key, col] of Object.entries(map)) {
-        const v = String(pl[key] || "").trim();
-        if (v && /^https?:\/\//i.test(v)) clean[col] = v;
+        const raw = pl[key];
+        if (raw == null || String(raw).trim() === "") continue;
+        const ok = cleanPlatformUrl(raw, FIELD_HOSTS[col]);
+        if (ok) clean[col] = ok;
+        else rejected.push(key);
       }
       if (Object.keys(clean).length > 0) {
-        await auth
+        const admin = createAdminClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.SUPABASE_SERVICE_ROLE_KEY!
+        );
+        const { error: linkErr } = await admin
           .from("submissions")
           .update(clean)
           .eq("artist_id", user.id)
           .eq("song_link", song_link)
           .gt("created_at", new Date(Date.now() - 10 * 60 * 1000).toISOString());
+        if (linkErr) console.error("submit platform-link attach failed:", linkErr);
       }
-    } catch {
+      if (rejected.length > 0) {
+        console.warn("submit rejected platform links (wrong host):", rejected);
+      }
+    } catch (e) {
       // Non-fatal: links can be added later from the dashboard.
+      console.error("submit platform-link attach error:", e);
     }
 
     return NextResponse.json({

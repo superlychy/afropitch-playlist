@@ -51,7 +51,7 @@ export function SongSearch({ value, onChange }: { value: string; onChange: (url:
             onClick={pasteFromClipboard}
             title="Paste from clipboard"
             aria-label="Paste link from clipboard"
-            className="p-1.5 -m-1.5 text-gray-400 hover:text-white transition-colors"
+            className="min-h-[44px] min-w-[44px] -m-2 flex items-center justify-center text-gray-400 hover:text-white transition-colors"
           >
             <ClipboardPaste className="h-4 w-4" />
           </button>
