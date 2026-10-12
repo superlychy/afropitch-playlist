@@ -51,7 +51,7 @@ export default function CuratorProfile() {
             // Fetch Real Profile
             const { data: profile, error } = await supabase
                 .from('profiles')
-                .select('*')
+                .select('id, full_name, role, verification_status, bio, avatar_url, photo_url, instagram, twitter, tiktok, youtube, website')
                 .eq('id', id)
                 .single();
 

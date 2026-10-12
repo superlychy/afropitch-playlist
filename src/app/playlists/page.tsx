@@ -40,10 +40,11 @@ export default function PlaylistsPage() {
                     .eq('is_active', true)
                     .order('followers', { ascending: false });
 
-                // Fetch Curators
+                // Fetch Curators (public directory columns only; anon cannot read
+                // emails, balances or other private profile fields)
                 const fetchCuratorsPromise = supabasePublic
                     .from('profiles')
-                    .select('*, playlists(count)')
+                    .select('id, full_name, role, verification_status, bio, avatar_url, playlists(count)')
                     .or('role.eq.curator,role.eq.admin');
 
                 const timeoutPromise = new Promise((_, reject) =>
