@@ -245,10 +245,10 @@ export default async function EventsPage({
             // Escape PostgREST `or` special chars so the search term can't break the filter.
             const safe = q.replace(/[%(),]/g, "").trim();
             if (safe) {
-                // Note: the outer parens are required — without them PostgREST
-                // rejects the query when combined with the other filters.
+                // Note: do NOT add parens here — supabase-js .or() wraps the
+                // filter in parens itself; doubling them makes PostgREST 400.
                 query = query.or(
-                    `(title.ilike.%${safe}%,venue.ilike.%${safe}%,city.ilike.%${safe}%,organizer.ilike.%${safe}%)`
+                    `title.ilike.%${safe}%,venue.ilike.%${safe}%,city.ilike.%${safe}%,organizer.ilike.%${safe}%`
                 );
             }
         }
