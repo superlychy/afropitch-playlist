@@ -997,10 +997,10 @@ function SubmitForm() {
                       disabled={findingLinks}
                       className="text-xs font-bold text-[#22C55E] hover:underline disabled:opacity-50"
                     >
-                      {findingLinks ? "Searching..." : "Find my links"}
+                      {findingLinks ? "Searching..." : "Find Apple + Deezer links"}
                     </button>
                   </div>
-                  <p className="text-[11px] text-zinc-500">These appear on your fan page so listeners can pick their app.</p>
+                  <p className="text-[11px] text-zinc-500">These appear on your fan page so listeners can pick their app. Auto-find covers Apple Music and Deezer only; Spotify, Audiomack, Boomplay and YouTube Music are pasted manually.</p>
                   {linksHint && <p className="text-[11px] text-yellow-400/90">{linksHint}</p>}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {[
