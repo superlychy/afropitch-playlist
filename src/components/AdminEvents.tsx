@@ -15,6 +15,7 @@ interface EventItem {
     ends_at: string;
     venue: string | null;
     city: string;
+    state: string | null;
     country: string;
     image_url: string | null;
     description: string | null;
@@ -459,6 +460,7 @@ interface EventForm {
     ends_at: string;
     venue: string;
     city: string;
+    state: string;
     country: string;
     image_url: string;
     description: string;
@@ -477,6 +479,7 @@ const emptyForm = (): EventForm => ({
     ends_at: "",
     venue: "",
     city: "",
+    state: "",
     country: "Nigeria",
     image_url: "",
     description: "",
@@ -548,6 +551,7 @@ export function AdminEvents() {
                 ends_at: toLocalInput(e.ends_at),
                 venue: e.venue ?? "",
                 city: e.city,
+                state: e.state ?? "",
                 country: e.country,
                 image_url: e.image_url ?? "",
                 description: e.description ?? "",
@@ -601,6 +605,7 @@ export function AdminEvents() {
             ends_at: fromLocalInput(newForm.ends_at),
             venue: newForm.venue.trim() || null,
             city: newForm.city.trim(),
+            state: newForm.state.trim() || null,
             country: newForm.country.trim() || "Nigeria",
             image_url: newForm.image_url.trim() || null,
             description: newForm.description.trim() || null,
@@ -641,6 +646,7 @@ export function AdminEvents() {
                 ends_at: fromLocalInput(f.ends_at),
                 venue: f.venue.trim() || null,
                 city: f.city.trim(),
+                state: f.state.trim() || null,
                 country: f.country.trim() || "Nigeria",
                 image_url: f.image_url.trim() || null,
                 description: f.description.trim() || null,
@@ -764,7 +770,7 @@ export function AdminEvents() {
                     <input type="datetime-local" value={f.ends_at} onChange={(e) => set({ ends_at: e.target.value })} className={inputCls} />
                 </div>
             </div>
-            <div className="grid sm:grid-cols-3 gap-4">
+            <div className="grid sm:grid-cols-4 gap-4">
                 <div>
                     <label className={labelCls}>Venue</label>
                     <input value={f.venue} onChange={(e) => set({ venue: e.target.value })} placeholder="New Afrika Shrine" className={inputCls} />
@@ -772,6 +778,10 @@ export function AdminEvents() {
                 <div>
                     <label className={labelCls}>City</label>
                     <input value={f.city} onChange={(e) => set({ city: e.target.value })} placeholder="Lagos" className={inputCls} />
+                </div>
+                <div>
+                    <label className={labelCls}>State / Province</label>
+                    <input value={f.state} onChange={(e) => set({ state: e.target.value })} placeholder="Lagos" className={inputCls} />
                 </div>
                 <div>
                     <label className={labelCls}>Country</label>

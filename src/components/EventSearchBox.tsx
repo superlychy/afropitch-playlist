@@ -8,11 +8,15 @@ import { useEffect, useRef, useState } from "react";
 export function EventSearchBox({
     initial,
     category,
-    location,
+    country,
+    state,
+    city,
 }: {
     initial: string;
     category: string | null;
-    location: string | null;
+    country: string | null;
+    state: string | null;
+    city: string | null;
 }) {
     const router = useRouter();
     const [value, setValue] = useState(initial);
@@ -25,7 +29,9 @@ export function EventSearchBox({
     const push = (v: string) => {
         const params = new URLSearchParams();
         if (category) params.set("category", category);
-        if (location) params.set("location", location);
+        if (country) params.set("country", country);
+        if (state) params.set("state", state);
+        if (city) params.set("city", city);
         const trimmed = v.trim();
         if (trimmed) params.set("q", trimmed);
         const qs = params.toString();

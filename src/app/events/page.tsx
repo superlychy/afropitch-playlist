@@ -3,6 +3,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase-server";
 import { Card, CardContent } from "@/components/ui/card";
 import { EventSearchBox } from "@/components/EventSearchBox";
+import { EventFilters } from "@/components/EventFilters";
 import { BannerCarousel, type BannerEvent } from "@/components/BannerCarousel";
 import { CalendarDays, MapPin, Ticket } from "lucide-react";
 
@@ -103,23 +104,44 @@ function EventCard({ event, live, showPresale }: { event: EventRow; live?: boole
     );
 }
 
-type EventsSearchParams = { page?: string; category?: string; location?: string; q?: string };
+type EventsSearchParams = {
+    page?: string;
+    category?: string;
+    location?: string; // legacy alias for city
+    country?: string;
+    state?: string;
+    city?: string;
+    q?: string;
+};
 
 const parseFilters = (sp: EventsSearchParams) => {
     const page = Math.max(1, parseInt(sp.page ?? "1", 10) || 1);
     const category = Object.keys(CATEGORY_LABELS).includes(sp.category ?? "")
         ? (sp.category as string)
         : null;
-    const location = sp.location?.trim() ? sp.location.trim().slice(0, 80) : null;
-    const q = sp.q?.trim() ? sp.q.trim().slice(0, 80) : null;
-    return { page, category, location, q };
+    const clean = (v?: string) => (v?.trim() ? v.trim().slice(0, 80) : null);
+    const country = clean(sp.country);
+    const state = clean(sp.state);
+    // `city` is the current param; `location` is the legacy alias.
+    const city = clean(sp.city) ?? clean(sp.location);
+    const q = clean(sp.q);
+    return { page, category, country, state, city, q };
 };
 
-const buildQs = (f: { page?: number; category?: string | null; location?: string | null; q?: string | null }) => {
+const buildQs = (f: {
+    page?: number;
+    category?: string | null;
+    country?: string | null;
+    state?: string | null;
+    city?: string | null;
+    q?: string | null;
+}) => {
     const qs = new URLSearchParams({
         ...(f.page && f.page > 1 ? { page: String(f.page) } : {}),
         ...(f.category ? { category: f.category } : {}),
-        ...(f.location ? { location: f.location } : {}),
+        ...(f.country ? { country: f.country } : {}),
+        ...(f.state ? { state: f.state } : {}),
+        ...(f.city ? { city: f.city } : {}),
         ...(f.q ? { q: f.q } : {}),
     }).toString();
     return qs ? `?${qs}` : "";
@@ -130,10 +152,10 @@ export async function generateMetadata({
 }: {
     searchParams: Promise<EventsSearchParams>;
 }): Promise<Metadata> {
-    const { page, category, location } = parseFilters(await searchParams);
-    const qs = buildQs({ page, category, location });
+    const { page, category, country, state, city } = parseFilters(await searchParams);
+    const qs = buildQs({ page, category, country, state, city });
     const catName = category ? ` ${CATEGORY_LABELS[category]}` : "";
-    const locName = location ? ` in ${location}` : "";
+    const locName = city ? ` in ${city}` : state ? ` in ${state}` : country ? ` in ${country}` : "";
     return {
         title: `African Music Events${catName}${locName} | AfroPitch`,
         description:
@@ -164,7 +186,7 @@ export default async function EventsPage({
 }: {
     searchParams: Promise<EventsSearchParams>;
 }) {
-    const { page, category, location: locationParam, q } = parseFilters(await searchParams);
+    const { page, category, country: countryParam, state: stateParam, city: cityParam, q } = parseFilters(await searchParams);
     const supabase = await createClient();
     const nowIso = new Date().toISOString();
     const baseSelect =
@@ -219,36 +241,51 @@ export default async function EventsPage({
     }
     const bannerIdSet = new Set(bannerEvents.map((e) => e.id));
 
-    // Location list is built from the published events themselves, so a new
-    // city appears in the filter automatically when its first event publishes.
+    // Location tree is built from the published events themselves, so a new
+    // country/state/city appears in the filters automatically when its first
+    // event publishes.
     const { data: locRows } = await supabase
         .from("events")
-        .select("city, country")
+        .select("country, state, city")
         .eq("status", "published");
-    const locCounts = new Map<string, { city: string; country: string; count: number }>();
+    const locationTree: Record<string, Record<string, Set<string>>> = {};
     for (const r of locRows ?? []) {
-        const cur = locCounts.get(r.city) ?? { city: r.city, country: r.country, count: 0 };
-        cur.count++;
-        locCounts.set(r.city, cur);
+        const c = (r.country ?? "").trim() || "Unknown";
+        const s = (r.state ?? "").trim() || (r.city ?? "").trim() || "Unknown";
+        const ct = (r.city ?? "").trim();
+        if (!ct) continue;
+        locationTree[c] ??= {};
+        locationTree[c][s] ??= new Set();
+        locationTree[c][s].add(ct);
     }
-    const locations = [...locCounts.values()].sort(
-        (a, b) => b.count - a.count || a.city.localeCompare(b.city)
-    );
-    const location = locations.some((l) => l.city === locationParam) ? locationParam : null;
+    const tree: import("@/components/EventFilters").LocationTree = {};
+    for (const [c, states] of Object.entries(locationTree)) {
+        tree[c] = {};
+        for (const [s, cities] of Object.entries(states)) {
+            tree[c][s] = [...cities];
+        }
+    }
+    // Validate the selected location against the tree (stale URLs fall back).
+    const country = tree[countryParam] ? countryParam : null;
+    const state = country && tree[country][stateParam] ? stateParam : null;
+    const city = country && state && tree[country][state].includes(cityParam ?? "") ? cityParam : null;
 
     const applyFilters = <T,>(q2: T): T => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         let query = q2 as any;
         if (category) query = query.eq("category", category);
-        if (location) query = query.eq("city", location);
+        // Most specific location level wins: city > state > country.
+        if (city) query = query.eq("city", city);
+        else if (state) query = query.eq("state", state);
+        else if (country) query = query.eq("country", country);
         if (q) {
             // Escape PostgREST `or` special chars so the search term can't break the filter.
             const safe = q.replace(/[%(),]/g, "").trim();
             if (safe) {
-                // Note: do NOT add parens here — supabase-js .or() wraps the
-                // filter in parens itself; doubling them makes PostgREST 400.
+                // Note: the outer parens are required — without them PostgREST
+                // rejects the query when combined with the other filters.
                 query = query.or(
-                    `title.ilike.%${safe}%,venue.ilike.%${safe}%,city.ilike.%${safe}%,organizer.ilike.%${safe}%`
+                    `(title.ilike.%${safe}%,venue.ilike.%${safe}%,city.ilike.%${safe}%,organizer.ilike.%${safe}%)`
                 );
             }
         }
@@ -300,14 +337,7 @@ export default async function EventsPage({
     const upcoming = ((upcomingData ?? []) as EventRow[]).filter((e) => !excludeBanners || !bannerIdSet.has(e.id));
     const past = ((pastData ?? []) as EventRow[]).filter((e) => !excludeBanners || !bannerIdSet.has(e.id));
     const totalPages = Math.max(1, Math.ceil((upcomingCount ?? 0) / PER_PAGE));
-    const pageHref = (p: number) => `/events${buildQs({ page: p, category, location, q })}`;
-
-    const pillCls = (active: boolean) =>
-        `rounded-full px-4 py-1.5 text-sm font-semibold transition-colors ${
-            active
-                ? "bg-yellow-500 text-black"
-                : "border border-white/15 bg-white/5 text-gray-300 hover:border-yellow-500/40"
-        }`;
+    const pageHref = (p: number) => `/events${buildQs({ page: p, category, country, state, city, q })}`;
 
     return (
         <main className="w-full mx-auto max-w-4xl px-4 py-16 md:py-24">
@@ -321,41 +351,20 @@ export default async function EventsPage({
                 </p>
             </div>
 
-            <div className="flex justify-center mb-6">
-                <EventSearchBox initial={q ?? ""} category={category} location={location} />
-            </div>
+            <EventFilters
+                tree={tree}
+                categories={Object.keys(CATEGORY_LABELS)}
+                current={{ category, country, state, city, q }}
+            />
 
-            <div className="flex flex-wrap justify-center gap-2 mb-4">
-                <Link href={`/events${buildQs({ location, q })}`} className={pillCls(!category)}>
-                    All
-                </Link>
-                {Object.entries(CATEGORY_LABELS).map(([key, label]) => (
-                    <Link
-                        key={key}
-                        href={`/events${buildQs({ category: key, location, q })}`}
-                        className={pillCls(category === key)}
-                    >
-                        {label}
-                    </Link>
-                ))}
-            </div>
-
-            <div className="flex flex-wrap justify-center items-center gap-2 mb-12">
-                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1 mr-1">
-                    <MapPin className="w-3.5 h-3.5" /> Location
-                </span>
-                <Link href={`/events${buildQs({ category, q })}`} className={pillCls(!location)}>
-                    All locations
-                </Link>
-                {locations.map((l) => (
-                    <Link
-                        key={l.city}
-                        href={`/events${buildQs({ category, location: l.city, q })}`}
-                        className={pillCls(location === l.city)}
-                    >
-                        {l.city}
-                    </Link>
-                ))}
+            <div className="flex justify-center mb-12">
+                <EventSearchBox
+                    initial={q ?? ""}
+                    category={category}
+                    country={country}
+                    state={state}
+                    city={city}
+                />
             </div>
 
             {bannerEvents.length > 0 && (
