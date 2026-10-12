@@ -9,14 +9,25 @@ export async function PartnerSpotlight() {
     const { data: rows } = await supabase.from("site_settings").select("key, value");
     const settings = new Map((rows ?? []).map((r) => [r.key, r.value]));
 
-    if (settings.get("spotlight_enabled") !== true) return null;
-    const headline = typeof settings.get("spotlight_headline") === "string" ? (settings.get("spotlight_headline") as string).trim() : "";
-    const imageUrl = typeof settings.get("spotlight_image_url") === "string" ? (settings.get("spotlight_image_url") as string).trim() : "";
+    // site_settings.value is TEXT: "true"/"false" or "".
+    const isOn = (v: unknown) => v === true || v === "true";
+    const asText = (k: string) => {
+        const v = settings.get(k);
+        if (typeof v !== "string") return "";
+        const t = v.trim();
+        if (t === "" || t === "null") return "";
+        // Tolerate double-encoded values saved by hand ("\"Partner\"").
+        return t.replace(/^"+|"+$/g, "");
+    };
+
+    if (!isOn(settings.get("spotlight_enabled"))) return null;
+    const headline = asText("spotlight_headline");
+    const imageUrl = asText("spotlight_image_url");
     if (!headline || !imageUrl) return null;
 
-    const label = typeof settings.get("spotlight_label") === "string" ? (settings.get("spotlight_label") as string) : "Partner";
-    const subtext = typeof settings.get("spotlight_subtext") === "string" ? (settings.get("spotlight_subtext") as string) : "";
-    const linkUrl = typeof settings.get("spotlight_link_url") === "string" ? (settings.get("spotlight_link_url") as string).trim() : "";
+    const label = asText("spotlight_label") || "Partner";
+    const subtext = asText("spotlight_subtext");
+    const linkUrl = asText("spotlight_link_url");
 
     const inner = (
         <div className="max-w-5xl mx-auto px-4">

@@ -87,8 +87,15 @@ function HomepageSpotlightCard({
     saving: boolean;
     onSave: (key: string, value: any) => void;
 }) {
-    const enabled = settings["spotlight_enabled"] === true;
-    const str = (k: string) => (typeof settings[k] === "string" ? (settings[k] as string) : "");
+    const isOn = (v: unknown) => v === true || v === "true";
+    const enabled = isOn(settings["spotlight_enabled"]);
+    const str = (k: string) => {
+        const v = settings[k];
+        if (typeof v !== "string") return "";
+        const t = v.trim();
+        if (t === "" || t === "null") return "";
+        return t.replace(/^"+|"+$/g, "");
+    };
     const label = str("spotlight_label") || "Partner";
     const headline = str("spotlight_headline");
     const subtext = str("spotlight_subtext");
@@ -202,12 +209,14 @@ function PartnerPlacementCard({
     saving: boolean;
     onSave: (key: string, value: any) => void;
 }) {
-    const bannerOn = settings["partner_banner_enabled"] === true;
-    const badgeOn = settings["presale_badge_enabled"] === true;
-    const bannerEventId =
-        typeof settings["partner_banner_event_id"] === "string"
-            ? settings["partner_banner_event_id"]
-            : "";
+    // site_settings.value is TEXT ("true"/"false", id, or ""); parse tolerantly
+    // because values may also be edited by hand in the dashboard.
+    const isOn = (v: unknown) => v === true || v === "true";
+    const asId = (v: unknown) =>
+        typeof v === "string" && v !== "" && v !== "null" ? v : "";
+    const bannerOn = isOn(settings["partner_banner_enabled"]);
+    const badgeOn = isOn(settings["presale_badge_enabled"]);
+    const bannerEventId = asId(settings["partner_banner_event_id"]);
     const publishedEvents = events.filter((e) => e.status === "published");
     const previewEvent = publishedEvents.find((e) => e.id === bannerEventId) ?? null;
 

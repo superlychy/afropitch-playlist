@@ -218,14 +218,15 @@ export default async function EventsPage({
         "id, title, slug, starts_at, ends_at, venue, city, country, image_url, description, category, is_presale";
 
     // Partner placement switches (both ship OFF; the admin flips them when a deal goes live).
+    // site_settings.value is TEXT: "true"/"false", event id, or "".
     const { data: settingRows } = await supabase.from("site_settings").select("key, value");
     const settings = new Map((settingRows ?? []).map((r) => [r.key, r.value]));
-    const bannerEnabled = settings.get("partner_banner_enabled") === true;
-    const badgeEnabled = settings.get("presale_badge_enabled") === true;
-    const bannerEventId =
-        typeof settings.get("partner_banner_event_id") === "string"
-            ? (settings.get("partner_banner_event_id") as string)
-            : null;
+    const isOn = (v: unknown) => v === true || v === "true";
+    const asId = (v: unknown) =>
+        typeof v === "string" && v !== "" && v !== "null" ? v : null;
+    const bannerEnabled = isOn(settings.get("partner_banner_enabled"));
+    const badgeEnabled = isOn(settings.get("presale_badge_enabled"));
+    const bannerEventId = asId(settings.get("partner_banner_event_id"));
 
     let bannerEvent: EventRow | null = null;
     if (bannerEnabled && bannerEventId) {

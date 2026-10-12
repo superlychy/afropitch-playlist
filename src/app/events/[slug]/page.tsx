@@ -51,7 +51,8 @@ async function presaleBadgeOn(): Promise<boolean> {
         .select("value")
         .eq("key", "presale_badge_enabled")
         .maybeSingle();
-    return data?.value === true;
+    // site_settings.value is TEXT.
+    return data?.value === true || data?.value === "true";
 }
 
 function formatDateTime(iso: string) {

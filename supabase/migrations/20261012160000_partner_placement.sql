@@ -1,10 +1,13 @@
 -- Partner placement + presale badge system (2026-10-12).
 -- Everything ships OFF. The admin flips the switches when a partnership goes live.
+--
+-- NOTE: site_settings.value is TEXT (the table predates this migration).
+-- Switches are the strings "true"/"false"; code parses them tolerantly.
 
 -- 1. Global switches, readable by the public site, writable by admins only.
 CREATE TABLE IF NOT EXISTS site_settings (
     key TEXT PRIMARY KEY,
-    value JSONB NOT NULL,
+    value TEXT NOT NULL,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
