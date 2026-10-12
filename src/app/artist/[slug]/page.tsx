@@ -2,7 +2,7 @@ import { createClient as createAdminClient } from "@supabase/supabase-js";
 import { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import { ArtistFanPage, type FanSong } from "@/components/ArtistFanPage";
+import { ArtistFanPage } from "@/components/ArtistFanPage";
 import type { ArtistProfile } from "@/components/ArtistCard";
 
 export const dynamic = "force-dynamic";
@@ -14,7 +14,7 @@ interface Props {
     params: { slug: string };
 }
 
-async function getArtist(slug: string): Promise<{ profile: ArtistProfile; songs: FanSong[] } | null> {
+async function getArtist(slug: string): Promise<{ profile: ArtistProfile } | null> {
     const supabase = getAdminSupabase();
     const { data: profile } = await supabase
         .from("profiles")
@@ -23,22 +23,7 @@ async function getArtist(slug: string): Promise<{ profile: ArtistProfile; songs:
         .single();
     if (!profile) return null;
 
-    const { data: songs } = await supabase
-        .from("submissions")
-        .select(
-            "id, song_title, song_link, apple_music_url, audiomack_url, boomplay_url, deezer_url, youtube_music_url, cover_art_url, playlist:playlists(name, playlist_link)"
-        )
-        .eq("artist_id", profile.id)
-        .eq("status", "accepted")
-        .order("created_at", { ascending: false });
-
-    return {
-        profile: profile as ArtistProfile,
-        songs: ((songs || []) as any[]).map((s) => ({
-            ...s,
-            playlist: Array.isArray(s.playlist) ? s.playlist[0] ?? null : s.playlist,
-        })),
-    };
+    return { profile: profile as ArtistProfile };
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -81,7 +66,7 @@ export default async function ArtistPage({ params }: Props) {
             >
                 <ArrowLeft className="w-4 h-4" /> Home
             </Link>
-            <ArtistFanPage profile={data.profile} songs={data.songs} />
+            <ArtistFanPage profile={data.profile} />
         </main>
     );
 }
