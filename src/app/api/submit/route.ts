@@ -28,7 +28,7 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json();
-    const { playlist_ids, song_title, artist_name, song_link, tier } = body;
+    const { playlist_ids, song_title, artist_name, song_link, tier, platform_links } = body;
 
     if (!playlist_ids?.length || !song_title || !song_link || !artist_name) {
       return NextResponse.json(
@@ -104,6 +104,35 @@ export async function POST(req: Request) {
         { success: false, error: message },
         { status }
       );
+    }
+
+    // Optional platform links (fan page): attached to the just-created
+    // submissions with a follow-up update. The money RPC is untouched.
+    // Best effort — a failure here must never fail the submission.
+    try {
+      const pl = platform_links || {};
+      const clean: Record<string, string> = {};
+      const map: Record<string, string> = {
+        apple: "apple_music_url",
+        audiomack: "audiomack_url",
+        boomplay: "boomplay_url",
+        deezer: "deezer_url",
+        youtubeMusic: "youtube_music_url",
+      };
+      for (const [key, col] of Object.entries(map)) {
+        const v = String(pl[key] || "").trim();
+        if (v && /^https?:\/\//i.test(v)) clean[col] = v;
+      }
+      if (Object.keys(clean).length > 0) {
+        await auth
+          .from("submissions")
+          .update(clean)
+          .eq("artist_id", user.id)
+          .eq("song_link", song_link)
+          .gt("created_at", new Date(Date.now() - 10 * 60 * 1000).toISOString());
+      }
+    } catch {
+      // Non-fatal: links can be added later from the dashboard.
     }
 
     return NextResponse.json({

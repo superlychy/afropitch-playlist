@@ -9,6 +9,8 @@ export interface FanSong {
     apple_music_url: string | null;
     audiomack_url: string | null;
     boomplay_url: string | null;
+    deezer_url: string | null;
+    youtube_music_url: string | null;
     cover_art_url: string | null;
     playlist: { name: string; playlist_link: string | null } | null;
 }
@@ -19,25 +21,26 @@ function platformLinks(song: FanSong): { label: string; url: string }[] {
         if (url?.trim()) links.push({ label, url: url.trim() });
     };
     push("Spotify", song.song_link);
-    push("Apple Music", song.apple_music_url);
+    push("iTunes", song.apple_music_url);
     push("Audiomack", song.audiomack_url);
     push("Boomplay", song.boomplay_url);
+    push("Deezer", song.deezer_url);
+    push("YouTube Music", song.youtube_music_url);
     return links;
 }
 
 // The artist fan page: photo, bio, socials, songs with platform + playlist links.
 // Used by /artist/[slug] and by /track/[slug] (with the clicked song featured).
 // The bio always shows; feature Q&A answers are reserved for Spotlight features.
+// Click counts are artist-only (dashboard) and never shown to viewers here.
 export function ArtistFanPage({
     profile,
     songs,
     featuredSongId,
-    viral,
 }: {
     profile: ArtistProfile;
     songs: FanSong[];
     featuredSongId?: string;
-    viral?: { clicks: number; needed: number };
 }) {
     const ordered = [...songs].sort((a, b) =>
         a.id === featuredSongId ? -1 : b.id === featuredSongId ? 1 : 0
@@ -61,25 +64,6 @@ export function ArtistFanPage({
                     <ArtistSocials profile={profile} className="mt-4 justify-center sm:justify-start" />
                 </div>
             </div>
-
-            {/* Viral strip (track-link visits only) */}
-            {viral && (
-                <div className="mt-8 bg-white/5 rounded-2xl p-4 border border-white/10">
-                    <div className="flex justify-between items-center text-sm">
-                        <span className="text-gray-400">Viral Progress</span>
-                        <span className={`font-bold ${viral.clicks >= viral.needed ? "text-yellow-400" : "text-green-400"}`}>
-                            {viral.clicks}/{viral.needed} Clicks
-                        </span>
-                    </div>
-                    <div className="h-2.5 w-full bg-black/50 rounded-full overflow-hidden mt-2">
-                        <div
-                            className="h-full rounded-full bg-gradient-to-r from-green-600 to-emerald-400 transition-all"
-                            style={{ width: `${Math.min(Math.round((viral.clicks / viral.needed) * 100), 100)}%` }}
-                        />
-                    </div>
-                    <p className="text-xs text-gray-500 mt-2">Share this link to boost the ranking.</p>
-                </div>
-            )}
 
             {/* Songs */}
             <section className="mt-10">

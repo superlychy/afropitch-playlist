@@ -26,7 +26,7 @@ async function getArtist(slug: string): Promise<{ profile: ArtistProfile; songs:
     const { data: songs } = await supabase
         .from("submissions")
         .select(
-            "id, song_title, song_link, apple_music_url, audiomack_url, boomplay_url, cover_art_url, playlist:playlists(name, playlist_link)"
+            "id, song_title, song_link, apple_music_url, audiomack_url, boomplay_url, deezer_url, youtube_music_url, cover_art_url, playlist:playlists(name, playlist_link)"
         )
         .eq("artist_id", profile.id)
         .eq("status", "accepted")

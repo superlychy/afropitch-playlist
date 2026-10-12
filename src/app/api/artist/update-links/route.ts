@@ -18,6 +18,8 @@ const FIELD_HOSTS: Record<string, Set<string>> = {
   apple_music_url: new Set(["music.apple.com"]),
   audiomack_url: new Set(["audiomack.com", "www.audiomack.com"]),
   boomplay_url: new Set(["boomplay.com", "www.boomplay.com"]),
+  deezer_url: new Set(["deezer.com", "www.deezer.com"]),
+  youtube_music_url: new Set(["music.youtube.com", "www.music.youtube.com"]),
 };
 
 function cleanPlatformUrl(v: unknown, hosts: Set<string>): string | null {

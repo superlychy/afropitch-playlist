@@ -16,6 +16,8 @@ export interface SmartLinkSubmission {
   apple_music_url: string | null;
   audiomack_url: string | null;
   boomplay_url: string | null;
+  deezer_url: string | null;
+  youtube_music_url: string | null;
   cover_art_url: string | null;
   playlist?: { name: string } | null;
 }
@@ -25,6 +27,8 @@ const PLATFORM_LABELS: Record<string, string> = {
   apple: "Apple",
   audiomack: "Audiomack",
   boomplay: "Boomplay",
+  deezer: "Deezer",
+  youtubeMusic: "YouTube Music",
 };
 
 // One card per song: copy link, QR, editable platform URLs, per-platform
@@ -50,6 +54,8 @@ export function SmartLinkCard({
     apple_music_url: submission.apple_music_url || "",
     audiomack_url: submission.audiomack_url || "",
     boomplay_url: submission.boomplay_url || "",
+    deezer_url: (submission as any).deezer_url || "",
+    youtube_music_url: (submission as any).youtube_music_url || "",
     cover_art_url: submission.cover_art_url || "",
   });
 
@@ -103,12 +109,14 @@ export function SmartLinkCard({
 
   // Platform chips: a platform is "on" when it has a URL (Spotify is always
   // on from the submission's Spotify link). Mockup labels: "Apple" short.
-  const platformOrder = ["spotify", "audiomack", "apple", "boomplay"] as const;
+  const platformOrder = ["spotify", "audiomack", "apple", "boomplay", "deezer", "youtubeMusic"] as const;
   const platformOn: Record<string, boolean> = {
     spotify: true,
     audiomack: !!(stats.audiomack || submission.audiomack_url),
     apple: !!(stats.apple || submission.apple_music_url),
     boomplay: !!(stats.boomplay || submission.boomplay_url),
+    deezer: !!((submission as any).deezer_url),
+    youtubeMusic: !!((submission as any).youtube_music_url),
   };
 
   const editForm = (
@@ -137,6 +145,24 @@ export function SmartLinkCard({
           value={form.boomplay_url}
           onChange={(e) => setForm({ ...form, boomplay_url: e.target.value })}
           placeholder="https://www.boomplay.com/..."
+          className="h-9 text-xs mt-1 bg-[#1B1B1F] border-white/10 text-white"
+        />
+      </div>
+      <div>
+        <Label className="text-[11px] text-zinc-400">Deezer link</Label>
+        <Input
+          value={(form as any).deezer_url}
+          onChange={(e) => setForm({ ...form, deezer_url: e.target.value })}
+          placeholder="https://www.deezer.com/..."
+          className="h-9 text-xs mt-1 bg-[#1B1B1F] border-white/10 text-white"
+        />
+      </div>
+      <div>
+        <Label className="text-[11px] text-zinc-400">YouTube Music link</Label>
+        <Input
+          value={(form as any).youtube_music_url}
+          onChange={(e) => setForm({ ...form, youtube_music_url: e.target.value })}
+          placeholder="https://music.youtube.com/..."
           className="h-9 text-xs mt-1 bg-[#1B1B1F] border-white/10 text-white"
         />
       </div>

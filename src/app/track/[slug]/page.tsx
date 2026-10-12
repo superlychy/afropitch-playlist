@@ -13,8 +13,6 @@ interface Props {
   params: { slug: string };
 }
 
-const CLICKS_NEEDED = 100;
-
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const supabase = getAdminSupabase();
   const { slug } = await Promise.resolve(params);
@@ -79,7 +77,8 @@ export default async function TrackPage({ params }: Props) {
     );
   }
 
-  // 2. Log the click against THIS song (trial + trending systems depend on it).
+  // 2. Log the click against THIS song (trial system + artist dashboard stats
+  // depend on it). The count itself is artist-only and never shown to viewers.
   const { headers } = await import('next/headers');
   const headerList = await headers();
   const forwardedFor = headerList.get('x-forwarded-for');
@@ -90,7 +89,6 @@ export default async function TrackPage({ params }: Props) {
     submission_id: submission.id,
     ip_address: ip,
   });
-  const newClicks = (submission.clicks || 0) + 1;
 
   // 3. Load the artist's fan page data.
   const { data: profile } = await supabase
@@ -102,7 +100,7 @@ export default async function TrackPage({ params }: Props) {
   const { data: acceptedSongs } = await supabase
     .from('submissions')
     .select(
-      'id, song_title, song_link, apple_music_url, audiomack_url, boomplay_url, cover_art_url, playlist:playlists(name, playlist_link)'
+      'id, song_title, song_link, apple_music_url, audiomack_url, boomplay_url, deezer_url, youtube_music_url, cover_art_url, playlist:playlists(name, playlist_link)'
     )
     .eq('artist_id', submission.artist_id)
     .eq('status', 'accepted')
@@ -129,7 +127,6 @@ export default async function TrackPage({ params }: Props) {
             profile={profile as ArtistProfile}
             songs={songs}
             featuredSongId={submission.id}
-            viral={{ clicks: newClicks, needed: CLICKS_NEEDED }}
           />
         ) : (
           <div className="text-center">

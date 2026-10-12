@@ -85,6 +85,47 @@ function SubmitForm() {
   const [songLink, setSongLink] = useState("");
   const [email, setEmail] = useState("");
 
+  // Optional other-platform links for the fan page (Spotify link above is required).
+  const [platformLinks, setPlatformLinks] = useState({
+    apple: "",
+    audiomack: "",
+    boomplay: "",
+    deezer: "",
+    youtubeMusic: "",
+  });
+  const [findingLinks, setFindingLinks] = useState(false);
+  const [linksHint, setLinksHint] = useState("");
+
+  const findPlatformLinks = async () => {
+    if (!songTitle.trim() || !artistName.trim()) {
+      toast("Enter the song title and artist name first.", "warning");
+      return;
+    }
+    setFindingLinks(true);
+    setLinksHint("");
+    try {
+      const res = await fetch("/api/song/find-links", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: songTitle.trim(), artist: artistName.trim() }),
+      });
+      const json = await res.json().catch(() => null);
+      if (json?.ok && (json.appleMusic || json.deezer)) {
+        setPlatformLinks((p) => ({
+          ...p,
+          apple: p.apple || json.appleMusic || "",
+          deezer: p.deezer || json.deezer || "",
+        }));
+        setLinksHint("Found these — please check they are your song before submitting.");
+      } else {
+        setLinksHint("No matches found — paste your links manually.");
+      }
+    } catch {
+      setLinksHint("Lookup failed — paste your links manually.");
+    }
+    setFindingLinks(false);
+  };
+
   // Ref to prevent double-submit
   const submitRef = useRef(false);
 
@@ -375,6 +416,7 @@ function SubmitForm() {
           tier,
           total_amount: total,
           email,
+          platform_links: platformLinks,
         }),
       });
 
@@ -943,6 +985,41 @@ function SubmitForm() {
                     value={songLink}
                     onChange={setSongLink}
                   />
+                </div>
+
+                {/* Other platform links (optional) — shown on the fan page */}
+                <div className="space-y-2 rounded-lg border border-white/10 p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <Label>Other platform links <span className="text-zinc-500 font-normal">(optional)</span></Label>
+                    <button
+                      type="button"
+                      onClick={findPlatformLinks}
+                      disabled={findingLinks}
+                      className="text-xs font-bold text-[#22C55E] hover:underline disabled:opacity-50"
+                    >
+                      {findingLinks ? "Searching..." : "Find my links"}
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-zinc-500">These appear on your fan page so listeners can pick their app.</p>
+                  {linksHint && <p className="text-[11px] text-yellow-400/90">{linksHint}</p>}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {[
+                      { key: "apple", label: "Apple Music / iTunes" },
+                      { key: "audiomack", label: "Audiomack" },
+                      { key: "boomplay", label: "Boomplay" },
+                      { key: "deezer", label: "Deezer" },
+                      { key: "youtubeMusic", label: "YouTube Music" },
+                    ].map((f) => (
+                      <div key={f.key} className="space-y-1">
+                        <span className="text-[11px] text-zinc-400">{f.label}</span>
+                        <Input
+                          placeholder="https://..."
+                          value={platformLinks[f.key as keyof typeof platformLinks]}
+                          onChange={(e) => setPlatformLinks((p) => ({ ...p, [f.key]: e.target.value }))}
+                        />
+                      </div>
+                    ))}
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <Label>Email</Label>
