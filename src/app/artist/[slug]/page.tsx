@@ -17,6 +17,7 @@ interface Props {
 async function getArtist(slug: string): Promise<{
     profile: ArtistProfile;
     feature: { slug: string | null; headline: string | null; story: string | null; qa: { q: string; a: string }[] | null } | null;
+    songs: { id: string; song_title: string; cover_art_url: string | null; tracking_slug: string | null; playlist: { name: string } | null }[];
 } | null> {
     const supabase = getAdminSupabase();
     const { data: profile } = await supabase
@@ -36,7 +37,24 @@ async function getArtist(slug: string): Promise<{
         .limit(1)
         .maybeSingle();
 
-    return { profile: profile as ArtistProfile, feature };
+    const { data: songs } = await supabase
+        .from("submissions")
+        .select("id, song_title, cover_art_url, tracking_slug, playlist:playlists(name)")
+        .eq("artist_id", profile.id)
+        .eq("status", "accepted")
+        .order("created_at", { ascending: false });
+
+    return {
+        profile: profile as ArtistProfile,
+        feature,
+        songs: ((songs || []) as any[]).map((s) => ({
+            id: s.id,
+            song_title: s.song_title,
+            cover_art_url: s.cover_art_url,
+            tracking_slug: s.tracking_slug,
+            playlist: Array.isArray(s.playlist) ? s.playlist[0] ?? null : s.playlist,
+        })),
+    };
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -79,7 +97,7 @@ export default async function ArtistPage({ params }: Props) {
             >
                 <ArrowLeft className="w-4 h-4" /> Home
             </Link>
-            <ArtistFanPage profile={data.profile} feature={data.feature} />
+            <ArtistFanPage profile={data.profile} feature={data.feature} songs={data.songs} />
         </main>
     );
 }
