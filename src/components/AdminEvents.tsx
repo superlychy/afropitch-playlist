@@ -25,6 +25,7 @@ interface EventItem {
     status: string;
     source: string | null;
     source_url: string | null;
+    is_presale: boolean;
     created_at: string;
 }
 
@@ -75,6 +76,146 @@ const inputCls =
     "w-full rounded-xl bg-black/40 border border-white/10 px-4 py-2.5 text-white text-sm focus:outline-none focus:border-yellow-500/60";
 const labelCls = "text-sm text-gray-300 block mb-1.5";
 
+// Partner placement controls. Everything ships OFF; the switches go live
+// only when a partnership deal is signed. The preview shows exactly how
+// the banner will look on /events before anything is switched on.
+function PartnerPlacementCard({
+    events,
+    settings,
+    saving,
+    onSave,
+}: {
+    events: EventItem[];
+    settings: Record<string, any>;
+    saving: boolean;
+    onSave: (key: string, value: any) => void;
+}) {
+    const bannerOn = settings["partner_banner_enabled"] === true;
+    const badgeOn = settings["presale_badge_enabled"] === true;
+    const bannerEventId =
+        typeof settings["partner_banner_event_id"] === "string"
+            ? settings["partner_banner_event_id"]
+            : "";
+    const publishedEvents = events.filter((e) => e.status === "published");
+    const previewEvent = publishedEvents.find((e) => e.id === bannerEventId) ?? null;
+
+    return (
+        <Card className="border-yellow-500/25 bg-yellow-950/10">
+            <CardHeader>
+                <CardTitle className="text-white text-base">Partner placement</CardTitle>
+                <CardDescription>
+                    The banner and the presale badge are switched off. Flip them on when a
+                    partnership deal goes live. The preview below shows exactly how the
+                    banner will look on /events.
+                </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+                <label className="flex items-center gap-3 text-sm text-gray-200 cursor-pointer">
+                    <input
+                        type="checkbox"
+                        checked={bannerOn}
+                        disabled={saving}
+                        onChange={(e) => onSave("partner_banner_enabled", e.target.checked)}
+                        className="w-5 h-5 accent-yellow-500"
+                    />
+                    <span>
+                        <span className="font-semibold text-white">Show partner banner</span>
+                        <span className="text-gray-500"> — pins the featured event front and centre on /events</span>
+                    </span>
+                </label>
+
+                <div>
+                    <label className={labelCls}>Featured event for the banner</label>
+                    <select
+                        value={bannerEventId}
+                        disabled={saving}
+                        onChange={(e) => onSave("partner_banner_event_id", e.target.value || null)}
+                        className={inputCls}
+                    >
+                        <option value="">Pick a published event…</option>
+                        {publishedEvents.map((e) => (
+                            <option key={e.id} value={e.id}>
+                                {e.title}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+
+                <label className="flex items-center gap-3 text-sm text-gray-200 cursor-pointer">
+                    <input
+                        type="checkbox"
+                        checked={badgeOn}
+                        disabled={saving}
+                        onChange={(e) => onSave("presale_badge_enabled", e.target.checked)}
+                        className="w-5 h-5 accent-yellow-500"
+                    />
+                    <span>
+                        <span className="font-semibold text-white">Show "AfroPitch presale" badges</span>
+                        <span className="text-gray-500"> — appears on every event ticked with "Presale badge" in its edit form</span>
+                    </span>
+                </label>
+
+                {previewEvent ? (
+                    <div className="pt-2">
+                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                            Preview — this is how it will look on /events
+                        </p>
+                        <div className="rounded-2xl overflow-hidden border border-yellow-500/40 bg-gradient-to-br from-yellow-950/30 via-white/5 to-white/5">
+                            <div className="flex flex-col sm:flex-row">
+                                {previewEvent.image_url ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img
+                                        src={previewEvent.image_url}
+                                        alt=""
+                                        className="w-full sm:w-48 h-36 sm:h-auto object-cover flex-shrink-0"
+                                    />
+                                ) : (
+                                    <div className="w-full sm:w-48 h-36 sm:h-auto bg-gradient-to-br from-green-900/50 to-yellow-900/50 flex-shrink-0" />
+                                )}
+                                <div className="p-5 min-w-0 flex-1">
+                                    <div className="flex items-center gap-2 flex-wrap mb-2">
+                                        <span className="text-[11px] font-bold text-yellow-400 uppercase tracking-widest">
+                                            Partner event
+                                        </span>
+                                        {previewEvent.is_presale && (
+                                            <span className="inline-flex items-center text-[11px] font-bold bg-yellow-500 text-black rounded-full px-2.5 py-0.5 uppercase tracking-wider">
+                                                AfroPitch presale
+                                            </span>
+                                        )}
+                                    </div>
+                                    <p className="text-white font-extrabold text-xl leading-tight">
+                                        {previewEvent.title}
+                                    </p>
+                                    <p className="text-sm text-gray-400 mt-2">
+                                        {new Date(previewEvent.starts_at).toLocaleDateString(undefined, {
+                                            month: "short",
+                                            day: "numeric",
+                                            year: "numeric",
+                                        })}{" "}
+                                        · {previewEvent.city}
+                                        {previewEvent.venue ? ` · ${previewEvent.venue}` : ""}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        {!bannerOn && (
+                            <p className="text-xs text-amber-500 mt-2">
+                                Banner preview only — the switch above is off, so the public site shows nothing.
+                            </p>
+                        )}
+                    </div>
+                ) : (
+                    bannerOn && (
+                        <p className="text-xs text-amber-500">
+                            The banner switch is on but no event is picked — nothing will show until you pick one.
+                        </p>
+                    )
+                )}
+            </CardContent>
+        </Card>
+    );
+}
+
 interface EventForm {
     title: string;
     slug: string;
@@ -88,6 +229,7 @@ interface EventForm {
     ticket_url: string;
     source_url: string;
     is_free: boolean;
+    is_presale: boolean;
     organizer: string;
     category: string;
 }
@@ -105,6 +247,7 @@ const emptyForm = (): EventForm => ({
     ticket_url: "",
     source_url: "",
     is_free: false,
+    is_presale: false,
     organizer: "",
     category: "concert",
 });
@@ -122,9 +265,15 @@ export function AdminEvents() {
 
     const [newForm, setNewForm] = useState<EventForm>(emptyForm());
     const [edits, setEdits] = useState<Record<string, EventForm>>({});
+    const [settings, setSettings] = useState<Record<string, any>>({});
+    const [savingSettings, setSavingSettings] = useState(false);
 
     const load = async () => {
         setLoading(true);
+        const { data: settingRows } = await supabase.from("site_settings").select("key, value");
+        const smap: Record<string, any> = {};
+        for (const r of settingRows ?? []) smap[r.key] = r.value;
+        setSettings(smap);
         const { data } = await supabase
             .from("events")
             .select("*")
@@ -169,6 +318,7 @@ export function AdminEvents() {
                 ticket_url: e.ticket_url ?? "",
                 source_url: e.source_url ?? "",
                 is_free: e.is_free ?? false,
+                is_presale: e.is_presale ?? false,
                 organizer: e.organizer ?? "",
                 category: e.category,
             };
@@ -221,6 +371,7 @@ export function AdminEvents() {
             ticket_url: newForm.ticket_url.trim() || null,
             source_url: newForm.source_url.trim() || null,
             is_free: newForm.is_free,
+            is_presale: newForm.is_presale,
             organizer: newForm.organizer.trim() || null,
             category: newForm.category,
             status: "draft",
@@ -260,6 +411,7 @@ export function AdminEvents() {
                 ticket_url: f.ticket_url.trim() || null,
                 source_url: f.source_url.trim() || null,
                 is_free: f.is_free,
+                is_presale: f.is_presale,
                 organizer: f.organizer.trim() || null,
                 category: f.category,
                 updated_at: new Date().toISOString(),
@@ -301,6 +453,21 @@ export function AdminEvents() {
         }
         toast("Deleted.", "success");
         load();
+    };
+
+    // Partner placement switches. Both ship OFF; flip them when a deal goes live.
+    const saveSetting = async (key: string, value: any) => {
+        setSavingSettings(true);
+        const { error } = await supabase
+            .from("site_settings")
+            .upsert({ key, value, updated_at: new Date().toISOString() }, { onConflict: "key" });
+        setSavingSettings(false);
+        if (error) {
+            toast("Could not save the switch: " + error.message, "error");
+            return;
+        }
+        setSettings((prev) => ({ ...prev, [key]: value }));
+        toast("Saved.", "success");
     };
 
     const uploadImage = async (eventId: string | null, file: File | undefined | null, isNew: boolean) => {
@@ -429,6 +596,10 @@ export function AdminEvents() {
                     <input type="checkbox" checked={f.is_free} onChange={(e) => set({ is_free: e.target.checked })} className="w-4 h-4 accent-green-600" />
                     Free entry <span className="text-gray-500">(shows a "Free entry" badge instead of a ticket button)</span>
                 </label>
+                <label className="mt-2 flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                    <input type="checkbox" checked={f.is_presale} onChange={(e) => set({ is_presale: e.target.checked })} className="w-4 h-4 accent-yellow-500" />
+                    Presale badge <span className="text-gray-500">(shows the "AfroPitch presale" badge on this event, but only while the presale switch is on below)</span>
+                </label>
             </div>
         </div>
     );
@@ -451,6 +622,13 @@ export function AdminEvents() {
                     <Plus className="w-4 h-4 mr-1.5" /> New event
                 </Button>
             </div>
+
+            <PartnerPlacementCard
+                events={events}
+                settings={settings}
+                saving={savingSettings}
+                onSave={saveSetting}
+            />
 
             {showNew && (
                 <Card className="border-yellow-500/25 bg-yellow-950/10">

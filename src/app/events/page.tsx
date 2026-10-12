@@ -16,6 +16,15 @@ interface EventRow {
     image_url: string | null;
     description: string | null;
     category: string;
+    is_presale: boolean;
+}
+
+function PresaleBadge() {
+    return (
+        <span className="inline-flex items-center gap-1 text-[11px] font-bold bg-yellow-500 text-black rounded-full px-2.5 py-0.5 uppercase tracking-wider">
+            AfroPitch presale
+        </span>
+    );
 }
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -43,7 +52,7 @@ function formatDateRange(startsAt: string, endsAt: string) {
     return `${start.toLocaleDateString(undefined, dateOpts)} - ${end.toLocaleDateString(undefined, dateOpts)}`;
 }
 
-function EventCard({ event, live }: { event: EventRow; live?: boolean }) {
+function EventCard({ event, live, showPresale }: { event: EventRow; live?: boolean; showPresale?: boolean }) {
     return (
         <Link href={`/events/${event.slug}`} className="block group">
             <Card className={`overflow-hidden transition-colors ${live ? "border-red-500/40 bg-red-950/10" : "border-white/10 bg-white/5 group-hover:border-yellow-500/40"}`}>
@@ -68,6 +77,7 @@ function EventCard({ event, live }: { event: EventRow; live?: boolean }) {
                                         <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" /> Live now
                                     </span>
                                 )}
+                                {showPresale && event.is_presale && <PresaleBadge />}
                                 <span className="text-[11px] font-semibold text-yellow-400/90 uppercase tracking-wider">
                                     {CATEGORY_LABELS[event.category] ?? event.category}
                                 </span>
@@ -88,6 +98,55 @@ function EventCard({ event, live }: { event: EventRow; live?: boolean }) {
                 </CardContent>
             </Card>
         </Link>
+    );
+}
+
+function PartnerBanner({ event, showPresale }: { event: EventRow; showPresale: boolean }) {
+    return (
+        <section className="mb-12">
+            <Link href={`/events/${event.slug}`} className="block group">
+                <Card className="overflow-hidden border-yellow-500/40 bg-gradient-to-br from-yellow-950/30 via-white/5 to-white/5 group-hover:border-yellow-500/70 transition-colors">
+                    <CardContent className="p-0">
+                        <div className="flex flex-col sm:flex-row">
+                            {event.image_url ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img
+                                    src={event.image_url}
+                                    alt={event.title}
+                                    className="w-full sm:w-64 h-44 sm:h-auto object-cover flex-shrink-0"
+                                />
+                            ) : (
+                                <div className="w-full sm:w-64 h-44 sm:h-auto bg-gradient-to-br from-green-900/50 to-yellow-900/50 flex items-center justify-center flex-shrink-0">
+                                    <Ticket className="w-12 h-12 text-gray-600" />
+                                </div>
+                            )}
+                            <div className="p-6 sm:p-8 min-w-0 flex-1">
+                                <div className="flex items-center gap-2 flex-wrap mb-3">
+                                    <span className="text-[11px] font-bold text-yellow-400 uppercase tracking-widest">
+                                        Partner event
+                                    </span>
+                                    {showPresale && event.is_presale && <PresaleBadge />}
+                                </div>
+                                <h2 className="text-white font-extrabold text-2xl sm:text-3xl leading-tight group-hover:text-yellow-300 transition-colors">
+                                    {event.title}
+                                </h2>
+                                <p className="text-sm text-gray-300 mt-3 flex items-center gap-1.5">
+                                    <CalendarDays className="w-4 h-4 flex-shrink-0" />
+                                    {formatDateRange(event.starts_at, event.ends_at)}
+                                </p>
+                                <p className="text-sm text-gray-400 mt-1.5 flex items-center gap-1.5">
+                                    <MapPin className="w-4 h-4 flex-shrink-0" />
+                                    {event.city}{event.venue ? ` · ${event.venue}` : ""}
+                                </p>
+                                <span className="inline-block mt-5 rounded-xl bg-yellow-500 px-5 py-2.5 text-sm font-bold text-black">
+                                    Get tickets
+                                </span>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+            </Link>
+        </section>
     );
 }
 
@@ -154,7 +213,28 @@ export default async function EventsPage({
     const supabase = await createClient();
     const nowIso = new Date().toISOString();
     const baseSelect =
-        "id, title, slug, starts_at, ends_at, venue, city, country, image_url, description, category";
+        "id, title, slug, starts_at, ends_at, venue, city, country, image_url, description, category, is_presale";
+
+    // Partner placement switches (both ship OFF; the admin flips them when a deal goes live).
+    const { data: settingRows } = await supabase.from("site_settings").select("key, value");
+    const settings = new Map((settingRows ?? []).map((r) => [r.key, r.value]));
+    const bannerEnabled = settings.get("partner_banner_enabled") === true;
+    const badgeEnabled = settings.get("presale_badge_enabled") === true;
+    const bannerEventId =
+        typeof settings.get("partner_banner_event_id") === "string"
+            ? (settings.get("partner_banner_event_id") as string)
+            : null;
+
+    let bannerEvent: EventRow | null = null;
+    if (bannerEnabled && bannerEventId) {
+        const { data: be } = await supabase
+            .from("events")
+            .select(baseSelect)
+            .eq("id", bannerEventId)
+            .eq("status", "published")
+            .maybeSingle();
+        bannerEvent = (be as EventRow | null) ?? null;
+    }
 
     // Location list is built from the published events themselves, so a new
     // city appears in the filter automatically when its first event publishes.
@@ -219,9 +299,9 @@ export default async function EventsPage({
             .limit(12)
     );
 
-    const live = (liveData ?? []) as EventRow[];
-    const upcoming = (upcomingData ?? []) as EventRow[];
-    const past = (pastData ?? []) as EventRow[];
+    const live = ((liveData ?? []) as EventRow[]).filter((e) => e.id !== bannerEvent?.id);
+    const upcoming = ((upcomingData ?? []) as EventRow[]).filter((e) => e.id !== bannerEvent?.id);
+    const past = ((pastData ?? []) as EventRow[]).filter((e) => e.id !== bannerEvent?.id);
     const totalPages = Math.max(1, Math.ceil((upcomingCount ?? 0) / PER_PAGE));
     const pageHref = (p: number) => `/events${buildQs({ page: p, category, location })}`;
 
@@ -277,6 +357,8 @@ export default async function EventsPage({
                 ))}
             </div>
 
+            {bannerEvent && <PartnerBanner event={bannerEvent} showPresale={badgeEnabled} />}
+
             {live.length > 0 && (
                 <section className="mb-12">
                     <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
@@ -284,7 +366,7 @@ export default async function EventsPage({
                     </h2>
                     <div className="space-y-3">
                         {live.map((e) => (
-                            <EventCard key={e.id} event={e} live />
+                            <EventCard key={e.id} event={e} live showPresale={badgeEnabled} />
                         ))}
                     </div>
                 </section>
@@ -296,7 +378,7 @@ export default async function EventsPage({
                     <>
                         <div className="space-y-3">
                             {upcoming.map((e) => (
-                                <EventCard key={e.id} event={e} />
+                                <EventCard key={e.id} event={e} showPresale={badgeEnabled} />
                             ))}
                         </div>
                         {totalPages > 1 && (
@@ -349,7 +431,7 @@ export default async function EventsPage({
                     <h2 className="text-xl font-bold text-white mb-4">Past events</h2>
                     <div className="space-y-3 opacity-75">
                         {past.map((e) => (
-                            <EventCard key={e.id} event={e} />
+                            <EventCard key={e.id} event={e} showPresale={badgeEnabled} />
                         ))}
                     </div>
                 </section>

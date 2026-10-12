@@ -22,6 +22,7 @@ interface EventDetail {
     is_free: boolean;
     organizer: string | null;
     category: string;
+    is_presale: boolean;
 }
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -36,11 +37,21 @@ async function getEvent(slug: string): Promise<EventDetail | null> {
     const supabase = await createClient();
     const { data } = await supabase
         .from("events")
-        .select("id, title, slug, starts_at, ends_at, venue, city, country, image_url, description, ticket_url, is_free, organizer, category")
+        .select("id, title, slug, starts_at, ends_at, venue, city, country, image_url, description, ticket_url, is_free, organizer, category, is_presale")
         .eq("slug", slug)
         .eq("status", "published")
         .maybeSingle();
     return (data as EventDetail | null) ?? null;
+}
+
+async function presaleBadgeOn(): Promise<boolean> {
+    const supabase = await createClient();
+    const { data } = await supabase
+        .from("site_settings")
+        .select("value")
+        .eq("key", "presale_badge_enabled")
+        .maybeSingle();
+    return data?.value === true;
 }
 
 function formatDateTime(iso: string) {
@@ -122,6 +133,7 @@ export default async function EventDetailPage({
     const isPast = new Date(event.ends_at).getTime() < now;
     const categoryLabel = CATEGORY_LABELS[event.category] ?? event.category;
     const locationName = event.venue ? `${event.venue}, ${event.city}` : event.city;
+    const showPresale = (await presaleBadgeOn()) && event.is_presale;
 
     const jsonLd = {
         "@context": "https://schema.org",
@@ -172,6 +184,11 @@ export default async function EventDetailPage({
                         <span className="text-xs font-semibold text-yellow-400/90 uppercase tracking-wider border border-yellow-500/30 bg-yellow-950/30 rounded-full px-3 py-1">
                             {categoryLabel}
                         </span>
+                        {showPresale && (
+                            <span className="text-[11px] font-bold bg-yellow-500 text-black rounded-full px-3 py-1 uppercase tracking-wider">
+                                AfroPitch presale
+                            </span>
+                        )}
                     </div>
 
                     {event.image_url && (
