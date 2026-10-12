@@ -1,6 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase-server";
+import { createClient as createAdminClient } from "@supabase/supabase-js";
+
+// Server-side only: resolves public artist names for published features.
+// Same pattern as the artist fan pages. Never exposed to the browser.
+const getAdminSupabase = () =>
+    createAdminClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 import { Card, CardContent } from "@/components/ui/card";
 import { ChevronRight, Music2 } from "lucide-react";
 
@@ -132,7 +138,7 @@ export default async function FeaturedPage() {
     const ids = [...new Set(rows.map((r) => r.artist_id).filter(Boolean))] as string[];
     const names: Record<string, string> = {};
     if (ids.length > 0) {
-        const { data: profs } = await supabase
+        const { data: profs } = await getAdminSupabase()
             .from("profiles")
             .select("id, full_name")
             .in("id", ids);
