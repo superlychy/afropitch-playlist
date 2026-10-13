@@ -12,6 +12,7 @@ export interface FilterSelection {
     state: string | null;
     city: string | null;
     q: string | null;
+    price: "all" | "free" | "paid" | null;
 }
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -23,6 +24,9 @@ const CATEGORY_LABELS: Record<string, string> = {
     party: "Party",
     tour: "Tour",
     showcase: "Showcase",
+    gospel: "Gospel",
+    comedy: "Comedy",
+    cultural: "Cultural",
 };
 
 const selectCls =
@@ -49,6 +53,7 @@ export function EventFilters({
         if (next.state) params.set("state", next.state);
         if (next.city) params.set("city", next.city);
         if (next.q) params.set("q", next.q);
+        if (next.price && next.price !== "all") params.set("price", next.price);
         const qs = params.toString();
         router.replace(`/events${qs ? `?${qs}` : ""}`);
     };
@@ -60,7 +65,7 @@ export function EventFilters({
             ? [...(tree[current.country]?.[current.state] ?? [])].sort()
             : [];
 
-    const hasFilter = current.category || current.country || current.q;
+    const hasFilter = current.category || current.country || current.q || (current.price && current.price !== "all");
 
     return (
         <div className="flex flex-wrap justify-center gap-2 mb-4">
@@ -126,10 +131,21 @@ export function EventFilters({
                 </select>
             )}
 
+            <select
+                value={current.price ?? "all"}
+                onChange={(e) => push({ price: (e.target.value || "all") as "all" | "free" | "paid" })}
+                aria-label="Filter by price"
+                className={selectCls}
+            >
+                <option value="all">All prices</option>
+                <option value="free">Free</option>
+                <option value="paid">Paid</option>
+            </select>
+
             {hasFilter && (
                 <button
                     type="button"
-                    onClick={() => push({ category: null, country: null, state: null, city: null, q: null })}
+                    onClick={() => push({ category: null, country: null, state: null, city: null, q: null, price: "all" })}
                     className="rounded-full px-4 py-2 text-sm text-gray-500 hover:text-white"
                 >
                     Clear all

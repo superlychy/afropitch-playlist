@@ -859,6 +859,7 @@ export function AdminEvents() {
     const [fCountry, setFCountry] = useState("");
     const [fState, setFState] = useState("");
     const [fCity, setFCity] = useState("");
+    const [fPrice, setFPrice] = useState<"all" | "free" | "paid">("all");
 
     if (loading) {
         return <div className="flex items-center gap-2 text-gray-400 py-10"><Loader2 className="w-5 h-5 animate-spin" /> Loading events…</div>;
@@ -894,6 +895,8 @@ export function AdminEvents() {
         .filter((e) => {
             if (fStatus !== "all" && e.status !== fStatus) return false;
             if (fCat && e.category !== fCat) return false;
+            if (fPrice === "free" && !e.is_free) return false;
+            if (fPrice === "paid" && e.is_free) return false;
             if (fCity && e.city !== fCity) return false;
             else if (fState && (e.state ?? "") !== fState) return false;
             else if (fCountry && e.country !== fCountry) return false;
@@ -913,9 +916,10 @@ export function AdminEvents() {
         setFCountry("");
         setFState("");
         setFCity("");
+        setFPrice("all");
     };
     const adminFiltersActive =
-        fq.trim() !== "" || fStatus !== "all" || fCat !== "" || fCountry !== "";
+        fq.trim() !== "" || fStatus !== "all" || fCat !== "" || fCountry !== "" || fPrice !== "all";
 
     return (
         <div className="space-y-6">
@@ -1007,6 +1011,16 @@ export function AdminEvents() {
                                 {CATEGORY_LABELS[c] ?? c}
                             </option>
                         ))}
+                    </select>
+                    <select
+                        value={fPrice}
+                        onChange={(e) => setFPrice(e.target.value as "all" | "free" | "paid")}
+                        aria-label="Filter by price"
+                        className={inputCls}
+                    >
+                        <option value="all">All prices</option>
+                        <option value="free">Free</option>
+                        <option value="paid">Paid</option>
                     </select>
                     <select
                         value={fCountry}

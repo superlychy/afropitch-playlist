@@ -115,6 +115,7 @@ type EventsSearchParams = {
     state?: string;
     city?: string;
     q?: string;
+    price?: string;
 };
 
 const parseFilters = (sp: EventsSearchParams) => {
@@ -128,7 +129,8 @@ const parseFilters = (sp: EventsSearchParams) => {
     // `city` is the current param; `location` is the legacy alias.
     const city = clean(sp.city) ?? clean(sp.location);
     const q = clean(sp.q);
-    return { page, category, country, state, city, q };
+    const price = sp.price === "free" || sp.price === "paid" ? sp.price : null;
+    return { page, category, country, state, city, q, price };
 };
 
 const buildQs = (f: {
@@ -138,6 +140,7 @@ const buildQs = (f: {
     state?: string | null;
     city?: string | null;
     q?: string | null;
+    price?: "free" | "paid" | null;
 }) => {
     const qs = new URLSearchParams({
         ...(f.page && f.page > 1 ? { page: String(f.page) } : {}),
@@ -146,6 +149,7 @@ const buildQs = (f: {
         ...(f.state ? { state: f.state } : {}),
         ...(f.city ? { city: f.city } : {}),
         ...(f.q ? { q: f.q } : {}),
+        ...(f.price ? { price: f.price } : {}),
     }).toString();
     return qs ? `?${qs}` : "";
 };
@@ -155,8 +159,8 @@ export async function generateMetadata({
 }: {
     searchParams: Promise<EventsSearchParams>;
 }): Promise<Metadata> {
-    const { page, category, country, state, city } = parseFilters(await searchParams);
-    const qs = buildQs({ page, category, country, state, city });
+    const { page, category, country, state, city, price } = parseFilters(await searchParams);
+    const qs = buildQs({ page, category, country, state, city, price });
     const catName = category ? ` ${CATEGORY_LABELS[category]}` : "";
     const locName = city ? ` in ${city}` : state ? ` in ${state}` : country ? ` in ${country}` : "";
     return {
@@ -189,7 +193,7 @@ export default async function EventsPage({
 }: {
     searchParams: Promise<EventsSearchParams>;
 }) {
-    const { page, category, country: countryParam, state: stateParam, city: cityParam, q } = parseFilters(await searchParams);
+    const { page, category, country: countryParam, state: stateParam, city: cityParam, q, price } = parseFilters(await searchParams);
     const supabase = await createClient();
     const nowIso = new Date().toISOString();
     const baseSelect =
@@ -277,6 +281,8 @@ export default async function EventsPage({
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         let query = q2 as any;
         if (category) query = query.eq("category", category);
+        if (price === "free") query = query.eq("is_free", true);
+        else if (price === "paid") query = query.eq("is_free", false);
         // Most specific location level wins: city > state > country.
         if (city) query = query.eq("city", city);
         else if (state) query = query.eq("state", state);
@@ -340,7 +346,7 @@ export default async function EventsPage({
     const upcoming = ((upcomingData ?? []) as EventRow[]).filter((e) => !excludeBanners || !bannerIdSet.has(e.id));
     const past = ((pastData ?? []) as EventRow[]).filter((e) => !excludeBanners || !bannerIdSet.has(e.id));
     const totalPages = Math.max(1, Math.ceil((upcomingCount ?? 0) / PER_PAGE));
-    const pageHref = (p: number) => `/events${buildQs({ page: p, category, country, state, city, q })}`;
+    const pageHref = (p: number) => `/events${buildQs({ page: p, category, country, state, city, q, price })}`;
 
     return (
         <main className="w-full mx-auto max-w-4xl px-4 py-16 md:py-24">
@@ -357,7 +363,7 @@ export default async function EventsPage({
             <EventFilters
                 tree={tree}
                 categories={Object.keys(CATEGORY_LABELS)}
-                current={{ category, country, state, city, q }}
+                current={{ category, country, state, city, q, price }}
             />
 
             <div className="flex justify-center mb-12">
