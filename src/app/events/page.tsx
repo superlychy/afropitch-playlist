@@ -360,6 +360,10 @@ export default async function EventsPage({
                 </p>
             </div>
 
+            {bannerEvents.length > 0 && (
+                <BannerCarousel banners={bannerEvents} showPresale={badgeEnabled} />
+            )}
+
             <EventFilters
                 tree={tree}
                 categories={Object.keys(CATEGORY_LABELS)}
@@ -375,10 +379,6 @@ export default async function EventsPage({
                     city={city}
                 />
             </div>
-
-            {bannerEvents.length > 0 && (
-                <BannerCarousel banners={bannerEvents} showPresale={badgeEnabled} />
-            )}
 
             {live.length > 0 && (
                 <section className="mb-12">
