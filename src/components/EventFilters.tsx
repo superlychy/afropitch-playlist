@@ -64,9 +64,6 @@ export function EventFilters({
         current.country && current.state
             ? [...(tree[current.country]?.[current.state] ?? [])].sort()
             : [];
-
-    const hasFilter = current.category || current.country || current.q || (current.price && current.price !== "all");
-
     return (
         <div className="flex flex-wrap justify-center gap-2 mb-4">
             <select
@@ -141,16 +138,6 @@ export function EventFilters({
                 <option value="free">Free</option>
                 <option value="paid">Paid</option>
             </select>
-
-            {hasFilter && (
-                <button
-                    type="button"
-                    onClick={() => push({ category: null, country: null, state: null, city: null, q: null, price: "all" })}
-                    className="rounded-full px-4 py-2 text-sm text-gray-500 hover:text-white"
-                >
-                    Clear all
-                </button>
-            )}
         </div>
     );
 }
