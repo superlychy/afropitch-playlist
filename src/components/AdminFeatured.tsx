@@ -226,13 +226,42 @@ export function AdminFeatured() {
         }
         if (status === "published" && !confirm(`Publish "${f.artist_name}" as this week's featured artist?`)) return;
         setSaving(f.id);
+        if (status === "published") {
+            // Publish through the server route so the artist is notified
+            // by email the moment their feature goes live.
+            try {
+                const { data: { session } } = await supabase.auth.getSession();
+                const res = await fetch("/api/admin/publish-featured", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Authorization": `Bearer ${session?.access_token}`,
+                    },
+                    body: JSON.stringify({ feature_id: f.id }),
+                });
+                const json = await res.json().catch(() => null);
+                if (!res.ok) throw new Error(json?.error || "Publish failed.");
+                setSaving(null);
+                toast(
+                    json?.email_sent
+                        ? "Published! It's live on /featured and the artist was notified by email."
+                        : "Published! It's live on /featured. (Email notification could not be sent.)",
+                    "success"
+                );
+                load();
+            } catch (e: any) {
+                setSaving(null);
+                toast("Failed: " + (e?.message || "Publish failed."), "error");
+            }
+            return;
+        }
         const { error } = await supabase.from("featured_artists").update({ status }).eq("id", f.id);
         setSaving(null);
         if (error) {
             toast("Failed: " + error.message, "error");
             return;
         }
-        toast(status === "published" ? "Published! It's live on /featured." : `Moved to ${status}.`, "success");
+        toast(`Moved to ${status}.`, "success");
         load();
     };
 
