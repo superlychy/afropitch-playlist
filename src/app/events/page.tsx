@@ -39,6 +39,9 @@ const CATEGORY_LABELS: Record<string, string> = {
     party: "Party",
     tour: "Tour",
     showcase: "Showcase",
+    gospel: "Gospel",
+    comedy: "Comedy",
+    cultural: "Cultural",
 };
 
 const PER_PAGE = 15;

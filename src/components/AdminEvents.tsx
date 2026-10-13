@@ -30,7 +30,7 @@ interface EventItem {
     created_at: string;
 }
 
-const CATEGORIES = ["concert", "festival", "awards", "industry", "competition", "party", "tour", "showcase"] as const;
+const CATEGORIES = ["concert", "festival", "awards", "industry", "competition", "party", "tour", "showcase", "gospel", "comedy", "cultural"] as const;
 
 const CATEGORY_LABELS: Record<string, string> = {
     concert: "Concert",
