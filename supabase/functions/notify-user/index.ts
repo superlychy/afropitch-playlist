@@ -213,6 +213,13 @@ async function handleSubmissionUpdate(record: any) {
     else if (record.status === 'declined') {
         // Quick decline (admin, free submissions only): no reason, no email.
         if (record.decline_silent === true) return;
+        // Playlist suggestion (2026-10-19): fetch the suggested playlist name
+        // so the email can name it and carry the Accept button.
+        let suggestedPlaylistName: string | null = null;
+        if (record.decline_reason === 'suggest_playlist' && record.suggested_playlist_id) {
+            const { data: suggested } = await supabase.from('playlists').select('name').eq('id', record.suggested_playlist_id).single();
+            suggestedPlaylistName = suggested?.name || null;
+        }
         const subject = `Update on your submission to ${playlistName}`;
         const html = getSongDeclinedTemplate({
             name: user.full_name || 'Artist',
@@ -225,7 +232,8 @@ async function handleSubmissionUpdate(record: any) {
             reason: record.decline_reason ?? null,
             amountPaid: Number(record.amount_paid) || 0,
             currency: CURRENCY,
-            dashboardLink: `${SITE_URL}/dashboard/artist`
+            dashboardLink: `${SITE_URL}/dashboard/artist`,
+            suggestedPlaylistName: suggestedPlaylistName
         });
         await sendEmail(user.email, subject, html, undefined, 'submission_declined');
     }

@@ -751,7 +751,7 @@ export default function CuratorDashboard() {
         }
     }, [newPlaylistLink]);
 
-    const handleReviewAction = async (submissionId: string, action: 'accepted' | 'declined' | 'archived', feedback: string, declineReasonCode?: DeclineReasonCode) => {
+    const handleReviewAction = async (submissionId: string, action: 'accepted' | 'declined' | 'archived', feedback: string, declineReasonCode?: DeclineReasonCode, suggestedPlaylistId?: string | null) => {
         if (!user) return;
 
         // All actions go through the secure RPC below so the money logic runs.
@@ -775,7 +775,8 @@ export default function CuratorDashboard() {
             p_feedback: feedback,
             p_curator_id: user.id,
             p_tracking_slug: trackingSlug,
-            p_decline_reason: declineReasonCode ?? null
+            p_decline_reason: declineReasonCode ?? null,
+            p_suggested_playlist_id: suggestedPlaylistId ?? null
         });
 
         if (error) {
@@ -807,9 +808,9 @@ export default function CuratorDashboard() {
         setSelectedSubmissionId(null);
     };
 
-    const confirmDecline = async (reasonCode: DeclineReasonCode, feedback: string) => {
+    const confirmDecline = async (reasonCode: DeclineReasonCode, feedback: string, suggestedPlaylistId?: string | null) => {
         if (!selectedSubmissionId) return;
-        await handleReviewAction(selectedSubmissionId, 'declined', feedback || "Declined", reasonCode);
+        await handleReviewAction(selectedSubmissionId, 'declined', feedback || "Declined", reasonCode, suggestedPlaylistId ?? null);
         setShowDeclineModal(false);
         setSelectedSubmissionId(null);
     };
@@ -1525,6 +1526,8 @@ export default function CuratorDashboard() {
                 <DeclineReasonModal
                     onClose={() => { setShowDeclineModal(false); setSelectedSubmissionId(null); }}
                     onConfirm={confirmDecline}
+                    currentPlaylistId={reviews.find(r => r.id === selectedSubmissionId)?.playlist_id}
+                    currentFee={Number(reviews.find(r => r.id === selectedSubmissionId)?.amount_paid ?? 0)}
                 />
             )}
 

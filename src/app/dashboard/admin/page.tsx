@@ -1144,7 +1144,7 @@ export default function AdminDashboard() {
         if (activeTab === 'submissions') fetchAllSubmissions();
     }, [activeTab]);
 
-    const runSubmissionAction = async (submissionId: string, action: 'accepted' | 'declined' | 'archived' | 'unarchived', feedback: string, trackingSlug: string | null, declineReasonCode?: DeclineReasonCode, silent?: boolean) => {
+    const runSubmissionAction = async (submissionId: string, action: 'accepted' | 'declined' | 'archived' | 'unarchived', feedback: string, trackingSlug: string | null, declineReasonCode?: DeclineReasonCode, silent?: boolean, suggestedPlaylistId?: string | null) => {
         const sub = playlistSongs.find(s => s.id === submissionId);
 
         try {
@@ -1155,7 +1155,8 @@ export default function AdminDashboard() {
                 p_curator_id: user?.id,
                 p_tracking_slug: trackingSlug,
                 p_decline_reason: declineReasonCode ?? null,
-                p_silent: silent ?? false
+                p_silent: silent ?? false,
+                p_suggested_playlist_id: suggestedPlaylistId ?? null
             });
 
             if (error) throw error;
@@ -1169,7 +1170,9 @@ export default function AdminDashboard() {
                         ? "Submission is back in the queue."
                         : silent
                             ? "Song declined silently. No reason asked, no email sent."
-                            : "Song rejected. Refund processed to artist wallet.";
+                            : declineReasonCode === 'suggest_playlist'
+                                ? "Song declined with a playlist suggestion. Fee returned to artist wallet."
+                                : "Song rejected. Refund processed to artist wallet.";
             toast(successMsg, "success");
 
             // Update local state (both the review queue and the submissions list)
@@ -1253,11 +1256,11 @@ export default function AdminDashboard() {
         await runSubmissionAction(submissionId, action, feedback, trackingSlug);
     };
 
-    const confirmAdminDecline = async (reasonCode: DeclineReasonCode, feedback: string) => {
+    const confirmAdminDecline = async (reasonCode: DeclineReasonCode, feedback: string, suggestedPlaylistId?: string | null) => {
         const targetId = declineTargetId;
         setDeclineTargetId(null);
         if (!targetId) return;
-        await runSubmissionAction(targetId, 'declined', feedback || "Declined", null, reasonCode);
+        await runSubmissionAction(targetId, 'declined', feedback || "Declined", null, reasonCode, false, suggestedPlaylistId ?? null);
     };
 
     // CHAT FUNCTIONS
@@ -3073,6 +3076,8 @@ export default function AdminDashboard() {
                 <DeclineReasonModal
                     onClose={() => setDeclineTargetId(null)}
                     onConfirm={confirmAdminDecline}
+                    currentPlaylistId={(playlistSongs.find(s => s.id === declineTargetId) || allSubmissions.find(s => s.id === declineTargetId))?.playlist_id}
+                    currentFee={Number((playlistSongs.find(s => s.id === declineTargetId) || allSubmissions.find(s => s.id === declineTargetId))?.amount_paid ?? 0)}
                 />
             )}
 

@@ -44,6 +44,14 @@ interface Submission {
     name: string;
     curator: { full_name: string } | null;
   } | null;
+  suggested_playlist_id: string | null;
+  suggested_by: string | null;
+  suggestion_status: string | null;
+  suggestion_round: number | null;
+  suggested_playlist: {
+    name: string;
+    submission_fee: number;
+  } | null;
 }
 
 export default function ArtistDashboard() {
@@ -82,6 +90,7 @@ export default function ArtistDashboard() {
   // Real Data State
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [loadingSubmissions, setLoadingSubmissions] = useState(true);
+  const [acceptingSuggestion, setAcceptingSuggestion] = useState<string | null>(null);
 
   // Per-platform smart-link click stats, fetched once (not once per card).
   const [linkStats, setLinkStats] = useState<Record<string, Record<string, number>>>({});
@@ -127,7 +136,7 @@ export default function ArtistDashboard() {
 
     const { data, error } = await supabase
       .from("submissions")
-      .select(`*, playlist:playlists!submissions_playlist_id_fkey(name, curator:profiles(full_name))`)
+      .select(`*, playlist:playlists!submissions_playlist_id_fkey(name, curator:profiles(full_name)), suggested_playlist:playlists!suggested_playlist_id(name, submission_fee)`)
       .eq("artist_id", user.id)
       .order("created_at", { ascending: false });
 
@@ -137,6 +146,27 @@ export default function ArtistDashboard() {
       setSubmissions((data as unknown as Submission[]) || []);
     }
     setLoadingSubmissions(false);
+  };
+
+  // Accept a curator's playlist suggestion: auto-resubmits the song to the
+  // suggested playlist, spending the wallet credit (the decline refund).
+  const acceptSuggestion = async (submissionId: string) => {
+    if (acceptingSuggestion) return;
+    setAcceptingSuggestion(submissionId);
+    try {
+      const { data, error } = await supabase.rpc("accept_playlist_suggestion", {
+        p_submission_id: submissionId,
+      });
+      if (error) throw error;
+      if (data && data.success === false) throw new Error(data.message || "Could not accept the suggestion.");
+      toast("Song resubmitted to the suggested playlist.", "success");
+      refreshUser();
+      fetchSubmissions();
+    } catch (err: any) {
+      toast(`Could not accept the suggestion: ${err.message}`, "error");
+    } finally {
+      setAcceptingSuggestion(null);
+    }
   };
 
   const fetchLinkStats = async () => {
@@ -583,6 +613,21 @@ export default function ArtistDashboard() {
                           <b className="text-red-300">Curator:</b> {sub.feedback}
                         </div>
                       )}
+                      {sub.suggestion_status === "pending" && sub.suggested_playlist && (
+                        <div className="mt-2 text-xs bg-[#22C55E]/5 border border-[#22C55E]/25 rounded-[10px] px-2.5 py-2">
+                          <p className="text-zinc-300">
+                            <b className="text-green-300">Playlist suggestion:</b> the curator thinks this song
+                            fits <b>{sub.suggested_playlist.name}</b> better.
+                          </p>
+                          <button
+                            onClick={() => acceptSuggestion(sub.id)}
+                            disabled={acceptingSuggestion === sub.id}
+                            className="mt-2 w-full bg-[#22C55E] hover:bg-[#16a34a] disabled:opacity-50 text-white text-xs font-bold rounded-[10px] px-3 py-2"
+                          >
+                            {acceptingSuggestion === sub.id ? "Submitting..." : "Accept — resubmit this song"}
+                          </button>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -601,6 +646,21 @@ export default function ArtistDashboard() {
                               <p className="text-xs text-zinc-400 mt-1 truncate" title={sub.feedback}>
                                 <span className="text-red-300 font-bold">Curator:</span> {sub.feedback}
                               </p>
+                            )}
+                            {sub.suggestion_status === "pending" && sub.suggested_playlist && (
+                              <div className="mt-2 bg-[#22C55E]/5 border border-[#22C55E]/25 rounded-[10px] px-2.5 py-2">
+                                <p className="text-xs text-zinc-300 whitespace-normal">
+                                  <span className="text-green-300 font-bold">Playlist suggestion:</span> the curator
+                                  thinks this song fits <b>{sub.suggested_playlist.name}</b> better.
+                                </p>
+                                <button
+                                  onClick={() => acceptSuggestion(sub.id)}
+                                  disabled={acceptingSuggestion === sub.id}
+                                  className="mt-1.5 bg-[#22C55E] hover:bg-[#16a34a] disabled:opacity-50 text-white text-xs font-bold rounded-[10px] px-3 py-1.5"
+                                >
+                                  {acceptingSuggestion === sub.id ? "Submitting..." : "Accept — resubmit this song"}
+                                </button>
+                              </div>
                             )}
                           </div>
                           <div className="text-right shrink-0">

@@ -106,6 +106,7 @@ export type DeclineReasonCode =
     | 'structure'
     | 'vocals'
     | 'not_right_now'
+    | 'suggest_playlist'
     | 'custom';
 
 const DECLINE_REASON_PARAGRAPHS: Record<Exclude<DeclineReasonCode, 'custom'>, string> = {
@@ -115,6 +116,7 @@ const DECLINE_REASON_PARAGRAPHS: Record<Exclude<DeclineReasonCode, 'custom'>, st
     structure: "The curator's feedback is about the structure of the song: how it starts, where the hook lands, and how the sections flow. On a playlist, listeners decide quickly, so a slow build or a late hook can cost a song its place even when the idea is strong. If you rework the arrangement, we would be glad to hear the song again in the future.",
     vocals: "The curator's feedback is about the vocal: parts of the performance are off key, or the vocal is not clear enough in the recording to carry the song. Vocals are the first thing listeners connect with, so it is worth another take or a cleaner recording session before pitching the song again. The song itself may well be strong; this is about the performance and recording.",
     not_right_now: "There is nothing wrong with this song, and this decision is not about its quality or its mix. The playlist simply cannot take it at this moment. Playlists rotate songs in and out, space opens and closes, and timing matters as much as the record itself. Please do not be discouraged: pitch it to other playlists that fit, and feel free to bring future songs to this curator again.",
+    suggest_playlist: "This is about fit, not quality. The curator did not feel this song sits comfortably inside this playlist's sound, but they believe it could work well on another playlist on AfroPitch, which is why they have suggested one for you below.",
 };
 
 const MIXING_OFFER_BOX = `
@@ -134,6 +136,7 @@ export const getSongDeclinedTemplate = (data: {
     amountPaid: number;
     currency: string;
     dashboardLink: string;
+    suggestedPlaylistName?: string | null;
 }) => {
     const knownReason = data.reason && data.reason !== 'custom' && Object.prototype.hasOwnProperty.call(DECLINE_REASON_PARAGRAPHS, data.reason)
         ? (data.reason as Exclude<DeclineReasonCode, 'custom'>)
@@ -146,14 +149,30 @@ export const getSongDeclinedTemplate = (data: {
 
     const mixingBox = data.reason === 'mix_quality' ? MIXING_OFFER_BOX : '';
 
-    const refundHtml = data.amountPaid > 0
-        ? `<p>Your submission fee of ${data.currency}${data.amountPaid.toLocaleString()} has been refunded to your AfroPitch wallet. You can use it to submit this song to another playlist, or save it for your next release.</p>`
-        : `<p>This was a free submission, so no fee was charged.</p>`;
+    // The curator suggested another playlist: the fee is already back in the
+    // artist's wallet, and the Accept button opens the dashboard where the
+    // suggestion can be accepted in one tap (one-tap actions straight from
+    // email are unreliable and unsafe, so the button links, it does not act).
+    const suggestionBox = data.reason === 'suggest_playlist' && data.suggestedPlaylistName
+        ? `
+    <div style="margin: 25px 0; padding: 20px; background-color: #f0fdf4; border: 1px solid #16a34a; border-radius: 8px; text-align: center;">
+        <p style="color: #111; font-weight: bold; margin: 0 0 8px 0;">The curator suggests ${data.suggestedPlaylistName} instead.</p>
+        <p style="color: #555; font-size: 14px; margin: 0 0 15px 0;">They think your song fits that playlist better. Accept on your dashboard and the song is resubmitted there automatically, paid from your wallet credit.</p>
+        ${btn(data.dashboardLink, 'Accept the suggestion')}
+    </div>`
+        : '';
+
+    const refundHtml = data.reason === 'suggest_playlist' && data.amountPaid > 0
+        ? `<p>Your submission fee of ${data.currency}${data.amountPaid.toLocaleString()} has been refunded to your AfroPitch wallet. Accepting the suggestion resubmits the song automatically and spends this credit.</p>`
+        : data.amountPaid > 0
+            ? `<p>Your submission fee of ${data.currency}${data.amountPaid.toLocaleString()} has been refunded to your AfroPitch wallet. You can use it to submit this song to another playlist, or save it for your next release.</p>`
+            : `<p>This was a free submission, so no fee was charged.</p>`;
 
     return brandedEmail(`
     <p>Hi ${data.name},</p>
     <p>Thank you for submitting <strong>${data.songTitle}</strong> to <strong>${data.playlistName}</strong>. The curator has listened and decided not to add the song this time.</p>
     ${reasonHtml}
+    ${suggestionBox}
     ${mixingBox}
     ${refundHtml}
     ${btn(data.dashboardLink, 'View dashboard')}
