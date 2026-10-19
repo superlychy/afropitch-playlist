@@ -127,7 +127,7 @@ export default function ArtistDashboard() {
 
     const { data, error } = await supabase
       .from("submissions")
-      .select(`*, playlist:playlists (name, curator:profiles (full_name))`)
+      .select(`*, playlist:playlists!submissions_playlist_id_fkey(name, curator:profiles(full_name))`)
       .eq("artist_id", user.id)
       .order("created_at", { ascending: false });
 
