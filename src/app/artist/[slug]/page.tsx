@@ -39,7 +39,7 @@ async function getArtist(slug: string): Promise<{
 
     const { data: songs } = await supabase
         .from("submissions")
-        .select("id, song_title, cover_art_url, tracking_slug, playlist:playlists(name)")
+        .select("id, song_title, cover_art_url, tracking_slug, playlist:playlists!submissions_playlist_id_fkey(name)")
         .eq("artist_id", profile.id)
         .eq("status", "accepted")
         .order("created_at", { ascending: false });

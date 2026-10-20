@@ -182,7 +182,7 @@ export default function CuratorDashboard() {
                     .select(`
                         *,
                         artist: profiles(full_name, bio, instagram, twitter, website),
-                        playlist: playlists(name)
+                        playlist: playlists!submissions_playlist_id_fkey(name)
                     `)
                     .in('playlist_id', playlistIds)
                     .order('created_at', { ascending: false });

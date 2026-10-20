@@ -19,7 +19,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   const { data: sub } = await supabase
     .from('submissions')
-    .select('song_title, artist_name, song_link, cover_art_url, playlist:playlists(name)')
+    .select('song_title, artist_name, song_link, cover_art_url, playlist:playlists!submissions_playlist_id_fkey(name)')
     .eq('tracking_slug', slug)
     .single();
 

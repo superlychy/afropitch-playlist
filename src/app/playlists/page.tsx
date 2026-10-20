@@ -108,6 +108,10 @@ export default function PlaylistsPage() {
         router.push(`/submit?playlists=${idsParam}`);
     };
 
+    const selectedTotal = playlists
+        .filter((p) => selectedPlaylistIds.includes(p.id))
+        .reduce((sum, p) => sum + (p.submission_fee || 0), 0);
+
     const filteredPlaylists = playlists.filter(pl => {
         const matchesSearch = pl.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
             (pl.description || "").toLowerCase().includes(searchTerm.toLowerCase());
@@ -340,26 +344,32 @@ export default function PlaylistsPage() {
                 </>
             )}
 
-            {/* Floating Selection Bar */}
-            <div className={`fixed bottom-0 left-0 right-0 bg-black/90 border-t border-green-500/30 backdrop-blur-xl p-4 transition-transform duration-300 z-50 ${selectedPlaylistIds.length > 0 ? 'translate-y-0' : 'translate-y-full'}`}>
-                <div className="container mx-auto max-w-6xl flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                        <div className="bg-green-500 text-black font-bold w-10 h-10 rounded-full flex items-center justify-center text-lg animate-bounce">
+            {/* Floating Selection Bar (same style as the /submit Continue bar) */}
+            <div className={`fixed bottom-0 left-0 right-0 bg-black/95 border-t border-green-500/30 backdrop-blur-xl p-3 md:p-4 transition-transform duration-300 z-50 shadow-2xl ${selectedPlaylistIds.length > 0 ? 'translate-y-0' : 'translate-y-full'}`}>
+                <div className="container mx-auto max-w-6xl flex items-center justify-between px-2 md:px-0">
+                    <div className="flex items-center gap-3 md:gap-4">
+                        <div className="bg-green-500 text-black font-bold w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center text-sm md:text-lg animate-bounce shadow-lg shadow-green-500/20">
                             {selectedPlaylistIds.length}
                         </div>
-                        <div>
-                            <p className="text-white font-bold text-lg">
-                                {selectedPlaylistIds.length} Playlist{selectedPlaylistIds.length !== 1 ? 's' : ''} Selected
+                        <div className="flex flex-col">
+                            <p className="text-white font-bold text-sm md:text-lg leading-tight">
+                                <span className="md:hidden">Total: </span>
+                                {pricingConfig.currency}
+                                {selectedTotal.toLocaleString()}
+                                <span className="hidden md:inline text-gray-400 font-normal mx-2">•</span>
+                                <span className="hidden md:inline text-gray-300 font-normal">
+                                    {selectedPlaylistIds.length} Selected
+                                </span>
                             </p>
-                            <p className="text-xs text-gray-400">Ready for submission</p>
+                            <p className="text-[10px] md:text-xs text-gray-400 hidden md:block">Ready for submission</p>
                         </div>
                     </div>
                     <Button
-                        size="lg"
+                        size="default"
                         onClick={proceedToSubmit}
-                        className="bg-green-600 hover:bg-green-700 text-white text-lg px-8 rounded-full shadow-lg shadow-green-900/20"
+                        className="bg-green-600 hover:bg-green-700 text-white font-bold text-sm md:text-lg px-6 md:px-8 py-2 md:py-6 rounded-full shadow-lg shadow-green-900/20 h-11 md:h-12 flex items-center"
                     >
-                        Proceed to Checkout <ArrowRight className="ml-2 w-5 h-5" />
+                        Continue <ArrowRight className="ml-2 w-4 h-4 md:w-5 md:h-5" />
                     </Button>
                 </div>
             </div>

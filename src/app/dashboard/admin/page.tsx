@@ -602,7 +602,7 @@ export default function AdminDashboard() {
             // 5. Fetch Top Campaigns (by clicks)
             const { data: topClicks } = await supabase
                 .from('submissions')
-                .select('*, artist:profiles!artist_id(full_name), playlist:playlists(name)')
+                .select('*, artist:profiles!artist_id(full_name), playlist:playlists!submissions_playlist_id_fkey(name)')
                 .neq('status', 'declined') // Exclude declined songs
                 .order('clicks', { ascending: false })
                 .limit(5);
@@ -621,7 +621,7 @@ export default function AdminDashboard() {
             const [{ data: depositTxns }, { data: financeWithdrawals }, { data: financeSubs }] = await Promise.all([
                 supabase.from('transactions').select('amount').eq('type', 'deposit'),
                 supabase.from('withdrawals').select('amount, status, processed_at'),
-                supabase.from('submissions').select('amount_paid, status, playlist:playlists(curator_id)').gt('amount_paid', 0),
+                supabase.from('submissions').select('amount_paid, status, playlist:playlists!submissions_playlist_id_fkey(curator_id)').gt('amount_paid', 0),
             ]);
 
             // Wallet balances by role (from already-fetched users list)
@@ -1111,7 +1111,7 @@ export default function AdminDashboard() {
     const fetchGlobalPendingSongs = async () => {
         const { data } = await supabase
             .from('submissions')
-            .select('*, artist:profiles(full_name), playlist:playlists(name, type)')
+            .select('*, artist:profiles(full_name), playlist:playlists!submissions_playlist_id_fkey(name, type)')
             .eq('status', 'pending')
             .eq('is_archived', false)
             .order('created_at', { ascending: false });
@@ -1122,7 +1122,7 @@ export default function AdminDashboard() {
     const fetchAllSubmissions = async () => {
         const { data } = await supabase
             .from('submissions')
-            .select('*, artist:profiles!artist_id(full_name, email), playlist:playlists(name, curator:profiles!curator_id(full_name))')
+            .select('*, artist:profiles!artist_id(full_name, email), playlist:playlists!submissions_playlist_id_fkey(name, curator:profiles!curator_id(full_name))')
             .order('created_at', { ascending: false });
         if (data) setAllSubmissions(data);
     };
