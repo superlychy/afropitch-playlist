@@ -50,6 +50,21 @@ export default function PortalPage() {
     const [resetEmail, setResetEmail] = useState("");
     const [resetSuccess, setResetSuccess] = useState(false);
 
+    // Post-login return (Max, 2026-10-20): a visitor who tapped Continue on
+    // /playlists while logged out is sent here with afropitch_post_login set.
+    // After login they go back there (their selection is restored from
+    // afropitch_pending_playlists) instead of the dashboard.
+    const peekPostLogin = () => {
+        try { return localStorage.getItem("afropitch_post_login"); } catch { return null; }
+    };
+    const consumePostLogin = () => {
+        try {
+            const next = localStorage.getItem("afropitch_post_login");
+            if (next) localStorage.removeItem("afropitch_post_login");
+            return next;
+        } catch { return null; }
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError("");
@@ -64,9 +79,13 @@ export default function PortalPage() {
                 setPassword("");
             } else {
                 const loggedInRole = await login(email, password);
-                if (loggedInRole === 'admin') router.push("/dashboard/admin");
-                else if (loggedInRole === 'curator') router.push("/dashboard/curator");
-                else router.push("/dashboard/artist");
+                // If a post-login return is pending, the redirect effect
+                // below owns routing (it fires when user state lands).
+                if (!peekPostLogin()) {
+                    if (loggedInRole === 'admin') router.push("/dashboard/admin");
+                    else if (loggedInRole === 'curator') router.push("/dashboard/curator");
+                    else router.push("/dashboard/artist");
+                }
             }
         } catch (err: any) {
             console.error(err);
@@ -138,6 +157,8 @@ export default function PortalPage() {
     useEffect(() => {
         if (user) {
             const timeout = setTimeout(() => {
+                const next = consumePostLogin();
+                if (next) { router.push(next); return; }
                 if (user.role === 'admin') router.push("/dashboard/admin");
                 else if (user.role === 'curator') router.push("/dashboard/curator");
                 else router.push("/dashboard/artist");
