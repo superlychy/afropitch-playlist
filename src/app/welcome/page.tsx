@@ -84,7 +84,7 @@ export default function WelcomePage() {
           AfroPitch
         </span>
         <h1 className="text-3xl font-bold text-white mt-4 mb-2">
-          Welcome{userEmail ? `, ${userEmail.split("@")[0]}` : ""}! 🎉
+          Welcome{userEmail ? `, ${userEmail.split("@")[0]}` : ""}!
         </h1>
         <p className="text-gray-400">One quick question so we set up the right dashboard for you.</p>
       </div>
