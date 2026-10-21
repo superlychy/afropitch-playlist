@@ -1,0 +1,11 @@
+-- 2026-10-21 (Max: "Fix"): curator dashboard activity heartbeat failed with
+-- 42501 "permission denied for table profiles". Diagnosis against the live DB:
+-- the October column-level lockdown granted UPDATE on profiles to the
+-- authenticated role for the editable profile columns only; the two columns the
+-- activity tracker writes (last_activity_at, is_online) were missed, so every
+-- signed-in heartbeat update was refused. RLS was never the blocker (own-row
+-- UPDATE policies "Users can update own activity" / "Users can update own
+-- profile." already exist). Narrow fix: grant UPDATE on exactly those two
+-- columns to authenticated. Applied live via the management API on
+-- 2026-10-21 and verified in information_schema.column_privileges.
+GRANT UPDATE (last_activity_at, is_online) ON public.profiles TO authenticated;

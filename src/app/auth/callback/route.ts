@@ -6,7 +6,7 @@ import { NextResponse, type NextRequest } from "next/server";
  * OAuth callback for "Continue with Google" (and any future OAuth provider).
  * Google -> Supabase -> here with ?code=... We exchange the code for a
  * session, then:
- *  - brand-new Google users  -> /welcome (pick artist or curator role)
+ *  - brand-new Google users who have not picked a role yet -> /welcome
  *  - everyone else           -> their role's dashboard
  */
 export async function GET(request: NextRequest) {
@@ -49,8 +49,13 @@ export async function GET(request: NextRequest) {
   const createdMs = new Date(user.created_at).getTime();
   const isFreshSignup = Date.now() - createdMs < 10 * 60 * 1000;
 
-  // Brand-new Google signup: they must choose artist vs curator (Google can't tell us).
-  if (isFreshSignup && provider === "google") {
+  // Brand-new Google signup: they must choose artist vs curator (Google
+  // can't tell us) — but only until they have chosen. The picker stamps the
+  // choice onto user_metadata, so a user who already picked is never sent
+  // back to /welcome on a later login within the fresh-signup window.
+  const chosenRole = user.user_metadata?.role;
+  const hasChosenRole = chosenRole === "artist" || chosenRole === "curator";
+  if (isFreshSignup && provider === "google" && !hasChosenRole) {
     return NextResponse.redirect(`${origin}/welcome`);
   }
 

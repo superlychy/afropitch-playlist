@@ -42,28 +42,20 @@ export default function WelcomePage() {
     setSaving(role);
     setError("");
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      // Fill in their real name from Google if the profile only has the email fallback.
-      const googleName =
-        (user?.user_metadata?.full_name as string | undefined) ||
-        (user?.user_metadata?.name as string | undefined);
-
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("full_name, email")
-        .eq("id", userId)
-        .single();
-
-      const updates: Record<string, string> = { role };
-      if (profile && googleName && (!profile.full_name || profile.full_name === profile.email)) {
-        updates.full_name = googleName;
+      // Saved server-side: for a brand-new account the choice must be free
+      // in both directions, which the in-app one-way role protection would
+      // otherwise block (see /api/welcome/set-role).
+      const res = await fetch("/api/welcome/set-role", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(
+          data?.error || "Couldn't save your choice. Please try again."
+        );
       }
-
-      const { error: upErr } = await supabase.from("profiles").update(updates).eq("id", userId);
-      if (upErr) throw upErr;
 
       try {
         localStorage.removeItem("afropitch_oauth_role");
@@ -71,8 +63,12 @@ export default function WelcomePage() {
         /* noop */
       }
       router.push(`/dashboard/${role}`);
-    } catch (e: any) {
-      setError(e.message || "Couldn't save your choice. Please try again.");
+    } catch (e) {
+      setError(
+        e instanceof Error
+          ? e.message
+          : "Couldn't save your choice. Please try again."
+      );
       setSaving(null);
     }
   };
