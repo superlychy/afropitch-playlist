@@ -7,6 +7,7 @@ import { AIHelp } from "@/components/AIHelp";
 import { AnalyticsTracker } from "@/components/AnalyticsTracker";
 import { AuthProvider } from "@/context/AuthContext";
 import { UserActivityTracker } from "@/components/UserActivityTracker";
+import { PostLoginRedirect } from "@/components/PostLoginRedirect";
 import { ErrorReporter } from "@/components/ErrorReporter";
 import { ToastProvider } from "@/components/ui/toast";
 import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
@@ -79,6 +80,7 @@ export default function RootLayout({
             <AIHelp />
             <AnalyticsTracker />
             <UserActivityTracker />
+            <PostLoginRedirect />
             <ErrorReporter />
             <ServiceWorkerRegister />
           </ToastProvider>
