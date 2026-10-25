@@ -359,6 +359,15 @@ export default async function EventsPage({
                     Concerts, festivals, award shows and industry nights across
                     Nigeria and Africa. Find your next night out.
                 </p>
+                <div className="pt-2">
+                    <Link
+                        href="/events/submit"
+                        className="inline-flex items-center gap-2 rounded-xl bg-yellow-400 px-5 py-2.5 text-sm font-bold text-black hover:bg-yellow-300 transition-colors"
+                    >
+                        List your event
+                    </Link>
+                    <p className="text-sm text-gray-500 mt-2">Free listings, reviewed before they go live.</p>
+                </div>
             </div>
 
             {bannerEvents.length > 0 && (
