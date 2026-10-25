@@ -8,6 +8,12 @@ import { TicketButton } from "./TicketButton";
 import { InterestButtons } from "./InterestButtons";
 import { siteConfig } from "@/../config/site";
 
+// Admin markers meaning "checked, could not confirm". They must never be
+// sent to Google or shown to visitors as real values.
+const UNCONFIRMED_MARKERS = ["n/a", "not confirmed"];
+const isConfirmedValue = (v: string | null | undefined) =>
+    !!v && !UNCONFIRMED_MARKERS.includes(v.trim().toLowerCase());
+
 interface EventDetail {
     id: string;
     title: string;
@@ -156,17 +162,19 @@ export default async function EventDetailPage({
         },
         ...(event.image_url ? { image: [event.image_url] } : {}),
         ...(event.description ? { description: event.description } : {}),
-        ...(event.organizer ? { organizer: { "@type": "Organization", name: event.organizer } } : {}),
-        ...(event.lineup
+        ...(isConfirmedValue(event.organizer)
+            ? { organizer: { "@type": "Organization", name: event.organizer } }
+            : {}),
+        ...(isConfirmedValue(event.lineup)
             ? {
-                  performer: event.lineup
+                  performer: event.lineup!
                       .split(/[,;]/)
                       .map((n) => n.trim())
                       .filter(Boolean)
                       .map((name) => ({ "@type": "MusicGroup", name })),
               }
             : {}),
-        ...(event.ticket_url
+        ...(isConfirmedValue(event.ticket_url)
             ? { offers: { "@type": "Offer", url: event.ticket_url, availability: "https://schema.org/InStock" } }
             : event.is_free
               ? {
@@ -236,7 +244,7 @@ export default async function EventDetailPage({
                             <MapPin className="w-4 h-4 text-yellow-400 flex-shrink-0" />
                             {locationName}, {event.country}
                         </p>
-                        {event.organizer && (
+                        {isConfirmedValue(event.organizer) && (
                             <p className="flex items-center gap-2">
                                 <Building2 className="w-4 h-4 text-yellow-400 flex-shrink-0" />
                                 Organized by {event.organizer}
@@ -254,7 +262,7 @@ export default async function EventDetailPage({
                     </Card>
                 )}
 
-                {event.ticket_url && !isPast ? (
+                {isConfirmedValue(event.ticket_url) && !isPast ? (
                     <div className="text-center pt-2">
                         <TicketButton eventId={event.id} ticketUrl={event.ticket_url} />
                         <p className="text-xs text-gray-600 mt-3">
