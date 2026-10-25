@@ -57,6 +57,7 @@ interface SpotlightFeature {
     week_start: string;
     headline: string | null;
     story: string | null;
+    bio: string | null;
     artist_id: string | null;
     photo_url: string | null;
     cover_art_url: string | null;
@@ -74,6 +75,9 @@ function formatDate(weekStart: string) {
 function HolderCard({ feature }: { feature: SpotlightFeature }) {
     // Artist photo if uploaded, otherwise the song's cover art — same fallback as the detail page.
     const image = feature.photo_url ?? feature.cover_art_url;
+    // Show the story when one is saved, otherwise the bio, so every holder
+    // card carries its detail text instead of only the ones with a story.
+    const detail = feature.story || feature.bio;
 
     const card = (
         <Card className="border-yellow-500/20 bg-gradient-to-b from-yellow-950/20 to-black/60 overflow-hidden">
@@ -96,9 +100,9 @@ function HolderCard({ feature }: { feature: SpotlightFeature }) {
                         </h2>
                     </div>
                 </div>
-                {feature.story && (
+                {detail && (
                     <p className="text-gray-300 leading-relaxed whitespace-pre-line line-clamp-4">
-                        {feature.story}
+                        {detail}
                     </p>
                 )}
             </CardContent>
@@ -127,7 +131,7 @@ export default async function FeaturedPage() {
     const supabase = await createClient();
     const { data } = await supabase
         .from("featured_artists")
-        .select("id, slug, week_start, headline, story, artist_id, photo_url, cover_art_url")
+        .select("id, slug, week_start, headline, story, bio, artist_id, photo_url, cover_art_url")
         .eq("status", "published")
         .not("slug", "is", null)
         .order("week_start", { ascending: false });
