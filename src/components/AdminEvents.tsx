@@ -22,6 +22,7 @@ interface EventItem {
     ticket_url: string | null;
     is_free: boolean;
     organizer: string | null;
+    lineup: string | null;
     category: string;
     status: string;
     source: string | null;
@@ -469,6 +470,7 @@ interface EventForm {
     is_free: boolean;
     is_presale: boolean;
     organizer: string;
+    lineup: string;
     category: string;
 }
 
@@ -488,6 +490,7 @@ const emptyForm = (): EventForm => ({
     is_free: false,
     is_presale: false,
     organizer: "",
+    lineup: "",
     category: "concert",
 });
 
@@ -560,6 +563,7 @@ export function AdminEvents() {
                 is_free: e.is_free ?? false,
                 is_presale: e.is_presale ?? false,
                 organizer: e.organizer ?? "",
+                lineup: e.lineup ?? "",
                 category: e.category,
             };
             setEdits((prev) => ({ ...prev, [e.id]: form }));
@@ -614,6 +618,7 @@ export function AdminEvents() {
             is_free: newForm.is_free,
             is_presale: newForm.is_presale,
             organizer: newForm.organizer.trim() || null,
+            lineup: newForm.lineup.trim() || null,
             category: newForm.category,
             status: "draft",
         });
@@ -655,6 +660,7 @@ export function AdminEvents() {
                 is_free: f.is_free,
                 is_presale: f.is_presale,
                 organizer: f.organizer.trim() || null,
+                lineup: f.lineup.trim() || null,
                 category: f.category,
                 updated_at: new Date().toISOString(),
             })
@@ -800,6 +806,10 @@ export function AdminEvents() {
                 <div>
                     <label className={labelCls}>Organizer <span className="text-gray-500">(optional)</span></label>
                     <input value={f.organizer} onChange={(e) => set({ organizer: e.target.value })} className={inputCls} />
+                </div>
+                <div>
+                    <label className={labelCls}>Lineup <span className="text-gray-500">(optional, comma-separated acts; sent to Google as the event performers)</span></label>
+                    <input value={f.lineup} onChange={(e) => set({ lineup: e.target.value })} placeholder="e.g. DJ Tunez, Elaine, Zee Nxumalo" className={inputCls} />
                 </div>
             </div>
             <div>

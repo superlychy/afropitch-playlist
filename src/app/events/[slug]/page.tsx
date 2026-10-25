@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { CalendarDays, MapPin, ArrowLeft, Building2 } from "lucide-react";
 import { TicketButton } from "./TicketButton";
 import { InterestButtons } from "./InterestButtons";
+import { siteConfig } from "@/../config/site";
 
 interface EventDetail {
     id: string;
@@ -21,6 +22,7 @@ interface EventDetail {
     ticket_url: string | null;
     is_free: boolean;
     organizer: string | null;
+    lineup: string | null;
     category: string;
     is_presale: boolean;
 }
@@ -37,7 +39,7 @@ async function getEvent(slug: string): Promise<EventDetail | null> {
     const supabase = await createClient();
     const { data } = await supabase
         .from("events")
-        .select("id, title, slug, starts_at, ends_at, venue, city, country, image_url, description, ticket_url, is_free, organizer, category, is_presale")
+        .select("id, title, slug, starts_at, ends_at, venue, city, country, image_url, description, ticket_url, is_free, organizer, lineup, category, is_presale")
         .eq("slug", slug)
         .eq("status", "published")
         .maybeSingle();
@@ -155,10 +157,27 @@ export default async function EventDetailPage({
         ...(event.image_url ? { image: [event.image_url] } : {}),
         ...(event.description ? { description: event.description } : {}),
         ...(event.organizer ? { organizer: { "@type": "Organization", name: event.organizer } } : {}),
+        ...(event.lineup
+            ? {
+                  performer: event.lineup
+                      .split(/[,;]/)
+                      .map((n) => n.trim())
+                      .filter(Boolean)
+                      .map((name) => ({ "@type": "MusicGroup", name })),
+              }
+            : {}),
         ...(event.ticket_url
             ? { offers: { "@type": "Offer", url: event.ticket_url, availability: "https://schema.org/InStock" } }
             : event.is_free
-              ? { offers: { "@type": "Offer", price: "0", priceCurrency: "NGN", availability: "https://schema.org/InStock" } }
+              ? {
+                    offers: {
+                        "@type": "Offer",
+                        url: `${siteConfig.url}/events/${event.slug}`,
+                        price: "0",
+                        priceCurrency: "NGN",
+                        availability: "https://schema.org/InStock",
+                    },
+                }
               : {}),
     };
 
