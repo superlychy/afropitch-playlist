@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Users, Copy, Check, Gift, Clock } from "lucide-react";
-import { pricingConfig } from "@/../config/pricing";
+import { useAuth } from "@/context/AuthContext";
+import { CURRENCIES, formatMoney } from "@/../config/currency";
 
 interface ReferralRow {
   name: string;
@@ -14,6 +15,9 @@ interface ReferralRow {
 }
 
 export function ReferralCard() {
+  const { user } = useAuth();
+  const currency = user?.currency || "NGN";
+  const reward = CURRENCIES[currency].prices.referral;
   const [code, setCode] = useState<string | null>(null);
   const [balance, setBalance] = useState(0);
   const [pending, setPending] = useState(0);
@@ -63,14 +67,13 @@ export function ReferralCard() {
           <Users className="w-4 h-4 text-amber-400" /> Refer & Earn
         </h3>
         <div className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
-          {pricingConfig.currency}
-          {balance.toLocaleString()}
+          {formatMoney(balance, currency)}
         </div>
         <p className="text-xs text-gray-500 mt-1">referral balance</p>
       </div>
       <CardContent className="p-4 sm:p-6 space-y-4">
         <p className="text-sm text-gray-300">
-          Earn {pricingConfig.currency}1,000 for every artist who joins with your
+          Earn {formatMoney(reward, currency)} for every artist who joins with your
           link and pays for their first submission. Your referral balance pays
           for submissions.
         </p>
@@ -115,7 +118,7 @@ export function ReferralCard() {
                       : "text-amber-400 text-xs font-medium"
                   }
                 >
-                  {r.status === "qualified" ? "+₦1,000" : "pending"}
+                  {r.status === "qualified" ? `+${formatMoney(reward, currency)}` : "pending"}
                 </span>
               </div>
             ))}

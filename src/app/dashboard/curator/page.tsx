@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Bell, HelpCircle, Settings, LogOut, CheckCircle, XCircle, Plus, ListMusic, Zap, Send, ChevronLeft, AlertCircle, RefreshCw, Star, TrendingUp, Wallet, Music4, ShieldCheck } from "lucide-react";
-import { pricingConfig } from "@/../config/pricing";
+import { CURRENCIES, convertAmount, formatMoney } from "@/../config/currency";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -395,8 +395,8 @@ export default function CuratorDashboard() {
             return;
         }
 
-        if (amount < 5000) {
-            toast("Minimum withdrawal is ₦5,000.", "error");
+        if (amount < CURRENCIES[user.currency].prices.payoutMin) {
+            toast(`Minimum withdrawal is ${formatMoney(CURRENCIES[user.currency].prices.payoutMin, user.currency)}.`, "error");
             setIsWithdrawing(false);
             return;
         }
@@ -825,7 +825,9 @@ export default function CuratorDashboard() {
     const totalFollowers = myPlaylists.reduce((acc, p) => acc + (Number(p.followers) || 0), 0);
     const monthEarned = reviews
         .filter((r: any) => (r.status === 'accepted' || r.status === 'declined') && isThisMonth(r.created_at))
-        .reduce((acc: number, r: any) => acc + (Number(r.amount_paid) || 0), 0);
+        // amount_paid is in the ARTIST's currency; convert each row into
+        // the curator's currency at the fixed table rates before summing.
+        .reduce((acc: number, r: any) => acc + convertAmount(Number(r.amount_paid) || 0, (r.currency as any) || "NGN", user?.currency || "NGN"), 0);
 
     const firstPlaylistName = myPlaylists[0]?.name;
     const queueSubtitle = view === 'queue'
@@ -949,7 +951,7 @@ export default function CuratorDashboard() {
                             <div className="rounded-[20px] border border-[rgba(34,197,94,0.3)] bg-gradient-to-br from-[#14532D] to-[#052E16] p-[18px] flex items-center gap-3">
                                 <div>
                                     <p className="text-[11px] uppercase tracking-[1px] text-[#BBF7D0]">Earned in {month}</p>
-                                    <p className="text-[28px] font-extrabold tracking-tight">{pricingConfig.currency}{monthEarned.toLocaleString()}</p>
+                                    <p className="text-[28px] font-extrabold tracking-tight">{formatMoney(monthEarned, user?.currency || "NGN")}</p>
                                 </div>
                                 <button
                                     onClick={() => setShowWithdraw(true)}
@@ -993,7 +995,7 @@ export default function CuratorDashboard() {
                             </div>
                             <div className="rounded-[18px] border border-[rgba(34,197,94,0.35)] bg-gradient-to-br from-[#14532D] to-[#052E16] p-[18px]">
                                 <p className="text-[#BBF7D0]/80 text-xs uppercase tracking-[0.8px]">Earned in {month}</p>
-                                <p className="text-[30px] font-extrabold tracking-tight mt-1.5">{pricingConfig.currency}{monthEarned.toLocaleString()}</p>
+                                <p className="text-[30px] font-extrabold tracking-tight mt-1.5">{formatMoney(monthEarned, user?.currency || "NGN")}</p>
                                 <button onClick={() => setShowWithdraw(true)} className="text-[#22C55E] text-xs font-bold mt-0.5 hover:underline">
                                     Withdraw →
                                 </button>
@@ -1026,7 +1028,7 @@ export default function CuratorDashboard() {
                                     <ReviewCard
                                         key={review.id}
                                         review={review}
-                                        currency={pricingConfig.currency}
+                                        currency={CURRENCIES[(review.currency as any) || "NGN"].symbol}
                                         onAccept={() => handleReviewAction(review.id, 'accepted', 'Great track! Added to playlist.')}
                                         onDecline={() => openDeclineModal(review.id)}
                                         onHide={() => handleReviewAction(review.id, 'archived' as any, 'Hidden by curator.')}
@@ -1044,7 +1046,7 @@ export default function CuratorDashboard() {
                                         <ReviewCard
                                             key={review.id}
                                             review={review}
-                                            currency={pricingConfig.currency}
+                                            currency={CURRENCIES[(review.currency as any) || "NGN"].symbol}
                                             onAccept={() => handleReviewAction(review.id, 'accepted', 'Great track! Added to playlist.')}
                                             onDecline={() => openDeclineModal(review.id)}
                                             onHide={() => handleReviewAction(review.id, 'archived' as any, 'Hidden by curator.')}
@@ -1159,21 +1161,21 @@ export default function CuratorDashboard() {
                                 <Wallet className="w-4 h-4" /> Wallet balance
                             </p>
                             <p className="text-4xl font-extrabold tracking-tight mt-2">
-                                {pricingConfig.currency}{user?.balance?.toLocaleString() || 0}
+                                {formatMoney(user?.balance || 0, user?.currency || "NGN")}
                             </p>
-                            <p className="text-xs text-[#BBF7D0]/70 mt-1">Earned in {month}: {pricingConfig.currency}{monthEarned.toLocaleString()}</p>
+                            <p className="text-xs text-[#BBF7D0]/70 mt-1">Earned in {month}: {formatMoney(monthEarned, user?.currency || "NGN")}</p>
                             <button
                                 onClick={() => setShowWithdraw(true)}
                                 className="mt-4 w-full bg-white text-black rounded-xl py-3.5 text-base font-bold hover:bg-zinc-200"
                             >
                                 Request Payout
                             </button>
-                            <p className="text-[10px] text-center text-[#BBF7D0]/60 mt-3">Minimum withdrawal: {pricingConfig.currency}5,000</p>
+                            <p className="text-[10px] text-center text-[#BBF7D0]/60 mt-3">Minimum withdrawal: {formatMoney(CURRENCIES[user?.currency || "NGN"].prices.payoutMin, user?.currency || "NGN")}</p>
                         </div>
 
                         <div className="bg-[#141417] border border-white/10 rounded-[20px] p-4">
                             <h3 className="font-bold text-white mb-3 px-1">History</h3>
-                            {user && <TransactionsList userId={user.id} />}
+                            {user && <TransactionsList userId={user.id} currency={user.currency} />}
                         </div>
                     </div>
                 )}
@@ -1496,7 +1498,7 @@ export default function CuratorDashboard() {
                                     <div className="space-y-2">
                                         <Label>Amount to Withdraw</Label>
                                         <div className="relative">
-                                            <span className="absolute left-3 top-3 text-zinc-500">{pricingConfig.currency}</span>
+                                            <span className="absolute left-3 top-3 text-zinc-500">{CURRENCIES[user?.currency || "NGN"].symbol}</span>
                                             <Input
                                                 type="number"
                                                 placeholder="0.00"
@@ -1505,8 +1507,8 @@ export default function CuratorDashboard() {
                                                 className="pl-8 bg-black/40 border-white/10"
                                             />
                                         </div>
-                                        <p className="text-xs text-zinc-500">Available: {pricingConfig.currency}{(user?.withdrawable_balance || 0).toLocaleString()}</p>
-                                        <p className="text-xs text-zinc-500">Minimum withdrawal: {pricingConfig.currency}5,000</p>
+                                        <p className="text-xs text-zinc-500">Available: {formatMoney(user?.withdrawable_balance || 0, user?.currency || "NGN")}</p>
+                                        <p className="text-xs text-zinc-500">Minimum withdrawal: {formatMoney(CURRENCIES[user?.currency || "NGN"].prices.payoutMin, user?.currency || "NGN")}</p>
                                     </div>
                                 </div>
                                 <div className="flex justify-end gap-2">
@@ -1702,9 +1704,9 @@ export default function CuratorDashboard() {
                                             <div className="font-bold capitalize">{t}</div>
                                             <div className="text-[10px] opacity-70">
                                                 {t === 'free' && 'No earnings'}
-                                                {t === 'standard' && `${pricingConfig.currency}${pricingConfig.tiers.standard.price} / sub`}
-                                                {t === 'express' && `${pricingConfig.currency}${pricingConfig.tiers.express.price} / sub`}
-                                                {t === 'exclusive' && `${pricingConfig.currency}${pricingConfig.tiers.exclusive.price} / sub`}
+                                                {t === 'standard' && `${formatMoney(CURRENCIES[user?.currency || "NGN"].prices.standard, user?.currency || "NGN")} / sub`}
+                                                {t === 'express' && `${formatMoney(CURRENCIES[user?.currency || "NGN"].prices.express, user?.currency || "NGN")} / sub`}
+                                                {t === 'exclusive' && `${formatMoney(CURRENCIES[user?.currency || "NGN"].prices.exclusive, user?.currency || "NGN")} / sub`}
                                             </div>
                                         </div>
                                     ))}

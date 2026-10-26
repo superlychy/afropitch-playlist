@@ -6,12 +6,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ArrowDownLeft, ArrowUpRight, Search, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { pricingConfig } from "@/../config/pricing";
+import { convertAmount, formatMoney, type CurrencyCode } from "@/../config/currency";
 import { usePagination, PaginationControls } from "@/components/admin/Pagination";
 
 interface Transaction {
     id: string;
     amount: number;
+    currency?: string | null;
     type: 'payment' | 'refund' | 'earning' | 'withdrawal' | 'deposit';
     description: string;
     created_at: string;
@@ -33,7 +34,8 @@ const TYPE_COLORS: Record<string, string> = {
 
 const isCredit = (type: string) => ['deposit', 'refund', 'earning'].includes(type);
 
-export function TransactionsList({ userId, allowedTypes }: { userId?: string; allowedTypes?: string[] }) {
+export function TransactionsList({ userId, allowedTypes, currency }: { userId?: string; allowedTypes?: string[]; currency?: CurrencyCode }) {
+    const viewerCurrency: CurrencyCode = currency || "NGN";
     const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [search, setSearch] = useState("");
@@ -94,14 +96,17 @@ export function TransactionsList({ userId, allowedTypes }: { userId?: string; al
     });
 
     // Admin summary uses RPC totals across all rows; the slice-based fallback is for user views.
+    // User-view totals convert each row (in its own currency) into the
+    // viewer's currency; the admin RPC totals are converted to NGN server-side.
+    const rowToViewer = (t: Transaction) => convertAmount(Number(t.amount), (t.currency as CurrencyCode) || "NGN", viewerCurrency);
     const totalDeposits = userId
-        ? visibleTransactions.filter(t => t.type === 'deposit').reduce((s, t) => s + Number(t.amount), 0)
+        ? visibleTransactions.filter(t => t.type === 'deposit').reduce((s, t) => s + rowToViewer(t), 0)
         : (summary['deposit']?.total || 0);
     const totalWithdrawals = userId
-        ? visibleTransactions.filter(t => t.type === 'withdrawal').reduce((s, t) => s + Math.abs(Number(t.amount)), 0)
+        ? visibleTransactions.filter(t => t.type === 'withdrawal').reduce((s, t) => s + Math.abs(rowToViewer(t)), 0)
         : Math.abs(summary['withdrawal']?.total || 0);
     const totalPayments = userId
-        ? visibleTransactions.filter(t => t.type === 'payment').reduce((s, t) => s + Math.abs(Number(t.amount)), 0)
+        ? visibleTransactions.filter(t => t.type === 'payment').reduce((s, t) => s + Math.abs(rowToViewer(t)), 0)
         : Math.abs(summary['payment']?.total || 0);
 
     const txPag = usePagination(filtered.length);
@@ -119,15 +124,15 @@ export function TransactionsList({ userId, allowedTypes }: { userId?: string; al
                 <div className="grid grid-cols-3 gap-4 mb-2">
                     <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3 text-center">
                         <p className="text-xs text-gray-400 mb-1">Total Deposits</p>
-                        <p className="font-bold text-green-400">{pricingConfig.currency}{totalDeposits.toLocaleString()}</p>
+                        <p className="font-bold text-green-400">{formatMoney(totalDeposits, "NGN")}</p>
                     </div>
                     <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-3 text-center">
                         <p className="text-xs text-gray-400 mb-1">Total Payments</p>
-                        <p className="font-bold text-yellow-400">{pricingConfig.currency}{totalPayments.toLocaleString()}</p>
+                        <p className="font-bold text-yellow-400">{formatMoney(totalPayments, "NGN")}</p>
                     </div>
                     <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 text-center">
                         <p className="text-xs text-gray-400 mb-1">Total Withdrawals</p>
-                        <p className="font-bold text-red-400">{pricingConfig.currency}{totalWithdrawals.toLocaleString()}</p>
+                        <p className="font-bold text-red-400">{formatMoney(totalWithdrawals, "NGN")}</p>
                     </div>
                 </div>
             )}
@@ -205,7 +210,7 @@ export function TransactionsList({ userId, allowedTypes }: { userId?: string; al
                                 </div>
                                 <div className="text-right shrink-0">
                                     <span className={`font-bold text-sm block ${isCredit(tx.type) ? 'text-green-400' : 'text-white'}`}>
-                                        {isCredit(tx.type) ? '+' : '-'}{pricingConfig.currency}{Math.abs(Number(tx.amount)).toLocaleString()}
+                                        {isCredit(tx.type) ? '+' : '-'}{formatMoney(Math.abs(Number(tx.amount)), (tx.currency as CurrencyCode) || "NGN")}
                                     </span>
                                     <span className="text-[10px] text-gray-600 block">
                                         {new Date(tx.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}

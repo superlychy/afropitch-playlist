@@ -172,7 +172,7 @@ export default function TermsOfService() {
                 <section>
                     <h2 className="text-2xl font-bold text-white mb-4">16. Mixing service</h2>
                     <ul className="list-disc pl-5 space-y-2">
-                        <li>AfroPitch offers a professional song mixing service with the following packages and typical turnaround times: Demo Polish (₦35,000, about 3 days), Full Mix (₦65,000, about 5 days), and Mix + Master (₦100,000, about 7 days). The price shown at checkout is the price that applies to your order.</li>
+                        <li>AfroPitch offers a professional song mixing service with the following packages and typical turnaround times: Demo Polish (about 3 days), Full Mix (about 5 days), and Mix + Master (about 7 days). The price shown at checkout, in your account currency, is the price that applies to your order.</li>
                         <li>You pay upfront, but your payment is held in escrow. It is not released to the engineer until you accept the delivered mix.</li>
                         <li>You will receive a watermarked preview of the mix in your dashboard. The full, clean file is released to you only after you accept the mix.</li>
                         <li>If you decline the preview mix, you will receive a 75% refund via manual bank transfer to the bank details you provided when placing the order. If you cancel an order while it is still in escrow (before work begins), you will receive a 95% refund the same way. Refunds are processed manually and may take up to 7 business days to reach your account. AfroPitch retains the remaining percentage as a processing and service fee. Mixing refunds are never credited to your AfroPitch wallet.</li>
@@ -187,7 +187,7 @@ export default function TermsOfService() {
                     <ul className="list-disc pl-5 space-y-2">
                         <li>When an artist pays a submission fee, 70% goes to the reviewing curator and 30% is retained by AfroPitch as a platform fee. The amounts shown to you before payment already reflect this split.</li>
                         <li>Curator payouts and wallet withdrawals may be delayed for verification and fraud checks. AfroPitch may withhold payouts where suspicious activity is detected.</li>
-                        <li>Withdrawals are available to curators only. Artists cannot withdraw funds from AfroPitch. The minimum withdrawal amount is ₦5,000. Withdrawals are reviewed and approved by AfroPitch before funds are released to your bank account.</li>
+                        <li>Withdrawals are available to curators only. Artists cannot withdraw funds from AfroPitch. The minimum withdrawal amount depends on your account currency and is shown on your dashboard. Withdrawals are reviewed and approved by AfroPitch before funds are released to your bank account.</li>
                     </ul>
                 </section>
 
@@ -202,7 +202,7 @@ export default function TermsOfService() {
                 <section>
                     <h2 className="text-2xl font-bold text-white mb-4">19. Referral rewards</h2>
                     <ul className="list-disc pl-5 space-y-2">
-                        <li>AfroPitch may offer referral rewards: ₦1,000 for each artist you refer who completes their first paid submission.</li>
+                        <li>AfroPitch may offer referral rewards: a reward for each artist you refer who completes their first paid submission. The reward amount, in your account currency, is shown on your dashboard.</li>
                         <li>Referral rewards are credited to a separate referral balance, which can only be spent on submissions. Referral balances cannot be withdrawn as cash.</li>
                         <li>When you pay for a submission, your referral balance is used first, then your wallet balance.</li>
                         <li>Self-referrals are not allowed, and each referred artist qualifies for only one reward.</li>

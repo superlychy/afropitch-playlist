@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
+import { currencyForCountry, type CurrencyCode } from "@/../config/currency";
 
 /**
  * Wipe every Supabase auth cookie in this tab — including stale chunks from a
@@ -33,6 +34,10 @@ export interface User {
   earnings: number;
   referral_balance: number;
   referral_code?: string;
+  /** ISO country code picked at signup (null = none picked = NGN). */
+  country?: string | null;
+  /** Display currency derived from country. Never changes on the client. */
+  currency: CurrencyCode;
   bio?: string;
   instagram?: string;
   twitter?: string;
@@ -49,7 +54,8 @@ interface AuthContextType {
     email: string,
     password: string,
     role: UserRole,
-    name: string
+    name: string,
+    country?: string
   ) => Promise<void>;
   logout: () => void;
   loadFunds: (amount: number) => void;
@@ -108,6 +114,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           earnings: 0,
           referral_balance: Number(profile.referral_balance) || 0,
           referral_code: profile.referral_code || undefined,
+          country: profile.country ?? null,
+          currency: currencyForCountry(profile.country),
           bio: profile.bio,
           instagram: profile.instagram,
           twitter: profile.twitter,
@@ -303,7 +311,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     email: string,
     password: string,
     role: UserRole,
-    name: string
+    name: string,
+    country?: string
   ) => {
     setIsLoading(true);
     try {
@@ -315,6 +324,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           data: {
             full_name: name,
             role: role,
+            // The handle_new_user trigger copies this onto profiles.country
+            // only when it is one of the priced countries; anything else
+            // stays NULL and resolves to NGN.
+            country: country || null,
           },
         },
       });
@@ -380,6 +393,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 referral_balance: Number(profile.referral_balance) || 0,
                 referral_code: profile.referral_code || prev.referral_code,
                 role: profile.role,
+                country: profile.country ?? prev.country ?? null,
+                currency: currencyForCountry(
+                  profile.country ?? prev.country ?? null
+                ),
                 bio: profile.bio ?? prev.bio,
                 instagram: profile.instagram ?? prev.instagram,
                 twitter: profile.twitter ?? prev.twitter,

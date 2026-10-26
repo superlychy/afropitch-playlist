@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Mic2, ListMusic, Loader2, Check } from "lucide-react";
+import { SIGNUP_COUNTRIES } from "@/../config/currency";
 
 /**
  * First-run page for brand-new Google signups.
@@ -17,6 +18,7 @@ export default function WelcomePage() {
   const [userId, setUserId] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState("");
   const [suggestedRole, setSuggestedRole] = useState<"artist" | "curator" | null>(null);
+  const [country, setCountry] = useState("NG");
   const [saving, setSaving] = useState<string | null>(null);
   const [error, setError] = useState("");
 
@@ -48,7 +50,7 @@ export default function WelcomePage() {
       const res = await fetch("/api/welcome/set-role", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role }),
+        body: JSON.stringify({ role, country }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -96,6 +98,26 @@ export default function WelcomePage() {
               {error}
             </div>
           )}
+          <div className="space-y-2 pb-1">
+            <label htmlFor="country" className="text-sm font-medium text-white">
+              Your country
+            </label>
+            <select
+              id="country"
+              className="w-full h-10 rounded-md border border-white/10 bg-white/5 px-3 text-sm text-white"
+              value={country}
+              onChange={(e) => setCountry(e.target.value)}
+            >
+              {SIGNUP_COUNTRIES.map((c) => (
+                <option key={c.code} value={c.code} className="bg-black">
+                  {c.label}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-gray-500">
+              Prices are shown in your country's currency. This cannot be changed later; to use another country you would need a new account.
+            </p>
+          </div>
           <button
             onClick={() => chooseRole("artist")}
             disabled={!!saving}

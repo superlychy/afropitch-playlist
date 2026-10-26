@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { createClient as createAuthClient } from "@/lib/supabase-server";
+import { currencyForCountry, ngnToLocal } from "@/../config/currency";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -161,7 +162,7 @@ export async function POST(req: Request) {
     // 2. Find the AfroPitch account that owns this payment email.
     const { data: profile } = await supabase
       .from("profiles")
-      .select("id, balance")
+      .select("id, balance, country")
       .ilike("email", customerEmail)
       .limit(1)
       .single();
@@ -185,7 +186,7 @@ export async function POST(req: Request) {
     // 3. Idempotency: already credited (e.g. by the webhook)?
     const { data: existing } = await supabase
       .from("transactions")
-      .select("id")
+      .select("id, amount")
       .eq("reference", reference)
       .limit(1)
       .single();
@@ -199,16 +200,20 @@ export async function POST(req: Request) {
       return NextResponse.json({
         success: true,
         alreadyProcessed: true,
-        amount: paidNgn,
+        // The credited amount, in the user's currency (the stored row).
+        amount: existing.amount,
         balance: fresh?.balance,
         transactionId: existing.id,
       });
     }
 
-    // 4. Credit the verified amount.
+    // 4. Credit the verified amount, converted into the user's currency.
+    // Paystack always charges naira; the wallet holds the user's currency.
+    const userCurrency = currencyForCountry(profile.country);
+    const creditLocal = ngnToLocal(paidNgn, userCurrency);
     const { data: result, error } = await supabase.rpc("process_deposit", {
       p_user_id: profile.id,
-      p_amount: paidNgn,
+      p_amount: creditLocal,
       p_reference: reference,
       p_description: `Wallet Deposit: ${reference}`,
     });
@@ -234,7 +239,7 @@ export async function POST(req: Request) {
     return NextResponse.json({
       success: true,
       alreadyProcessed: false,
-      amount: paidNgn,
+      amount: creditLocal,
       balance: updated?.balance,
     });
   } catch (err: any) {

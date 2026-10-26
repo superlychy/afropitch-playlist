@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { UploadCloud, CreditCard, Headphones, MessageSquare } from "lucide-react";
 import { pricingConfig } from "@/../config/pricing";
+import { DisplayPrice } from "@/components/DisplayPrice";
 
 const steps = [
     {
@@ -13,7 +14,7 @@ const steps = [
     },
     {
         order: 2,
-        title: `Pay ${pricingConfig.currency}${pricingConfig.tiers.standard.price.toLocaleString()}`,
+        title: (<>Pay <DisplayPrice k="standard" /></>),
         description: "Secure one-time payment for a professional review. No hidden subscriptions.",
         icon: CreditCard,
     },

@@ -35,6 +35,19 @@ export async function middleware(request: NextRequest) {
         data: { session },
     } = await supabase.auth.getSession()
 
+    // Detected location for visitors who have not signed up: Vercel's
+    // country header, kept in a cookie so client pages can price in the
+    // visitor's currency. Signed-in users always use their account
+    // country instead; this cookie never overrides that.
+    const detected = request.headers.get("x-vercel-ip-country");
+    if (detected && request.cookies.get("afropitch_country")?.value !== detected) {
+        response.cookies.set("afropitch_country", detected, {
+            path: "/",
+            maxAge: 60 * 60 * 24 * 365,
+            sameSite: "lax",
+        });
+    }
+
     // Protected Routes Logic
     if (request.nextUrl.pathname.startsWith('/dashboard')) {
         if (!session) {

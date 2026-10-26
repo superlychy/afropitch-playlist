@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import crypto from "crypto";
+import { currencyForCountry, ngnToLocal } from "@/../config/currency";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -131,11 +132,18 @@ export async function POST(req: Request) {
         return NextResponse.json({ success: true, message: "Already processed" });
       }
 
-      // Process deposit using the RPC function
+      // Process deposit using the RPC function. Paystack always charges
+      // naira; the wallet holds the user's currency, so convert first.
       const amountInNaira = amount / 100; // Convert from kobo
+      const { data: payer } = await supabase
+        .from("profiles")
+        .select("country")
+        .eq("id", userId)
+        .single();
+      const creditLocal = ngnToLocal(amountInNaira, currencyForCountry(payer?.country));
       const { data: result, error } = await supabase.rpc("process_deposit", {
         p_user_id: userId,
-        p_amount: amountInNaira,
+        p_amount: creditLocal,
         p_reference: reference,
         p_description: `Paystack Deposit: ${reference}`
       });

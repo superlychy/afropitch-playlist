@@ -13,7 +13,7 @@ import {
   Home, Link2, User, TrendingUp, AlertCircle, AudioWaveform,
   Music2, Users, Search,
 } from "lucide-react";
-import { pricingConfig } from "@/../config/pricing";
+import { CURRENCIES, formatMoney, localToNgn } from "@/../config/currency";
 import { supabase } from "@/lib/supabase";
 import dynamic from "next/dynamic";
 import { TransactionsList } from "@/components/TransactionsList";
@@ -325,7 +325,7 @@ export default function ArtistDashboard() {
       if (result?.alreadyProcessed) {
         toast("This payment was already processed. Refreshing balance...", "warning");
       } else {
-        toast(`₦${Number(result?.amount || 0).toLocaleString()} loaded to your wallet! ✅`, "success");
+        toast(`${formatMoney(result?.amount || 0, currentUser.currency || "NGN")} loaded to your wallet! ✅`, "success");
       }
 
       // Clear the payment form immediately
@@ -504,7 +504,7 @@ export default function ArtistDashboard() {
               className="hidden lg:block text-left bg-gradient-to-br from-[#14532D] to-[#052E16] border border-[#22C55E]/30 rounded-[18px] p-[18px] hover:border-[#22C55E]/60 transition-colors"
             >
               <span className="text-xs text-zinc-500 uppercase tracking-wider">Wallet balance</span>
-              <b className="text-[30px] block tracking-tight my-1.5">{pricingConfig.currency}{user.balance.toLocaleString()}</b>
+              <b className="text-[30px] block tracking-tight my-1.5">{formatMoney(user.balance, user.currency)}</b>
               <span className="text-[#22C55E] text-xs font-bold">Top up</span>
             </button>
           </div>
@@ -678,7 +678,7 @@ export default function ArtistDashboard() {
                               Smart link
                             </button>
                           ) : (
-                            <span className="text-sm font-bold text-white shrink-0">{pricingConfig.currency}{sub.amount_paid}</span>
+                            <span className="text-sm font-bold text-white shrink-0">{formatMoney(sub.amount_paid, user.currency)}</span>
                           )}
                         </div>
                       ))}
@@ -725,7 +725,7 @@ export default function ArtistDashboard() {
             <div className="bg-gradient-to-br from-[#14532D] to-[#052E16] border border-[#22C55E]/30 rounded-[20px] p-[18px] mb-3">
               <small className="text-[#BBF7D0] text-[11px] uppercase tracking-[1px]">Available balance</small>
               <div className="text-[32px] font-extrabold tracking-tight my-1 mb-3">
-                {pricingConfig.currency}{user.balance.toLocaleString()}
+                {formatMoney(user.balance, user.currency)}
               </div>
               <div className="flex gap-2">
                 <button
@@ -744,7 +744,7 @@ export default function ArtistDashboard() {
                 <Input
                   id="top-up-amount"
                   type="number"
-                  placeholder="Amount (NGN)"
+                  placeholder={`Amount (${CURRENCIES[user.currency].symbol.trim()})`}
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                   className="bg-black/40 border-white/10 text-white"
@@ -752,7 +752,7 @@ export default function ArtistDashboard() {
                 {parseInt(amount) > 0 ? (
                   <PayWithPaystack
                     email={user.email}
-                    amount={(lockedAmount || parseInt(amount)) * 100}
+                    amount={localToNgn(lockedAmount || parseInt(amount) || 0, user.currency) * 100}
                     userId={user.id}
                     onSuccess={handlePaymentSuccess}
                     onClose={() => setLockedAmount(0)}
@@ -764,10 +764,13 @@ export default function ArtistDashboard() {
                 )}
               </div>
               <p className="text-[10px] text-center text-zinc-500 mt-2">Top-ups are for submissions and mixing. Refunds go straight to your bank account.</p>
+              {user.currency !== "NGN" && (
+                <p className="text-[10px] text-center text-zinc-500 mt-1">Your card is charged in naira and your bank converts it; the amount above lands in your wallet in {CURRENCIES[user.currency].symbol.trim()}.</p>
+              )}
             </div>
             <div className="pt-1">
               <h2 className="text-[15px] lg:text-base font-bold text-white mb-2.5">Wallet history</h2>
-              <TransactionsList userId={user.id} allowedTypes={["deposit", "refund", "withdrawal"]} />
+              <TransactionsList userId={user.id} currency={user.currency} allowedTypes={["deposit", "refund", "withdrawal"]} />
             </div>
           </section>
         </div>

@@ -16,7 +16,8 @@ import {
   CardFooter,
   CardDescription,
 } from "@/components/ui/card";
-import { pricingConfig } from "@/../config/pricing";
+import { CURRENCIES, formatMoney, priceForPlaylist } from "@/../config/currency";
+import { useDisplayCurrency } from "@/hooks/useDisplayCurrency";
 import {
   Loader2,
   Music,
@@ -78,6 +79,9 @@ function PlaylistsSubmitFlow() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [tier, setTier] = useState("standard");
+  // Display currency: account country when signed in, detected location
+  // for visitors. The RPC prices in exactly this currency.
+  const currency = useDisplayCurrency();
   const [artistName, setArtistName] = useState("");
   const [songTitle, setSongTitle] = useState("");
   const [songLink, setSongLink] = useState("");
@@ -365,14 +369,9 @@ function PlaylistsSubmitFlow() {
     selectedPlaylistIds.forEach((id) => {
       const playlist = allPlaylists.find((p) => p.id === id);
       if (playlist) {
-        let cost = 0;
-        if (playlist.type === "exclusive")
-          cost = pricingConfig.tiers.exclusive.price;
-        else if (playlist.type === "express")
-          cost = pricingConfig.tiers.express.price;
-        else if (playlist.type === "standard" || !playlist.type)
-          cost = pricingConfig.tiers.standard.price;
-        // free = 0
+        // Mirrors submit_with_payment: playlist type fixes the price,
+        // otherwise the picked tier does.
+        const cost = priceForPlaylist(playlist.type, tier, currency);
 
         if (cost > 0) {
           paidTotal += cost;
@@ -518,8 +517,7 @@ function PlaylistsSubmitFlow() {
           <br />
           Paid:{" "}
           <span className="text-green-400 font-bold">
-            {pricingConfig.currency}
-            {total.toLocaleString()}
+            {formatMoney(total, currency)}
           </span>
         </p>
         <div className="flex gap-4">
@@ -601,18 +599,15 @@ function PlaylistsSubmitFlow() {
                 </option>
                 <option value="standard" className="bg-zinc-900 text-white">
                   Standard (
-                  {pricingConfig.currency}
-                  {pricingConfig.tiers.standard.price.toLocaleString()})
+                  {formatMoney(CURRENCIES[currency].prices.standard, currency)})
                 </option>
                 <option value="express" className="bg-zinc-900 text-white">
                   Express Only (
-                  {pricingConfig.currency}
-                  {pricingConfig.tiers.express.price.toLocaleString()})
+                  {formatMoney(CURRENCIES[currency].prices.express, currency)})
                 </option>
                 <option value="exclusive" className="bg-zinc-900 text-white">
                   Exclusive (
-                  {pricingConfig.currency}
-                  {pricingConfig.tiers.exclusive.price.toLocaleString()})
+                  {formatMoney(CURRENCIES[currency].prices.exclusive, currency)})
                 </option>
               </Select>
             </div>
@@ -743,15 +738,10 @@ function PlaylistsSubmitFlow() {
                               Fee
                             </span>
                             <span className="font-bold text-white">
-                              {playlist.type === "exclusive"
-                                ? `${pricingConfig.currency}${pricingConfig.tiers.exclusive.price.toLocaleString()}`
-                                : playlist.type === "express"
-                                ? `${pricingConfig.currency}${pricingConfig.tiers.express.price.toLocaleString()}`
-                                : playlist.type === "standard"
-                                ? `${pricingConfig.currency}${pricingConfig.tiers.standard.price.toLocaleString()}`
-                                : playlist.submissionFee > 0
-                                ? `${pricingConfig.currency}${playlist.submissionFee.toLocaleString()}`
-                                : "FREE"}
+                              {(() => {
+                                const fee = priceForPlaylist(playlist.type, tier, currency);
+                                return fee > 0 ? formatMoney(fee, currency) : "FREE";
+                              })()}
                             </span>
                           </div>
                           <div className="flex items-center gap-2">
@@ -875,8 +865,7 @@ function PlaylistsSubmitFlow() {
               <div className="flex flex-col">
                 <p className="text-white font-bold text-sm md:text-lg leading-tight">
                   <span className="md:hidden">Total: </span>
-                  {pricingConfig.currency}
-                  {total.toLocaleString()}
+                  {formatMoney(total, currency)}
                   <span className="hidden md:inline text-gray-400 font-normal mx-2">
                     •
                   </span>
@@ -977,13 +966,10 @@ function PlaylistsSubmitFlow() {
                               </div>
                             </div>
                             <span className="text-sm font-bold text-white">
-                              {p.type === "exclusive"
-                                ? `${pricingConfig.currency}${pricingConfig.tiers.exclusive.price.toLocaleString()}`
-                                : p.type === "express"
-                                ? `${pricingConfig.currency}${pricingConfig.tiers.express.price.toLocaleString()}`
-                                : p.type === "standard"
-                                ? `${pricingConfig.currency}${pricingConfig.tiers.standard.price.toLocaleString()}`
-                                : "FREE"}
+                              {(() => {
+                                const fee = priceForPlaylist(p.type, tier, currency);
+                                return fee > 0 ? formatMoney(fee, currency) : "FREE";
+                              })()}
                             </span>
                           </div>
                         ))}
@@ -1104,24 +1090,21 @@ function PlaylistsSubmitFlow() {
                   <div className="flex justify-between text-sm text-gray-400">
                     <span>Subtotal ({selectedPlaylistIds.length || 1} items)</span>
                     <span>
-                      {pricingConfig.currency}
-                      {(total + (discountAmount || 0)).toLocaleString()}
+                      {formatMoney(total + (discountAmount || 0), currency)}
                     </span>
                   </div>
                   {discountAmount > 0 && (
                     <div className="flex justify-between text-sm text-green-400">
                       <span>Bulk Discount</span>
                       <span>
-                        -{pricingConfig.currency}
-                        {discountAmount.toLocaleString()}
+                        -{formatMoney(discountAmount, currency)}
                       </span>
                     </div>
                   )}
                   <div className="flex justify-between text-lg font-bold text-white border-t border-white/10 pt-2 mt-2">
                     <span>Total Due</span>
                     <span>
-                      {pricingConfig.currency}
-                      {total.toLocaleString()}
+                      {formatMoney(total, currency)}
                     </span>
                   </div>
                 </div>
@@ -1139,7 +1122,7 @@ function PlaylistsSubmitFlow() {
                         <p className="text-xs text-gray-400">
                           Balance:{" "}
                           {user
-                            ? `${pricingConfig.currency}${user.balance.toLocaleString()}${user.referral_balance > 0 ? ` + ${pricingConfig.currency}${user.referral_balance.toLocaleString()} referral` : ""}`
+                            ? `${formatMoney(user.balance, currency)}${user.referral_balance > 0 ? ` + ${formatMoney(user.referral_balance, currency)} referral` : ""}`
                             : "Login to view"}
                         </p>
                       </div>
@@ -1190,8 +1173,8 @@ function PlaylistsSubmitFlow() {
                         : total === 0
                         ? "SUBMIT FREE"
                         : referralCovers > 0
-                        ? `PAY ${pricingConfig.currency}${total.toLocaleString()} (${pricingConfig.currency}${referralCovers.toLocaleString()} referral)`
-                        : `PAY ${pricingConfig.currency}${total.toLocaleString()}`}
+                        ? `PAY ${formatMoney(total, currency)} (${formatMoney(referralCovers, currency)} referral)`
+                        : `PAY ${formatMoney(total, currency)}`}
                     </span>
                   )}
                 </Button>
@@ -1235,7 +1218,7 @@ function PlaylistsSubmitFlow() {
           <div>
             <p className="text-xs text-gray-400">Total Due</p>
             <p className="text-xl font-bold text-green-400">
-              {pricingConfig.currency}{total.toLocaleString()}
+              {formatMoney(total, currency)}
             </p>
           </div>
           <button
