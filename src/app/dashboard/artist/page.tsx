@@ -354,7 +354,6 @@ export default function ArtistDashboard() {
   const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
   const todayLabel = new Date().toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" });
   const acceptedCount = submissions.filter((s) => s.status === "accepted").length;
-  const totalTaps = submissions.reduce((n, s) => n + (s.clicks || 0), 0);
   const smartLinkSubs = submissions.filter((s) => s.tracking_slug);
   const topSmartLink = [...smartLinkSubs].sort((a, b) => (b.clicks || 0) - (a.clicks || 0))[0] || null;
   const smartLinkCopy = (slug: string) => {
@@ -486,7 +485,7 @@ export default function ArtistDashboard() {
 
         <div className="px-4 lg:px-8 pb-28 lg:pb-10">
           {/* ===== Stats ===== */}
-          <div className="grid grid-cols-3 lg:grid-cols-4 gap-2 lg:gap-3.5 mb-4 lg:mb-[22px]">
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-2 lg:gap-3.5 mb-4 lg:mb-[22px]">
             <div className="bg-[#141417] border border-white/[0.08] rounded-2xl lg:rounded-[18px] p-3 lg:p-[18px]">
               <span className="text-[11px] lg:text-xs text-zinc-400 lg:uppercase lg:tracking-wider lg:text-zinc-500">Submissions</span>
               <b className="text-xl lg:text-[30px] block tracking-tight lg:my-1.5">{submissions.length}</b>
@@ -494,10 +493,6 @@ export default function ArtistDashboard() {
             <div className="bg-[#141417] border border-white/[0.08] rounded-2xl lg:rounded-[18px] p-3 lg:p-[18px]">
               <span className="text-[11px] lg:text-xs text-zinc-400 lg:uppercase lg:tracking-wider lg:text-zinc-500">Accepted</span>
               <b className="text-xl lg:text-[30px] block tracking-tight lg:my-1.5">{acceptedCount}</b>
-            </div>
-            <div className="bg-[#141417] border border-white/[0.08] rounded-2xl lg:rounded-[18px] p-3 lg:p-[18px]">
-              <span className="text-[11px] lg:text-xs text-zinc-400 lg:uppercase lg:tracking-wider lg:text-zinc-500">Link taps</span>
-              <b className="text-xl lg:text-[30px] block tracking-tight lg:my-1.5">{totalTaps.toLocaleString()}</b>
             </div>
             <button
               onClick={() => scrollTo("wallet")}
@@ -662,10 +657,6 @@ export default function ArtistDashboard() {
                                 </button>
                               </div>
                             )}
-                          </div>
-                          <div className="text-right shrink-0">
-                            <b className="text-[#22C55E] text-base block">{sub.clicks || 0}</b>
-                            <span className="text-[11px] text-zinc-500">taps</span>
                           </div>
                           <span className={`text-[10px] font-extrabold uppercase tracking-wide px-3 py-1.5 rounded-full shrink-0 ${pillClass(sub.status)}`}>
                             {sub.status}
