@@ -11,6 +11,7 @@ import { Music, Users, Trophy, DollarSign, ShieldAlert, CheckCircle, XCircle, Me
 import { supabase } from "@/lib/supabase";
 import { TransactionsList } from "@/components/TransactionsList";
 import { pricingConfig } from "@/../config/pricing";
+import { convertAmount, currencyForCountry, formatMoney, type CurrencyCode } from "@/../config/currency";
 import AnalyticsPage from "./analytics/page";
 import { AdminAnalytics } from "@/components/admin/AdminAnalytics";
 import { AdminMessageForm } from "@/components/AdminMessageForm";
@@ -39,6 +40,7 @@ interface AdminUser {
     full_name: string;
     role: string;
     balance: number;
+    country?: string | null;
     is_blocked: boolean;
     created_at: string;
     is_online?: boolean;
@@ -51,6 +53,7 @@ interface WithdrawalRequest {
     user_name: string;
     user_withdrawable: number;
     amount: number;
+    currency: CurrencyCode;
     status: 'pending' | 'approved' | 'rejected';
     bank_details: string;
     reason: string;
@@ -539,6 +542,7 @@ export default function AdminDashboard() {
                     user_name: w.profiles?.full_name || 'Unknown',
                     user_withdrawable: Number(w.profiles?.withdrawable_balance) || 0,
                     amount: w.amount,
+                    currency: (w.currency as CurrencyCode) || "NGN",
                     status: w.status,
                     bank_details: `${w.bank_name} - ${w.account_number}${w.account_name ? ` (${w.account_name})` : ''}`,
                     reason: w.reason || '',
@@ -619,21 +623,22 @@ export default function AdminDashboard() {
 
             // 7. Finance Stats — sourced from real DB tables
             const [{ data: depositTxns }, { data: financeWithdrawals }, { data: financeSubs }] = await Promise.all([
-                supabase.from('transactions').select('amount').eq('type', 'deposit'),
-                supabase.from('withdrawals').select('amount, status, processed_at'),
-                supabase.from('submissions').select('amount_paid, status, playlist:playlists!submissions_playlist_id_fkey(curator_id)').gt('amount_paid', 0),
+                supabase.from('transactions').select('amount, currency').eq('type', 'deposit'),
+                supabase.from('withdrawals').select('amount, currency, status, processed_at'),
+                supabase.from('submissions').select('amount_paid, currency, status, playlist:playlists!submissions_playlist_id_fkey(curator_id)').gt('amount_paid', 0),
             ]);
 
-            // Wallet balances by role (from already-fetched users list)
+            // Wallet balances by role (from already-fetched users list).
+            // Balances are in each user's own currency; convert to naira.
             const artistHoldings = users?.filter((u: any) => u.role === 'artist')
-                .reduce((acc: number, curr: any) => acc + Number(curr.balance || 0), 0) || 0;
+                .reduce((acc: number, curr: any) => acc + convertAmount(Number(curr.balance || 0), currencyForCountry(curr.country), "NGN"), 0) || 0;
             const curatorHoldings = users?.filter((u: any) => u.role === 'curator')
-                .reduce((acc: number, curr: any) => acc + Number(curr.balance || 0), 0) || 0;
+                .reduce((acc: number, curr: any) => acc + convertAmount(Number(curr.balance || 0), currencyForCountry(curr.country), "NGN"), 0) || 0;
             const adminHoldings = users?.filter((u: any) => u.role === 'admin')
-                .reduce((acc: number, curr: any) => acc + Number(curr.balance || 0), 0) || 0;
+                .reduce((acc: number, curr: any) => acc + convertAmount(Number(curr.balance || 0), currencyForCountry(curr.country), "NGN"), 0) || 0;
 
             // Total deposits ever made
-            const totalDeposits = depositTxns?.reduce((acc, t) => acc + Number(t.amount), 0) || 0;
+            const totalDeposits = depositTxns?.reduce((acc, t) => acc + convertAmount(Number(t.amount), (t.currency as CurrencyCode) || "NGN", "NGN"), 0) || 0;
 
             // Submission fees (only non-declined ones count as real revenue)
             let totalSubmissionFees = 0;
@@ -646,7 +651,7 @@ export default function AdminDashboard() {
             );
             financeSubs?.forEach((s: any) => {
                 if (s.status === 'declined' || s.status === 'rejected') return;
-                const amt = Number(s.amount_paid || 0);
+                const amt = convertAmount(Number(s.amount_paid || 0), (s.currency as CurrencyCode) || "NGN", "NGN");
                 totalSubmissionFees += amt;
                 const isAdminPlaylist = !!s.playlist?.curator_id && adminIds.has(s.playlist.curator_id);
                 if (isAdminPlaylist) {
@@ -659,10 +664,10 @@ export default function AdminDashboard() {
 
             const approvedWithdrawals = financeWithdrawals
                 ?.filter((w: any) => w.status === 'approved' && w.processed_at)
-                .reduce((acc, curr) => acc + Number(curr.amount), 0) || 0;
+                .reduce((acc, curr) => acc + convertAmount(Number(curr.amount), (curr.currency as CurrencyCode) || "NGN", "NGN"), 0) || 0;
             const pendingWithdrawalAmt = financeWithdrawals
                 ?.filter((w: any) => w.status === 'pending')
-                .reduce((acc, curr) => acc + Number(curr.amount), 0) || 0;
+                .reduce((acc, curr) => acc + convertAmount(Number(curr.amount), (curr.currency as CurrencyCode) || "NGN", "NGN"), 0) || 0;
 
             setFinStats({
                 totalDeposits,
@@ -826,7 +831,7 @@ export default function AdminDashboard() {
 
         // Mark as paid: record the transfer reference so approved vs actually-paid is visible
         if (action === 'mark_paid') {
-            const ref = prompt(`Enter the transfer reference for the ${pricingConfig.currency}${withdrawal.amount.toLocaleString()} payout to ${withdrawal.user_name}:`);
+            const ref = prompt(`Enter the transfer reference for the ${formatMoney(withdrawal.amount, withdrawal.currency)} payout to ${withdrawal.user_name}:`);
             if (ref === null) return; // cancelled
             const reference = ref.trim();
             if (!reference) {
@@ -860,8 +865,8 @@ export default function AdminDashboard() {
 
         // Confirm action
         const confirmMsg = action === 'approve'
-            ? `Approve withdrawal of ${withdrawal.amount} for ${withdrawal.user_name}?`
-            : `Reject withdrawal of ${withdrawal.amount} for ${withdrawal.user_name}? Funds will be refunded to their wallet.`;
+            ? `Approve withdrawal of ${formatMoney(withdrawal.amount, withdrawal.currency)} for ${withdrawal.user_name}?`
+            : `Reject withdrawal of ${formatMoney(withdrawal.amount, withdrawal.currency)} for ${withdrawal.user_name}? Funds will be refunded to their wallet.`;
 
         if (!confirm(confirmMsg)) return;
 
@@ -2015,7 +2020,7 @@ export default function AdminDashboard() {
                                             <CardTitle className="text-xs text-blue-400 uppercase tracking-wider">Total Deposits</CardTitle>
                                         </CardHeader>
                                         <CardContent className="px-4 pb-3">
-                                            <div className="text-xl font-bold text-white">{pricingConfig.currency}{finStats.totalDeposits.toLocaleString()}</div>
+                                            <div className="text-xl font-bold text-white">{formatMoney(finStats.totalDeposits, "NGN")}</div>
                                             <p className="text-[10px] text-gray-500 mt-0.5">Money loaded by artists via Paystack</p>
                                         </CardContent>
                                     </Card>
@@ -2024,7 +2029,7 @@ export default function AdminDashboard() {
                                             <CardTitle className="text-xs text-purple-400 uppercase tracking-wider">Submission Volume</CardTitle>
                                         </CardHeader>
                                         <CardContent className="px-4 pb-3">
-                                            <div className="text-xl font-bold text-white">{pricingConfig.currency}{finStats.totalSubmissionFees.toLocaleString()}</div>
+                                            <div className="text-xl font-bold text-white">{formatMoney(finStats.totalSubmissionFees, "NGN")}</div>
                                             <p className="text-[10px] text-gray-500 mt-0.5">Total fees paid across all accepted pitches</p>
                                         </CardContent>
                                     </Card>
@@ -2033,7 +2038,7 @@ export default function AdminDashboard() {
                                             <CardTitle className="text-xs text-green-400 uppercase tracking-wider">Platform Revenue</CardTitle>
                                         </CardHeader>
                                         <CardContent className="px-4 pb-3">
-                                            <div className="text-xl font-bold text-white">{pricingConfig.currency}{finStats.platformRevenue.toLocaleString()}</div>
+                                            <div className="text-xl font-bold text-white">{formatMoney(finStats.platformRevenue, "NGN")}</div>
                                             <p className="text-[10px] text-gray-500 mt-0.5">AfroPitch's net cut (100% own / 30% others)</p>
                                         </CardContent>
                                     </Card>
@@ -2042,7 +2047,7 @@ export default function AdminDashboard() {
                                             <CardTitle className="text-xs text-orange-400 uppercase tracking-wider">Curator Earnings</CardTitle>
                                         </CardHeader>
                                         <CardContent className="px-4 pb-3">
-                                            <div className="text-xl font-bold text-white">{pricingConfig.currency}{finStats.curatorEarnings.toLocaleString()}</div>
+                                            <div className="text-xl font-bold text-white">{formatMoney(finStats.curatorEarnings, "NGN")}</div>
                                             <p className="text-[10px] text-gray-500 mt-0.5">70% of 3rd-party playlist fees earned by curators</p>
                                         </CardContent>
                                     </Card>
@@ -2054,7 +2059,7 @@ export default function AdminDashboard() {
                                             <CardTitle className="text-xs text-gray-400 uppercase tracking-wider">Artist Wallets</CardTitle>
                                         </CardHeader>
                                         <CardContent className="px-4 pb-3">
-                                            <div className="text-xl font-bold text-pink-400">{pricingConfig.currency}{finStats.artistHoldings.toLocaleString()}</div>
+                                            <div className="text-xl font-bold text-pink-400">{formatMoney(finStats.artistHoldings, "NGN")}</div>
                                             <p className="text-[10px] text-gray-500 mt-0.5">Sum of all artist balances</p>
                                         </CardContent>
                                     </Card>
@@ -2063,7 +2068,7 @@ export default function AdminDashboard() {
                                             <CardTitle className="text-xs text-gray-400 uppercase tracking-wider">Curator Wallets</CardTitle>
                                         </CardHeader>
                                         <CardContent className="px-4 pb-3">
-                                            <div className="text-xl font-bold text-green-400">{pricingConfig.currency}{finStats.curatorHoldings.toLocaleString()}</div>
+                                            <div className="text-xl font-bold text-green-400">{formatMoney(finStats.curatorHoldings, "NGN")}</div>
                                             <p className="text-[10px] text-gray-500 mt-0.5">Sum of all curator balances (unpaid earnings)</p>
                                         </CardContent>
                                     </Card>
@@ -2072,8 +2077,8 @@ export default function AdminDashboard() {
                                             <CardTitle className="text-xs text-yellow-400 uppercase tracking-wider">Total in Wallets</CardTitle>
                                         </CardHeader>
                                         <CardContent className="px-4 pb-3">
-                                            <div className="text-xl font-bold text-yellow-400">{pricingConfig.currency}{finStats.totalEcosystem.toLocaleString()}</div>
-                                            <p className="text-[10px] text-gray-500 mt-0.5">All users total (incl. admin: {pricingConfig.currency}{finStats.adminHoldings.toLocaleString()})</p>
+                                            <div className="text-xl font-bold text-yellow-400">{formatMoney(finStats.totalEcosystem, "NGN")}</div>
+                                            <p className="text-[10px] text-gray-500 mt-0.5">All users total (incl. admin: {formatMoney(finStats.adminHoldings, "NGN")})</p>
                                         </CardContent>
                                     </Card>
                                     <Card className={`border ${finStats.pendingWithdrawals > 0 ? 'bg-red-600/10 border-red-500/20' : 'bg-[#141417] border-white/[0.08]'}`}>
@@ -2082,10 +2087,10 @@ export default function AdminDashboard() {
                                         </CardHeader>
                                         <CardContent className="px-4 pb-3">
                                             <div className={`text-xl font-bold ${finStats.pendingWithdrawals > 0 ? 'text-red-400' : 'text-white'}`}>
-                                                {pricingConfig.currency}{finStats.pendingWithdrawals.toLocaleString()}
+                                                {formatMoney(finStats.pendingWithdrawals, "NGN")}
                                                 {finStats.pendingWithdrawals > 0 && <span className="text-xs ml-1 animate-pulse">pending</span>}
                                             </div>
-                                            <p className="text-[10px] text-gray-500 mt-0.5">Paid out: {pricingConfig.currency}{finStats.approvedWithdrawals.toLocaleString()}</p>
+                                            <p className="text-[10px] text-gray-500 mt-0.5">Paid out: {formatMoney(finStats.approvedWithdrawals, "NGN")}</p>
                                         </CardContent>
                                     </Card>
                                 </div>
@@ -2181,7 +2186,7 @@ export default function AdminDashboard() {
                                                     <p className="text-sm text-gray-500 truncate">{u.email}</p>
                                                     <div className="mt-1 flex items-center gap-2">
                                                         <span className="text-xs text-gray-400">Bal:</span>
-                                                        <span className="text-sm font-bold text-green-400">{pricingConfig.currency}{(u.balance || 0).toLocaleString()}</span>
+                                                        <span className="text-sm font-bold text-green-400">{formatMoney(u.balance || 0, currencyForCountry(u.country))}</span>
                                                     </div>
                                                 </div>
                                             </div>
@@ -2217,29 +2222,29 @@ export default function AdminDashboard() {
                                 <Card className="bg-blue-600/10 border-blue-500/20">
                                     <CardHeader className="pb-1 pt-3 px-4"><CardTitle className="text-xs text-blue-400 uppercase tracking-wider">Submission Volume</CardTitle></CardHeader>
                                     <CardContent className="px-4 pb-3">
-                                        <div className="text-xl font-bold text-white">{pricingConfig.currency}{finStats.totalSubmissionFees.toLocaleString()}</div>
+                                        <div className="text-xl font-bold text-white">{formatMoney(finStats.totalSubmissionFees, "NGN")}</div>
                                         <p className="text-[10px] text-gray-500">Total fees from accepted pitches</p>
                                     </CardContent>
                                 </Card>
                                 <Card className="bg-green-600/10 border-green-500/20">
                                     <CardHeader className="pb-1 pt-3 px-4"><CardTitle className="text-xs text-green-400 uppercase tracking-wider">Platform Revenue</CardTitle></CardHeader>
                                     <CardContent className="px-4 pb-3">
-                                        <div className="text-xl font-bold text-white">{pricingConfig.currency}{finStats.platformRevenue.toLocaleString()}</div>
+                                        <div className="text-xl font-bold text-white">{formatMoney(finStats.platformRevenue, "NGN")}</div>
                                         <p className="text-[10px] text-gray-500">AfroPitch net cut</p>
                                     </CardContent>
                                 </Card>
                                 <Card className="bg-purple-600/10 border-purple-500/20">
                                     <CardHeader className="pb-1 pt-3 px-4"><CardTitle className="text-xs text-purple-400 uppercase tracking-wider">Total Deposits</CardTitle></CardHeader>
                                     <CardContent className="px-4 pb-3">
-                                        <div className="text-xl font-bold text-white">{pricingConfig.currency}{finStats.totalDeposits.toLocaleString()}</div>
+                                        <div className="text-xl font-bold text-white">{formatMoney(finStats.totalDeposits, "NGN")}</div>
                                         <p className="text-[10px] text-gray-500">Artist Paystack top-ups</p>
                                     </CardContent>
                                 </Card>
                                 <Card className="bg-orange-600/10 border-orange-500/20">
                                     <CardHeader className="pb-1 pt-3 px-4"><CardTitle className="text-xs text-orange-400 uppercase tracking-wider">Withdrawals</CardTitle></CardHeader>
                                     <CardContent className="px-4 pb-3">
-                                        <div className="text-xl font-bold text-white">{pricingConfig.currency}{finStats.pendingWithdrawals.toLocaleString()} pending</div>
-                                        <p className="text-[10px] text-gray-500">Paid out: {pricingConfig.currency}{finStats.approvedWithdrawals.toLocaleString()}</p>
+                                        <div className="text-xl font-bold text-white">{formatMoney(finStats.pendingWithdrawals, "NGN")} pending</div>
+                                        <p className="text-[10px] text-gray-500">Paid out: {formatMoney(finStats.approvedWithdrawals, "NGN")}</p>
                                     </CardContent>
                                 </Card>
                             </div>
@@ -2280,12 +2285,12 @@ export default function AdminDashboard() {
                                                 </div>
                                                 <div>
                                                     <p className="font-bold text-white flex items-center gap-2">
-                                                        {pricingConfig.currency}{w.amount.toLocaleString()}
+                                                        {formatMoney(w.amount, w.currency)}
                                                         <span className={`text-[10px] px-2 py-0.5 rounded-full uppercase ${w.status === 'pending' ? 'bg-yellow-500 text-black' : w.status === 'approved' && w.processed_at ? 'bg-green-500 text-white' : w.status === 'approved' ? 'bg-amber-600 text-white' : 'bg-red-500 text-white'}`}>
                                                             {w.status === 'approved' && w.processed_at ? 'paid' : w.status === 'approved' ? 'approved - unpaid' : w.status}
                                                         </span>
                                                     </p>
-                                                    <p className="text-sm text-gray-400">Requested by <span className="text-white">{w.user_name}</span> &middot; {w.date} &middot; withdrawable {pricingConfig.currency}{w.user_withdrawable.toLocaleString()}</p>
+                                                    <p className="text-sm text-gray-400">Requested by <span className="text-white">{w.user_name}</span> &middot; {w.date} &middot; withdrawable {formatMoney(w.user_withdrawable, w.currency)}</p>
                                                     <p className="text-xs text-gray-500 mt-1 font-mono break-all">{w.bank_details}</p>
                                                     {w.reason && <p className="text-xs text-gray-400 mt-1"><span className="text-gray-500">Reason:</span> {w.reason}</p>}
                                                     {w.status === 'approved' && w.processed_at && (
@@ -3508,7 +3513,7 @@ export default function AdminDashboard() {
                         <p className="text-sm text-gray-400">Add funds to <strong>{showTopUp.full_name}</strong>'s wallet.</p>
 
                         <div>
-                            <label className="text-xs text-gray-400 mb-1 block">Amount ({pricingConfig.currency})</label>
+                            <label className="text-xs text-gray-400 mb-1 block">Amount ({CURRENCIES[currencyForCountry(showTopUp.country)].symbol.trim()})</label>
                             <Input
                                 type="number"
                                 value={fundingAmount}

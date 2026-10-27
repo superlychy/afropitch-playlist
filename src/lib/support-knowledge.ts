@@ -93,7 +93,7 @@ AfroPitch (afropitchplay.best) connects African artists with real playlist curat
 
 Submitting a song
 - Artists submit from the Submit page: pick playlists, add a song link (Spotify, Apple Music, YouTube, Audiomack, SoundCloud and Boomplay are accepted), and pay from their wallet if the tier is paid.
-- Tiers: Standard ₦3,000, review within 5 days. Express ₦5,000, review within 48 hours. Exclusive ₦13,500, review within 24 hours, top position placement. Free playlists ₦0, review within 7 to 14 days, no feedback guarantee.
+- Tiers: Standard, review within 5 days. Express, review within 48 hours. Exclusive, review within 24 hours, top position placement. Free playlists, review within 7 to 14 days, no feedback guarantee. Prices are shown in the artist's account currency at checkout.
 - NEW RELEASES and Naija Viral 50 are the free playlists; free placements run a 1 week trial.
 - Bulk discount: 10% off when submitting to 7 or more paid playlists at once.
 - If a song is declined, the fee is refunded to the artist's wallet automatically and the artist gets an email with the curator's feedback.
@@ -101,15 +101,15 @@ Submitting a song
 - Payment is by wallet: top up with Paystack (card or transfer), then pay for submissions from the balance. International cards are accepted; charges are in naira.
 
 Referrals
-- Artists earn ₦1,000 referral balance when someone they referred makes their first paid submission.
+- Artists earn referral balance (the amount, in their account currency, is shown on the dashboard) when someone they referred makes their first paid submission.
 - Referral balance can only be spent on submissions. It is not withdrawable as cash. It spends first, and the wallet covers the rest.
 
 Withdrawals
 - Artists do NOT withdraw money. Submission refunds return to the wallet for future submissions.
-- Only curators withdraw earnings, minimum ₦5,000, paid to their bank account after review by the team.
+- Only curators withdraw earnings, a minimum that depends on the curator's account currency (shown on the dashboard), paid to their bank account after review by the team.
 
 Mixing service
-- Packages: Demo Polish ₦35,000 (about 3 days), Full Mix ₦65,000 (about 5 days), Mix + Master ₦100,000 (about 7 days).
+- Packages: Demo Polish (about 3 days), Full Mix (about 5 days), Mix + Master (about 7 days). Prices are shown in the artist's account currency at checkout.
 - How it works: order on the Mixing page, share files by Google Drive link (WeTransfer is also accepted), pay, and the money is held protected while the engineer works.
 - The artist first hears a short tagged preview. They can accept it, ask for an adjustment, or decline it.
 - Money rules, stated exactly: cancelling while the order is still in escrow refunds 95% by bank transfer. Declining the delivered preview refunds 75% by bank transfer. Refunds are paid to the artist's bank account, never to the wallet.
@@ -120,7 +120,7 @@ Curators
 - Anyone can apply to be a curator from the Curators section with their playlist links. The team reviews every application.
 - New playlists go through a one time verification: the curator adds a specific test song to their playlist on Spotify so the team can confirm they control it, then removes it once verified.
 - Curators earn 70% of submission fees on their own playlists; AfroPitch keeps 30%. Playlists owned by AfroPitch pay the platform 100%.
-- Curators withdraw from ₦5,000 upward, to their bank, after team review.
+- Curators withdraw from a minimum that depends on their account currency upward, to their bank, after team review.
 
 Featured artists (AfroPitch Spotlight)
 - Three tiers: Artist of the Week, Rising Artist, Artist of the Season, shown on the Featured page.

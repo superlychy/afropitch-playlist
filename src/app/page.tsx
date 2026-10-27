@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { pricingConfig } from "@/../config/pricing";
 import { CheckCircle2, ArrowRight } from "lucide-react";
+import { DisplayPrice } from "@/components/DisplayPrice";
 import { RecentApprovals } from "@/components/RecentApprovals";
 import { PartnerSpotlight } from "@/components/PartnerSpotlight";
 import { HomeFaq } from "@/components/HomeFaq";
@@ -41,7 +41,7 @@ export default function Home() {
             The trusted platform for Amapiano, Afrobeats, and Francophone African artists.
             Real human feedback, free Afrobeat playlist options, and premium paid playlist pitching starting at{" "}
             <span className="text-white font-semibold">
-              {pricingConfig.currency}{pricingConfig.tiers.standard.price.toLocaleString()}
+              <DisplayPrice k="standard" />
             </span>.
           </p>
 

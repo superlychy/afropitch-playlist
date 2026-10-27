@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { BarChart3, TrendingUp, UserPlus, ListMusic, Trophy } from "lucide-react";
+import { convertAmount, formatMoney, type CurrencyCode } from "@/../config/currency";
 
 const DAYS = 14;
 
@@ -137,7 +138,7 @@ export function AdminAnalytics({ topPlaylists, topSongs }: { topPlaylists: any[]
             const map = new Map(keys.map((k) => [k.key, { ...k, submissions: 0, revenue: 0, artists: 0, curators: 0 }]));
             const since = keys[0].key;
             const [{ data: subs }, { data: profs }] = await Promise.all([
-                supabase.from("submissions").select("created_at, status, amount_paid").gte("created_at", since).limit(3000),
+                supabase.from("submissions").select("created_at, status, amount_paid, currency").gte("created_at", since).limit(3000),
                 supabase.from("profiles").select("created_at, role").gte("created_at", since).limit(3000),
             ]);
             let tSubs = 0, tRev = 0, tArt = 0, tCur = 0;
@@ -148,7 +149,9 @@ export function AdminAnalytics({ topPlaylists, topSongs }: { topPlaylists: any[]
                 b.submissions += 1;
                 tSubs += 1;
                 if (s.status !== "declined" && s.status !== "rejected") {
-                    const amt = Number(s.amount_paid || 0);
+                    // amount_paid is in the artist's currency; convert to
+                    // naira at the fixed table rates so the chart stays in ₦.
+                    const amt = convertAmount(Number(s.amount_paid || 0), (s.currency as CurrencyCode) || "NGN", "NGN");
                     b.revenue += amt;
                     tRev += amt;
                 }
@@ -193,9 +196,9 @@ export function AdminAnalytics({ topPlaylists, topSongs }: { topPlaylists: any[]
                     <div className="bg-[#141417] border border-white/[0.08] rounded-[18px] p-4 lg:p-5">
                         <div className="flex items-center justify-between mb-1">
                             <h3 className="text-sm font-extrabold text-white flex items-center gap-2"><TrendingUp className="w-4 h-4 text-green-400" /> Revenue</h3>
-                            <span className="text-xs text-[#71717A]"><b className="text-white text-sm">₦{totals.revenue.toLocaleString()}</b> in 14 days</span>
+                            <span className="text-xs text-[#71717A]"><b className="text-white text-sm">{formatMoney(totals.revenue, "NGN")}</b> in 14 days</span>
                         </div>
-                        <p className="text-xs text-[#71717A] mb-2">Submission fees per day (declined excluded)</p>
+                        <p className="text-xs text-[#71717A] mb-2">Submission fees per day (declined excluded, converted to ₦)</p>
                         <AreaChart buckets={buckets} color="#22C55E" />
                     </div>
 

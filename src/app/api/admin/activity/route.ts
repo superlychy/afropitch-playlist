@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { requireAdmin } from "@/lib/require-admin";
+import { formatMoney, type CurrencyCode } from "@/../config/currency";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -54,8 +55,8 @@ export async function GET(req: Request) {
             icon: t.type === "deposit" ? "💰" : "🎵",
             title:
               t.type === "deposit"
-                ? `Wallet funded: ₦${Number(t.amount).toLocaleString()}`
-                : `Payment: ₦${Math.abs(Number(t.amount)).toLocaleString()}`,
+                ? `Wallet funded: ${formatMoney(Number(t.amount), (t.currency as CurrencyCode) || "NGN")}`
+                : `Payment: ${formatMoney(Math.abs(Number(t.amount)), (t.currency as CurrencyCode) || "NGN")}`,
             user: t.profiles?.full_name || "Unknown",
             user_email: t.profiles?.email,
             time: t.created_at,
@@ -136,7 +137,7 @@ export async function GET(req: Request) {
           activity.push({
             type: `withdrawal_${w.status}`,
             icon,
-            title: `₦${Number(w.amount).toLocaleString()} ${
+            title: `${formatMoney(Number(w.amount), (w.currency as CurrencyCode) || "NGN")} ${
               w.status === "pending"
                 ? "requested"
                 : w.status === "approved"

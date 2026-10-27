@@ -16,6 +16,7 @@ import {
     CardDescription,
 } from "@/components/ui/card";
 import { Check, Loader2, Link as LinkIcon, CheckCircle2 } from "lucide-react";
+import { formatMoney, mixingPackagePrice } from "@/../config/currency";
 
 const PayWithPaystack = dynamic(() => import("@/components/PaystackButton"), {
     ssr: false,
@@ -230,7 +231,7 @@ export function MixingOrderForm() {
                             <div className="font-bold text-white text-lg">{pkg.name}</div>
                             <div className="text-sm text-gray-400 mt-1">{pkg.description}</div>
                             <div className="text-2xl font-extrabold text-white mt-3">
-                                ₦{Number(pkg.price_ngn).toLocaleString()}
+                                {formatMoney(mixingPackagePrice(pkg.name, user?.currency || "NGN"), user?.currency || "NGN")}
                             </div>
                             <ul className="mt-3 space-y-1.5">
                                 {(pkg.features || []).map((f, i) => (
@@ -338,7 +339,7 @@ export function MixingOrderForm() {
                                 </div>
                                 <div className="flex justify-between gap-4 border-t border-white/10 pt-2">
                                     <span className="text-gray-500">Total (held in escrow)</span>
-                                    <span className="text-white font-bold">₦{Number(selected.price_ngn).toLocaleString()}</span>
+                                    <span className="text-white font-bold">{formatMoney(mixingPackagePrice(selected.name, user?.currency || "NGN"), user?.currency || "NGN")}</span>
                                 </div>
                             </div>
                             <PayWithPaystack
@@ -349,7 +350,7 @@ export function MixingOrderForm() {
                                 onClose={() => {}}
                             />
                             <p className="text-xs text-gray-500 max-w-md">
-                                Paying places your order immediately. Your ₦{Number(selected.price_ngn).toLocaleString()} is held
+                                Paying places your order immediately. Your {formatMoney(mixingPackagePrice(selected.name, user?.currency || "NGN"), user?.currency || "NGN")} is held
                                 in escrow. It only goes to the engineer when you accept
                                 the finished mix. Not happy? It comes straight back to
                                 your wallet.
@@ -372,7 +373,7 @@ export function MixingOrderForm() {
                         <div className="min-w-0 flex-1">
                             <div className="text-white font-bold truncate">{selected.name}</div>
                             <div className="text-xs text-gray-400">
-                                ₦{Number(selected.price_ngn).toLocaleString()} held in escrow · “{songTitle.trim()}”
+                                {formatMoney(mixingPackagePrice(selected.name, user?.currency || "NGN"), user?.currency || "NGN")} held in escrow · “{songTitle.trim()}”
                             </div>
                         </div>
                         <div className="w-44 sm:w-56 shrink-0">

@@ -7,6 +7,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { pricingConfig } from "@/../config/pricing";
+import { DisplayPrice } from "@/components/DisplayPrice";
 import { supabase } from "@/lib/supabase";
 
 export default function CuratorProfile() {
@@ -186,11 +187,11 @@ export default function CuratorProfile() {
                                                         <span className="block text-[10px] text-gray-500 uppercase tracking-wider">Fee</span>
                                                         <span className="font-bold text-white">
                                                             {playlist.type === 'exclusive'
-                                                                ? `${pricingConfig.currency}${pricingConfig.tiers.exclusive.price.toLocaleString()}`
+                                                                ? <DisplayPrice k="exclusive" />
                                                                 : playlist.type === 'express'
-                                                                    ? `${pricingConfig.currency}${pricingConfig.tiers.express.price.toLocaleString()}`
+                                                                    ? <DisplayPrice k="express" />
                                                                     : playlist.type === 'standard'
-                                                                        ? `${pricingConfig.currency}${pricingConfig.tiers.standard.price.toLocaleString()}`
+                                                                        ? <DisplayPrice k="standard" />
                                                                         : playlist.submission_fee > 0
                                                                             ? `${pricingConfig.currency}${playlist.submission_fee.toLocaleString()}`
                                                                             : <span className="text-green-400">FREE</span>

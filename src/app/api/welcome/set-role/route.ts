@@ -38,13 +38,19 @@ export async function POST(req: Request) {
       );
     }
 
-    const { role } = await req.json().catch(() => ({}));
+    const { role, country } = await req.json().catch(() => ({}));
     if (role !== "artist" && role !== "curator") {
       return NextResponse.json(
         { success: false, error: "Invalid role" },
         { status: 400 }
       );
     }
+    // Country is fixed for the account's life (changing country means
+    // re-registering). Only a priced country is stored; anything else
+    // (including "OTHER") stays NULL and resolves to NGN.
+    const priced = ["NG", "ZA", "GH", "KE", "CM", "TZ", "US"];
+    const countryValue =
+      typeof country === "string" && priced.includes(country) ? country : null;
 
     const { data: profile } = await admin
       .from("profiles")
@@ -96,7 +102,8 @@ export async function POST(req: Request) {
     const googleName =
       (user.user_metadata?.full_name as string | undefined) ||
       (user.user_metadata?.name as string | undefined);
-    const updates: Record<string, string> = { role };
+    const updates: Record<string, string | null> = { role };
+    if (countryValue) updates.country = countryValue;
     if (
       googleName &&
       (!profile.full_name || profile.full_name === profile.email)
@@ -115,7 +122,7 @@ export async function POST(req: Request) {
     // the source of truth for routing.
     await admin.auth.admin
       .updateUserById(user.id, {
-        user_metadata: { ...user.user_metadata, role },
+        user_metadata: { ...user.user_metadata, role, country: countryValue },
       })
       .catch(() => {});
 

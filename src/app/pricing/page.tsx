@@ -3,9 +3,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Check, Zap, Crown, Star, ArrowRight } from "lucide-react";
 import { pricingConfig } from "@/../config/pricing";
+import { DisplayPrice } from "@/components/DisplayPrice";
 
 export default function PricingPage() {
-    const { currency, tiers } = pricingConfig;
+    const { tiers } = pricingConfig;
 
     return (
         <div className="w-full mx-auto max-w-7xl px-4 py-16 md:py-24 flex flex-col items-center justify-center min-h-[80vh]">
@@ -63,7 +64,7 @@ export default function PricingPage() {
                     </CardHeader>
                     <CardContent className="space-y-5 flex-grow pt-2">
                         <div className="flex items-baseline text-white">
-                            <span className="text-4xl font-extrabold tracking-tight">{currency}{tiers.standard.price.toLocaleString()}</span>
+                            <span className="text-4xl font-extrabold tracking-tight"><DisplayPrice k="standard" /></span>
                         </div>
                         <ul className="space-y-2.5 text-left">
                             {tiers.standard.features.map((feature, i) => (
@@ -98,7 +99,7 @@ export default function PricingPage() {
                     </CardHeader>
                     <CardContent className="space-y-5 flex-grow pt-2">
                         <div className="flex items-baseline text-white">
-                            <span className="text-5xl font-extrabold tracking-tight bg-gradient-to-r from-green-400 to-emerald-300 bg-clip-text text-transparent">{currency}{tiers.express.price.toLocaleString()}</span>
+                            <span className="text-5xl font-extrabold tracking-tight bg-gradient-to-r from-green-400 to-emerald-300 bg-clip-text text-transparent"><DisplayPrice k="express" /></span>
                         </div>
                         <ul className="space-y-2.5 text-left">
                             {tiers.express.features.map((feature, i) => (
@@ -130,7 +131,7 @@ export default function PricingPage() {
                     </CardHeader>
                     <CardContent className="space-y-5 flex-grow pt-2">
                         <div className="flex items-baseline text-white">
-                            <span className="text-5xl font-extrabold tracking-tight bg-gradient-to-r from-yellow-400 to-amber-300 bg-clip-text text-transparent">{currency}{tiers.exclusive.price.toLocaleString()}</span>
+                            <span className="text-5xl font-extrabold tracking-tight bg-gradient-to-r from-yellow-400 to-amber-300 bg-clip-text text-transparent"><DisplayPrice k="exclusive" /></span>
                         </div>
                         <ul className="space-y-2.5 text-left">
                             {tiers.exclusive.features.map((feature, i) => (

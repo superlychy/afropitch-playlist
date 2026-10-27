@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { User, Mail, ArrowRight, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { GoogleSignInButton } from "@/components/GoogleSignInButton";
+import { SIGNUP_COUNTRIES } from "@/../config/currency";
 
 export default function ArtistSignupPage() {
     const router = useRouter();
@@ -17,12 +18,13 @@ export default function ArtistSignupPage() {
     const [name, setName] = useState("");
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
+    const [country, setCountry] = useState("NG");
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     const handleSignup = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsSubmitting(true);
-        await signup(email, password, "curator", name);
+        await signup(email, password, "curator", name, country);
         // AuthContext handles alert. If success, user needs to login or is auto-logged in? 
         // Supabase auto-login after signup is default unless email confirmation is on. 
         // But my AuthContext signup says "Account created! You can now log in." 
@@ -90,6 +92,26 @@ export default function ArtistSignupPage() {
                                 onChange={(e) => setPassword(e.target.value)}
                                 required
                             />
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label htmlFor="country">Country</Label>
+                            <select
+                                id="country"
+                                className="w-full h-10 rounded-md border border-white/10 bg-white/5 px-3 text-sm text-white"
+                                value={country}
+                                onChange={(e) => setCountry(e.target.value)}
+                                required
+                            >
+                                {SIGNUP_COUNTRIES.map((c) => (
+                                    <option key={c.code} value={c.code} className="bg-black">
+                                        {c.label}
+                                    </option>
+                                ))}
+                            </select>
+                            <p className="text-xs text-gray-500">
+                                Prices are shown in your country's currency. This cannot be changed later; to use another country you would need a new account.
+                            </p>
                         </div>
 
                         <Button type="submit" className="w-full bg-green-600 hover:bg-green-700 font-bold h-11" disabled={isSubmitting || isLoading}>
