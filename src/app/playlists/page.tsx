@@ -35,7 +35,6 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { supabasePublic } from "@/lib/supabase";
 import { SongSearch } from "@/components/SongSearch";
 
 interface Playlist {
@@ -152,12 +151,15 @@ function PlaylistsSubmitFlow() {
   }, [user]);
 
   // Fetch Data
-  // Public listings load through supabasePublic (no login session), the same
-  // fix applied to /playlists on 2026-09-28: a stale or expired session in
-  // the browser can never break this page's public data again. Each query
-  // gets its own timeout and one automatic retry, and failures log the real
-  // error detail as a plain string (Error objects serialise to "{}" in the
-  // client error log, which hid the cause of the Oct 6 / Oct 10 failures).
+  // Public listings load from same-origin API routes (/api/public/playlists,
+  // /api/public/curators) instead of Supabase direct from the browser: the
+  // Oct 27 session timed out on BOTH lists even with the 2026-09-28
+  // supabasePublic fix, separate 15s timeouts and a retry, so the remaining
+  // failure was the client connection itself, not the session. The routes
+  // fetch server-side and are edge-cached for 60s; the timeout and retry
+  // below stay as a backstop, and failures still log the real error detail
+  // as a plain string (Error objects serialise to "{}" in the client error
+  // log, which hid the cause of the Oct 6 / Oct 10 failures).
   useEffect(() => {
     const errDetail = (e: any): string => {
       if (!e) return "unknown error";
@@ -177,16 +179,14 @@ function PlaylistsSubmitFlow() {
     const loadPlaylists = async () => {
       let lastErr: any = null;
       for (let attempt = 0; attempt < 2; attempt++) {
-        const { data, error } = await withTimeout(
-          supabasePublic
-            .from("playlists")
-            .select("*, curator:profiles!curator_id(role, full_name, verification_status)")
-            .eq("is_active", true)
-            .order("followers", { ascending: false }),
-          "Playlists fetch"
-        );
-        if (!error && data) return data;
-        lastErr = error || new Error("Playlists query returned no data");
+        try {
+          const res = await withTimeout(fetch("/api/public/playlists"), "Playlists fetch");
+          const json = await res.json().catch(() => null);
+          if (res.ok && json?.success && json.playlists) return json.playlists;
+          lastErr = new Error("Playlists query returned no data");
+        } catch (e) {
+          lastErr = e;
+        }
         if (attempt === 0) await new Promise((r) => setTimeout(r, 800));
       }
       throw lastErr;
@@ -195,15 +195,14 @@ function PlaylistsSubmitFlow() {
     const loadCurators = async () => {
       let lastErr: any = null;
       for (let attempt = 0; attempt < 2; attempt++) {
-        const { data, error } = await withTimeout(
-          supabasePublic
-            .from("profiles")
-            .select("id, full_name, role, verification_status, bio, avatar_url, playlists(count)")
-            .or("role.eq.curator,role.eq.admin"),
-          "Curators fetch"
-        );
-        if (!error && data) return data;
-        lastErr = error || new Error("Curators query returned no data");
+        try {
+          const res = await withTimeout(fetch("/api/public/curators"), "Curators fetch");
+          const json = await res.json().catch(() => null);
+          if (res.ok && json?.success && json.curators) return json.curators;
+          lastErr = new Error("Curators query returned no data");
+        } catch (e) {
+          lastErr = e;
+        }
         if (attempt === 0) await new Promise((r) => setTimeout(r, 800));
       }
       throw lastErr;
