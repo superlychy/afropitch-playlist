@@ -130,10 +130,9 @@ export function SmartLinkCard({
     }
   };
 
-  const totalTaps = submission.clicks || 0;
-
   // Platform chips: a platform is "on" when it has a URL (Spotify is always
   // on from the submission's Spotify link). Mockup labels: "Apple" short.
+  // Counts are admin-only and never render here.
   const platformOrder = ["spotify", "audiomack", "apple", "boomplay", "deezer", "youtubeMusic"] as const;
   const platformOn: Record<string, boolean> = {
     spotify: true,
@@ -259,21 +258,8 @@ export function SmartLinkCard({
               }`}
             >
               {PLATFORM_LABELS[p]}
-              <b className="block text-[#22C55E] text-[15px] mt-0.5">{stats[p] || 0}</b>
             </div>
           ))}
-        </div>
-        <div className="mt-3">
-          <div className="flex justify-between text-xs text-zinc-400 mb-1.5">
-            <span>Viral progress</span>
-            <b className="text-white">{totalTaps} / 100</b>
-          </div>
-          <div className="h-2 bg-[#1B1B1F] rounded-full overflow-hidden">
-            <div
-              className="h-full bg-gradient-to-r from-[#22C55E] to-[#4ADE80] rounded-full transition-all"
-              style={{ width: `${Math.min((totalTaps / 100) * 100, 100)}%` }}
-            />
-          </div>
         </div>
         <button
           onClick={() => setEditing(!editing)}
@@ -295,10 +281,6 @@ export function SmartLinkCard({
           <h4 className="text-[15px] font-bold text-white truncate">{submission.song_title}</h4>
           <p className="text-xs text-zinc-400 truncate">{submission.playlist?.name || "Smart link"}</p>
         </div>
-        <div className="text-right shrink-0">
-          <b className="text-lg text-[#22C55E] block">{totalTaps}</b>
-          <span className="text-[10px] text-zinc-500">taps</span>
-        </div>
       </div>
       <div className="flex gap-1.5 flex-wrap mb-3">
         {platformOrder.map((p) =>
@@ -308,9 +290,6 @@ export function SmartLinkCard({
               className="flex items-center gap-1.5 bg-[#1B1B1F] border border-white/[0.08] rounded-full px-3 py-[7px] text-xs font-semibold text-zinc-200"
             >
               {PLATFORM_LABELS[p]}
-              <span className="bg-[#22C55E]/15 text-[#22C55E] rounded-full px-2 py-[1px] text-[11px] font-extrabold">
-                {stats[p] || 0}
-              </span>
             </span>
           ) : (
             <span
