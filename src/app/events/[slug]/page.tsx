@@ -28,10 +28,47 @@ interface EventDetail {
     ticket_url: string | null;
     is_free: boolean;
     organizer: string | null;
+    organizer_url: string | null;
+    ticket_price_min: number | string | null;
+    ticket_price_max: number | string | null;
+    ticket_currency: string | null;
     lineup: string | null;
     category: string;
     is_presale: boolean;
 }
+
+// Currency follows the event country, never NGN by default. The admin-set
+// ticket_currency wins when present; otherwise this map supplies the
+// currency; otherwise no currency is emitted at all.
+const COUNTRY_CURRENCIES: Record<string, string> = {
+    Nigeria: "NGN",
+    "South Africa": "ZAR",
+    Ghana: "GHS",
+    Kenya: "KES",
+    Cameroon: "XAF",
+    Tanzania: "TZS",
+    Uganda: "UGX",
+    Rwanda: "RWF",
+    Senegal: "XOF",
+    "Côte d'Ivoire": "XOF",
+    "Ivory Coast": "XOF",
+    Egypt: "EGP",
+    Morocco: "MAD",
+    Ethiopia: "ETB",
+    Zambia: "ZMW",
+    "United States": "USD",
+    "United Kingdom": "GBP",
+    France: "EUR",
+    Germany: "EUR",
+    Spain: "EUR",
+    Italy: "EUR",
+    Netherlands: "EUR",
+    Canada: "CAD",
+    Australia: "AUD",
+    Brazil: "BRL",
+    India: "INR",
+    "United Arab Emirates": "AED",
+};
 
 const CATEGORY_LABELS: Record<string, string> = {
     concert: "Concert",
@@ -45,7 +82,7 @@ async function getEvent(slug: string): Promise<EventDetail | null> {
     const supabase = await createClient();
     const { data } = await supabase
         .from("events")
-        .select("id, title, slug, starts_at, ends_at, venue, city, country, image_url, description, ticket_url, is_free, organizer, lineup, category, is_presale")
+        .select("id, title, slug, starts_at, ends_at, venue, city, country, image_url, description, ticket_url, is_free, organizer, organizer_url, ticket_price_min, ticket_price_max, ticket_currency, lineup, category, is_presale")
         .eq("slug", slug)
         .eq("status", "published")
         .maybeSingle();
@@ -144,6 +181,52 @@ export default async function EventDetailPage({
     const locationName = event.venue ? `${event.venue}, ${event.city}` : event.city;
     const showPresale = (await presaleBadgeOn()) && event.is_presale;
 
+    // Structured data: organizer url and offer price/currency are emitted
+    // only when genuinely verified. A missing price or currency is an
+    // honest gap, never an invented value.
+    const effectiveCurrency =
+        (isConfirmedValue(event.ticket_currency) ? event.ticket_currency!.trim().toUpperCase() : undefined) ??
+        COUNTRY_CURRENCIES[event.country];
+    const organizerObj = isConfirmedValue(event.organizer)
+        ? {
+              "@type": "Organization",
+              name: event.organizer,
+              ...(isConfirmedValue(event.organizer_url) && event.organizer_url!.startsWith("http")
+                  ? { url: event.organizer_url }
+                  : {}),
+          }
+        : null;
+    const priceMin = event.ticket_price_min === null || event.ticket_price_min === undefined ? null : Number(event.ticket_price_min);
+    const priceMax = event.ticket_price_max === null || event.ticket_price_max === undefined ? null : Number(event.ticket_price_max);
+    const hasVerifiedPrice = priceMin !== null && Number.isFinite(priceMin) && priceMin >= 0;
+    const offersObj = event.is_free
+        ? {
+              "@type": "Offer",
+              url: isConfirmedValue(event.ticket_url) ? event.ticket_url : `${siteConfig.url}/events/${event.slug}`,
+              price: "0",
+              ...(effectiveCurrency ? { priceCurrency: effectiveCurrency } : {}),
+              availability: "https://schema.org/InStock",
+          }
+        : isConfirmedValue(event.ticket_url) && hasVerifiedPrice && effectiveCurrency
+          ? {
+                "@type": "Offer",
+                url: event.ticket_url,
+                ...(priceMax !== null && Number.isFinite(priceMax) && priceMax > priceMin
+                    ? {
+                          priceSpecification: {
+                              "@type": "PriceSpecification",
+                              minPrice: String(priceMin),
+                              maxPrice: String(priceMax),
+                              priceCurrency: effectiveCurrency,
+                          },
+                      }
+                    : { price: String(priceMin), priceCurrency: effectiveCurrency }),
+                availability: "https://schema.org/InStock",
+            }
+          : isConfirmedValue(event.ticket_url)
+            ? { "@type": "Offer", url: event.ticket_url, availability: "https://schema.org/InStock" }
+            : null;
+
     const jsonLd = {
         "@context": "https://schema.org",
         "@type": "Event",
@@ -162,9 +245,7 @@ export default async function EventDetailPage({
         },
         ...(event.image_url ? { image: [event.image_url] } : {}),
         ...(event.description ? { description: event.description } : {}),
-        ...(isConfirmedValue(event.organizer)
-            ? { organizer: { "@type": "Organization", name: event.organizer } }
-            : {}),
+        ...(organizerObj ? { organizer: organizerObj } : {}),
         ...(isConfirmedValue(event.lineup)
             ? {
                   performer: event.lineup!
@@ -174,19 +255,7 @@ export default async function EventDetailPage({
                       .map((name) => ({ "@type": "MusicGroup", name })),
               }
             : {}),
-        ...(isConfirmedValue(event.ticket_url)
-            ? { offers: { "@type": "Offer", url: event.ticket_url, availability: "https://schema.org/InStock" } }
-            : event.is_free
-              ? {
-                    offers: {
-                        "@type": "Offer",
-                        url: `${siteConfig.url}/events/${event.slug}`,
-                        price: "0",
-                        priceCurrency: "NGN",
-                        availability: "https://schema.org/InStock",
-                    },
-                }
-              : {}),
+        ...(offersObj ? { offers: offersObj } : {}),
     };
 
     return (

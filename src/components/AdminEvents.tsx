@@ -22,6 +22,10 @@ interface EventItem {
     ticket_url: string | null;
     is_free: boolean;
     organizer: string | null;
+    organizer_url: string | null;
+    ticket_price_min: number | null;
+    ticket_price_max: number | null;
+    ticket_currency: string | null;
     lineup: string | null;
     category: string;
     status: string;
@@ -30,6 +34,41 @@ interface EventItem {
     is_presale: boolean;
     created_at: string;
 }
+
+// Currency follows the event country, never NGN by default. Used to
+// pre-fill the ticket currency in the form; the event page applies the
+// same rule when no currency was entered.
+const COUNTRY_CURRENCIES: Record<string, string> = {
+    Nigeria: "NGN",
+    "South Africa": "ZAR",
+    Ghana: "GHS",
+    Kenya: "KES",
+    Cameroon: "XAF",
+    Tanzania: "TZS",
+    Uganda: "UGX",
+    Rwanda: "RWF",
+    Senegal: "XOF",
+    "Côte d'Ivoire": "XOF",
+    "Ivory Coast": "XOF",
+    Egypt: "EGP",
+    Morocco: "MAD",
+    Ethiopia: "ETB",
+    Zambia: "ZMW",
+    "United States": "USD",
+    "United Kingdom": "GBP",
+    France: "EUR",
+    Germany: "EUR",
+    Spain: "EUR",
+    Italy: "EUR",
+    Netherlands: "EUR",
+    Canada: "CAD",
+    Australia: "AUD",
+    Brazil: "BRL",
+    India: "INR",
+    "United Arab Emirates": "AED",
+};
+
+const CURRENCIES = ["NGN", "ZAR", "GHS", "KES", "XAF", "TZS", "UGX", "RWF", "XOF", "EGP", "MAD", "ETB", "ZMW", "USD", "GBP", "EUR", "CAD", "AUD", "BRL", "INR", "AED"];
 
 const CATEGORIES = ["concert", "festival", "awards", "industry", "competition", "party", "tour", "showcase", "gospel", "comedy", "cultural"] as const;
 
@@ -470,6 +509,10 @@ interface EventForm {
     is_free: boolean;
     is_presale: boolean;
     organizer: string;
+    organizer_url: string;
+    ticket_price_min: string;
+    ticket_price_max: string;
+    ticket_currency: string;
     lineup: string;
     category: string;
 }
@@ -490,6 +533,10 @@ const emptyForm = (): EventForm => ({
     is_free: false,
     is_presale: false,
     organizer: "",
+    organizer_url: "",
+    ticket_price_min: "",
+    ticket_price_max: "",
+    ticket_currency: "",
     lineup: "",
     category: "concert",
 });
@@ -563,6 +610,10 @@ export function AdminEvents() {
                 is_free: e.is_free ?? false,
                 is_presale: e.is_presale ?? false,
                 organizer: e.organizer ?? "",
+                organizer_url: e.organizer_url ?? "",
+                ticket_price_min: e.ticket_price_min !== null && e.ticket_price_min !== undefined ? String(e.ticket_price_min) : "",
+                ticket_price_max: e.ticket_price_max !== null && e.ticket_price_max !== undefined ? String(e.ticket_price_max) : "",
+                ticket_currency: e.ticket_currency ?? "",
                 lineup: e.lineup ?? "",
                 category: e.category,
             };
@@ -591,8 +642,20 @@ export function AdminEvents() {
         if (!f.starts_at || !f.ends_at) return "Set a start and end date/time.";
         if (new Date(f.ends_at) < new Date(f.starts_at)) return "The end must be after the start.";
         if (!f.city.trim()) return "Set a city.";
+        if (f.organizer_url.trim() && !f.organizer_url.trim().startsWith("https://")) return "The organiser website must start with https://.";
+        const min = f.ticket_price_min.trim() === "" ? null : Number(f.ticket_price_min);
+        const max = f.ticket_price_max.trim() === "" ? null : Number(f.ticket_price_max);
+        if (min !== null && (!Number.isFinite(min) || min < 0)) return "The ticket price from must be 0 or more.";
+        if (max !== null && (!Number.isFinite(max) || max < 0)) return "The ticket price to must be 0 or more.";
+        if (min !== null && max !== null && max < min) return "The ticket price to must not be less than the price from.";
+        if ((min !== null || max !== null) && !f.ticket_currency.trim() && !COUNTRY_CURRENCIES[f.country.trim()]) return "Set a ticket currency for this price, or a country with a known currency.";
         return null;
     };
+
+    // Currency follows the event country: an entered currency wins,
+    // otherwise the country currency, otherwise nothing is stored.
+    const effectiveCurrency = (f: EventForm) =>
+        f.ticket_currency.trim().toUpperCase() || COUNTRY_CURRENCIES[f.country.trim()] || null;
 
     const createEvent = async () => {
         const err = validate(newForm);
@@ -618,6 +681,10 @@ export function AdminEvents() {
             is_free: newForm.is_free,
             is_presale: newForm.is_presale,
             organizer: newForm.organizer.trim() || null,
+            organizer_url: newForm.organizer_url.trim() || null,
+            ticket_price_min: newForm.ticket_price_min.trim() === "" ? null : Number(newForm.ticket_price_min),
+            ticket_price_max: newForm.ticket_price_max.trim() === "" ? null : Number(newForm.ticket_price_max),
+            ticket_currency: effectiveCurrency(newForm),
             lineup: newForm.lineup.trim() || null,
             category: newForm.category,
             status: "draft",
@@ -660,6 +727,10 @@ export function AdminEvents() {
                 is_free: f.is_free,
                 is_presale: f.is_presale,
                 organizer: f.organizer.trim() || null,
+                organizer_url: f.organizer_url.trim() || null,
+                ticket_price_min: f.ticket_price_min.trim() === "" ? null : Number(f.ticket_price_min),
+                ticket_price_max: f.ticket_price_max.trim() === "" ? null : Number(f.ticket_price_max),
+                ticket_currency: effectiveCurrency(f),
                 lineup: f.lineup.trim() || null,
                 category: f.category,
                 updated_at: new Date().toISOString(),
@@ -808,6 +879,10 @@ export function AdminEvents() {
                     <input value={f.organizer} onChange={(e) => set({ organizer: e.target.value })} className={inputCls} />
                 </div>
                 <div>
+                    <label className={labelCls}>Organizer website <span className="text-gray-500">(optional, official site only; sent to Google)</span></label>
+                    <input value={f.organizer_url} onChange={(e) => set({ organizer_url: e.target.value })} placeholder="https://…" className={`${inputCls} font-mono`} />
+                </div>
+                <div>
                     <label className={labelCls}>Lineup <span className="text-gray-500">(optional, comma-separated acts; sent to Google as the event performers)</span></label>
                     <input value={f.lineup} onChange={(e) => set({ lineup: e.target.value })} placeholder="e.g. DJ Tunez, Elaine, Zee Nxumalo" className={inputCls} />
                 </div>
@@ -848,6 +923,25 @@ export function AdminEvents() {
             <div>
                 <label className={labelCls}>Ticket URL <span className="text-gray-500">(optional, links the "Get tickets" button)</span></label>
                 <input value={f.ticket_url} onChange={(e) => set({ ticket_url: e.target.value })} placeholder="https://…" className={`${inputCls} font-mono`} />
+                <div className="grid sm:grid-cols-3 gap-4 mt-4">
+                    <div>
+                        <label className={labelCls}>Ticket price from <span className="text-gray-500">(optional, verified only; sent to Google)</span></label>
+                        <input type="number" min="0" value={f.ticket_price_min} onChange={(e) => set({ ticket_price_min: e.target.value })} placeholder="e.g. 399" className={inputCls} />
+                    </div>
+                    <div>
+                        <label className={labelCls}>Ticket price to <span className="text-gray-500">(optional, for a price range)</span></label>
+                        <input type="number" min="0" value={f.ticket_price_max} onChange={(e) => set({ ticket_price_max: e.target.value })} placeholder="e.g. 449" className={inputCls} />
+                    </div>
+                    <div>
+                        <label className={labelCls}>Ticket currency <span className="text-gray-500">(blank uses the event country's currency)</span></label>
+                        <select value={f.ticket_currency} onChange={(e) => set({ ticket_currency: e.target.value })} className={inputCls}>
+                            <option value="">Use country currency ({COUNTRY_CURRENCIES[f.country.trim()] ?? "unknown"})</option>
+                            {CURRENCIES.map((c) => (
+                                <option key={c} value={c}>{c}</option>
+                            ))}
+                        </select>
+                    </div>
+                </div>
                 <label className="mt-2 flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
                     <input type="checkbox" checked={f.is_free} onChange={(e) => set({ is_free: e.target.checked })} className="w-4 h-4 accent-green-600" />
                     Free entry <span className="text-gray-500">(shows a "Free entry" badge instead of a ticket button)</span>
