@@ -12,7 +12,7 @@ import { currencyForCountry, type CurrencyCode } from "@/../config/currency";
  */
 export function useDisplayCurrency(): CurrencyCode {
   const { user } = useAuth();
-  if (user) return user.currency;
+  if (user) return user.currency || "NGN";
   if (typeof document !== "undefined") {
     const match = document.cookie.match(/(?:^|;\s*)afropitch_country=([^;]*)/);
     if (match) return currencyForCountry(decodeURIComponent(match[1]));

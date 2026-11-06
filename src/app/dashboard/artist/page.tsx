@@ -735,7 +735,7 @@ export default function ArtistDashboard() {
                 <Input
                   id="top-up-amount"
                   type="number"
-                  placeholder={`Amount (${CURRENCIES[user.currency].symbol.trim()})`}
+                  placeholder={`Amount (${CURRENCIES[user.currency || "NGN"].symbol.trim()})`}
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                   className="bg-black/40 border-white/10 text-white"
@@ -756,7 +756,7 @@ export default function ArtistDashboard() {
               </div>
               <p className="text-[10px] text-center text-zinc-500 mt-2">Top-ups are for submissions and mixing. Refunds go straight to your bank account.</p>
               {user.currency !== "NGN" && (
-                <p className="text-[10px] text-center text-zinc-500 mt-1">Your card is charged in naira and your bank converts it; the amount above lands in your wallet in {CURRENCIES[user.currency].symbol.trim()}.</p>
+                <p className="text-[10px] text-center text-zinc-500 mt-1">Your card is charged in naira and your bank converts it; the amount above lands in your wallet in {CURRENCIES[user.currency || "NGN"].symbol.trim()}.</p>
               )}
             </div>
             <div className="pt-1">

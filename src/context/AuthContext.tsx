@@ -144,6 +144,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           withdrawable_balance: 0,
           earnings: 0,
           referral_balance: 0,
+          country: null,
+          currency: "NGN",
           created_at: session.user.created_at,
         });
       }
@@ -159,6 +161,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           withdrawable_balance: 0,
           earnings: 0,
           referral_balance: 0,
+          country: null,
+          currency: "NGN",
           created_at: session.user.created_at,
         });
       }
